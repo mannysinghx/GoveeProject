@@ -4,6 +4,8 @@ The app runs on Railway as **one** service, built from the root `Dockerfile`, wi
 
 On Railway the app is on the public internet, protected by its own sign-in. Read [Security](security.md) first. Keep a strong owner password.
 
+Current deployment: project `goveeproject`, service `@glm/server`, <https://glmserver-production.up.railway.app>.
+
 ## Service settings
 
 | Setting | Value | Why |
@@ -25,7 +27,7 @@ On Railway the app is on the public internet, protected by its own sign-in. Read
 | `GOVEE_API_KEY` | Your key | Set this yourself in the Railway dashboard |
 | `PORT` | `8787` | Matches the domain's target port |
 | `RAILWAY_RUN_UID` | `0` | Railway mounts volumes as root, so the image's `node` user could not write to `/data` |
-| `TRUST_PROXY` | Number of proxies in front of the app, currently `1` | Client addresses for login throttling. To check it, see below. |
+| `TRUST_PROXY` | `2` | Railway puts two proxies in front of the app, measured November 2026. Login throttling depends on this. To check it, see below. |
 | `COOKIE_SECURE` | `true` | Railway serves the app over HTTPS |
 | `ALLOWED_HOSTS` | Your Railway domain, plus any custom domain | Requests for any other host name are refused |
 
@@ -33,11 +35,11 @@ On Railway the app is on the public internet, protected by its own sign-in. Read
 
 ## First sign-in
 
-Setup requires a one-time code, because the site is public. Find `setupCodeForFirstRun` in the service's **Deploy Logs**. The code changes on every restart until the owner account exists.
+Set `GOVEE_API_KEY` first, because changing a variable restarts the app. Then find `setupCodeForFirstRun` in the service's **Deploy Logs**. Setup requires this one-time code because the site is public. The code changes on every restart until the owner account exists.
 
 ## Checking `TRUST_PROXY`
 
-Send a request with a forged `X-Forwarded-For` header, then look for `remoteAddress` in the Deploy Logs. It should show your real address, not the forged one and not an internal Railway address.
+Send one request normally and one with a forged `X-Forwarded-For` header, then look for `remoteAddress` in the Deploy Logs. Both should show your real address. If it shows a Railway address, the value is too low and all visitors share one login-throttling address. If it shows the forged address, the value is too high, and anyone could dodge throttling. Recheck if Railway changes its network.
 
 ## Backup
 
