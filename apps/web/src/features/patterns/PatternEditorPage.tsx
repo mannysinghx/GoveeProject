@@ -1,33 +1,59 @@
-import { ArrowLeft, Blend, Brush, Eraser, Redo2, Repeat, Save, Send, Trash2, Undo2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { isHexColor, type DeviceDto, type SegmentedColorCapability } from '@glm/shared';
-import { RunResults } from '../../components/status';
-import { Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
-import { useApplyDraft, useDevices, usePresets, useSavePreset } from '../../lib/queries';
-import { parseTarget, TargetOptions } from '../presets/ApplyPresetDialog';
 import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  Blend,
+  Brush,
+  Eraser,
+  FlipHorizontal2,
+  Redo2,
+  RefreshCw,
+  Repeat,
+  Save,
+  Send,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { isHexColor, type DeviceDto, type PatternStringSetting } from '@glm/shared';
+import { RunResults } from '../../components/status';
+import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
+import {
+  useApplyDraft,
+  useDevices,
+  useDiscover,
+  usePresets,
+  useRefreshDue,
+  useSavePreset,
+  useSettings,
+  useUpdateSettings,
+} from '../../lib/queries';
+import {
+  canvasCells,
   cellColor,
+  cellKey,
   clearPattern,
   emptyPattern,
   gradientFill,
+  moveString,
+  paintableDevices,
   paintCell,
   patternFromPreset,
   patternToActions,
   readableTextColor,
   repeatFill,
-  resizePattern,
+  resolveStrings,
   serpentineRows,
+  slowestStringCommands,
+  toSettings,
   type PatternState,
+  type PatternString,
 } from './pattern-model';
 
 const CELLS_PER_ROW = 9;
 /** Finer than the narrowest cell on a phone, so a stroke cannot jump over one. */
 const STROKE_SAMPLE_PX = 8;
-
-function segmentCapability(device: DeviceDto | undefined): SegmentedColorCapability | undefined {
-  return device?.capabilities.find((c) => c.kind === 'segmentedColor') as SegmentedColorCapability | undefined;
-}
 
 function ColorChoice({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
   return (
@@ -44,18 +70,118 @@ function ColorChoice({ label, value, onChange }: { label: string; value: string;
   );
 }
 
-/** The light string, drawn as it zigzags. Drag across it, or use the keyboard, to paint. */
-function StringCanvas({
+/** Which strings are shown, in what order, and which way each one runs. */
+function StringArrangement({
+  strings,
+  onChange,
+  notPaintable,
+}: {
+  strings: PatternString[];
+  onChange: (next: PatternString[]) => void;
+  notPaintable: DeviceDto[];
+}) {
+  const discover = useDiscover();
+  const update = (deviceId: string, change: Partial<PatternString>) =>
+    onChange(strings.map((s) => (s.deviceId === deviceId ? { ...s, ...change } : s)));
+  const flip = (string: PatternString) =>
+    update(string.deviceId, { reversed: !string.reversed, segments: [...string.segments].reverse() });
+
+  return (
+    <SectionCard
+      title={`${strings.length} light string${strings.length === 1 ? '' : 's'} found`}
+      description="Put them in the order they run on your house. Flip a string if it starts from the other end."
+      action={
+        <Button
+          size="sm"
+          icon={<RefreshCw className="size-4" aria-hidden />}
+          busy={discover.isPending}
+          onClick={() => discover.mutate()}
+        >
+          Check for lights
+        </Button>
+      }
+    >
+      <ol className="space-y-2">
+        {strings.map((string, index) => (
+          <li key={string.deviceId} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-2.5">
+            <span className="w-5 text-center text-sm text-ink-400 tabular-nums">{index + 1}</span>
+            {/* Takes its own line on a phone, so a long name is never squeezed by the controls. */}
+            <label className="flex min-h-9 min-w-0 flex-[1_1_calc(100%-2rem)] items-center gap-2 text-sm sm:flex-1">
+              <input
+                type="checkbox"
+                className="size-4"
+                aria-label={`Include ${string.name}`}
+                checked={string.included}
+                onChange={(e) => update(string.deviceId, { included: e.target.checked })}
+              />
+              <span className="min-w-0">
+                <span className="block font-medium break-words">{string.name}</span>
+                <span className="block text-xs text-ink-400">{string.segments.length} segments</span>
+              </span>
+            </label>
+            {string.connectivity === 'offline' ? <Badge tone="bad">Offline</Badge> : null}
+            {string.reversed ? <Badge tone="info">Flipped</Badge> : null}
+            <div className="ml-auto flex gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Move ${string.name} earlier`}
+                disabled={index === 0}
+                icon={<ArrowUp className="size-4" aria-hidden />}
+                onClick={() => onChange(moveString(strings, string.deviceId, -1))}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Move ${string.name} later`}
+                disabled={index === strings.length - 1}
+                icon={<ArrowDown className="size-4" aria-hidden />}
+                onClick={() => onChange(moveString(strings, string.deviceId, 1))}
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-pressed={string.reversed}
+                aria-label={`Flip ${string.name}`}
+                icon={<FlipHorizontal2 className="size-4" aria-hidden />}
+                onClick={() => flip(string)}
+              />
+            </div>
+          </li>
+        ))}
+      </ol>
+      {notPaintable.length > 0 ? (
+        <p className="mt-3 text-xs text-ink-400">
+          Not shown: {notPaintable.map((d) => d.name).join(', ')}. Groups and lights without segment control cannot be
+          painted. A group's lights appear here individually.
+        </p>
+      ) : null}
+      {discover.isError ? (
+        <div className="mt-3">
+          <ErrorNotice error={discover.error} />
+        </div>
+      ) : null}
+      {discover.isSuccess ? (
+        <p className="mt-3 text-xs text-ink-400" role="status">
+          Light list updated from Govee.
+        </p>
+      ) : null}
+    </SectionCard>
+  );
+}
+
+/** Every string in series. Drag across them, including from one string to the next. */
+function SeriesCanvas({
   pattern,
-  rows,
+  strings,
   onStrokeStart,
   onPaint,
   onStrokeEnd,
 }: {
   pattern: PatternState;
-  rows: number[][];
+  strings: PatternString[];
   onStrokeStart: () => void;
-  onPaint: (index: number) => void;
+  onPaint: (key: string) => void;
   onStrokeEnd: () => void;
 }) {
   const painting = useRef(false);
@@ -76,25 +202,26 @@ function StringCanvas({
     };
   }, [onStrokeEnd]);
 
-  const segmentAtPoint = (x: number, y: number, fallback: EventTarget | null) => {
+  const cellAtPoint = (x: number, y: number, fallback: EventTarget | null) => {
     const target = document.elementFromPoint?.(x, y) ?? fallback;
-    const value = (target as HTMLElement | null)?.closest?.('[data-segment]')?.getAttribute('data-segment');
-    return value === null || value === undefined ? null : Number(value);
+    return (target as HTMLElement | null)?.closest?.('[data-cell]')?.getAttribute('data-cell') ?? null;
   };
+
+  const shown = strings.filter((s) => s.included);
 
   return (
     <div
       role="group"
-      aria-label="Light string. Each cell is one segment."
-      className="touch-none select-none space-y-1"
+      aria-label="Your light strings in series. Each cell is one segment."
+      className="space-y-4 select-none"
       onPointerDown={(event: ReactPointerEvent) => {
-        const index = segmentAtPoint(event.clientX, event.clientY, event.target);
-        if (index === null) return;
+        const key = cellAtPoint(event.clientX, event.clientY, event.target);
+        if (key === null) return;
         event.preventDefault();
         painting.current = true;
         lastPoint.current = { x: event.clientX, y: event.clientY };
         onStrokeStart();
-        onPaint(index);
+        onPaint(key);
       }}
       onPointerMove={(event: ReactPointerEvent) => {
         if (!painting.current) return;
@@ -106,75 +233,90 @@ function StringCanvas({
         for (let step = 1; step <= steps; step++) {
           const x = from.x + ((event.clientX - from.x) * step) / steps;
           const y = from.y + ((event.clientY - from.y) * step) / steps;
-          const index = segmentAtPoint(x, y, event.target);
-          if (index !== null) onPaint(index);
+          const key = cellAtPoint(x, y, event.target);
+          if (key !== null) onPaint(key);
         }
         lastPoint.current = { x: event.clientX, y: event.clientY };
       }}
     >
-      {rows.map((row, rowIndex) => {
-        const reversed = rowIndex % 2 === 1;
-        const offset = reversed ? CELLS_PER_ROW - row.length : 0;
-        return (
-          <div key={rowIndex}>
-            {rowIndex > 0 ? (
-              // Where the string turns: the right end after a left-to-right row, then the left.
-              <div className={`mb-1 flex ${reversed ? 'justify-end' : 'justify-start'}`} aria-hidden>
-                <div className="h-3 w-[calc((100%-2rem)/9)] border-x-2 border-dashed border-ink-600" />
-              </div>
-            ) : null}
-            <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${CELLS_PER_ROW}, minmax(0, 1fr))` }}>
-              {row.map((index, position) => {
-                const color = cellColor(pattern, index);
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    data-segment={index}
-                    aria-label={`Segment ${index}, ${color}`}
-                    // A pointer paints on pointerdown. detail is 0 only for Enter or Space.
-                    onClick={(event) => {
-                      if (event.detail === 0) {
-                        onStrokeStart();
-                        onPaint(index);
-                        onStrokeEnd();
-                      }
-                    }}
-                    className="h-14 min-w-0 rounded border border-ink-600 text-[10px] tabular-nums sm:text-xs"
-                    style={{
-                      backgroundColor: color,
-                      color: readableTextColor(color),
-                      gridColumnStart: offset + position + 1,
-                    }}
-                  >
-                    {index}
-                  </button>
-                );
-              })}
-            </div>
+      {shown.map((string, stringIndex) => (
+        <div key={string.deviceId}>
+          <p className="mb-1.5 text-sm font-medium text-ink-200">
+            {stringIndex + 1}. {string.name}
+            {string.connectivity === 'offline' ? <span className="ml-2 text-xs font-normal text-bad">offline</span> : null}
+          </p>
+          <div className="space-y-1">
+            {serpentineRows(string.segments.length, CELLS_PER_ROW).map((row, rowIndex) => {
+              const reversed = rowIndex % 2 === 1;
+              const offset = reversed ? CELLS_PER_ROW - row.length : 0;
+              return (
+                <div key={rowIndex}>
+                  {rowIndex > 0 ? (
+                    // Where the string turns: the right end after a left-to-right row, then the left.
+                    <div className={`mb-1 flex ${reversed ? 'justify-end' : 'justify-start'}`} aria-hidden>
+                      <div className="h-3 w-[calc((100%-2rem)/9)] border-x-2 border-dashed border-ink-600" />
+                    </div>
+                  ) : null}
+                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${CELLS_PER_ROW}, minmax(0, 1fr))` }}>
+                    {row.map((position, column) => {
+                      const segment = string.segments[position] as number;
+                      const key = cellKey(string.deviceId, segment);
+                      const color = cellColor(pattern, key);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          data-cell={key}
+                          aria-label={`${string.name} segment ${segment}, ${color}`}
+                          // A pointer paints on pointerdown. detail is 0 only for Enter or Space.
+                          onClick={(event) => {
+                            if (event.detail === 0) {
+                              onStrokeStart();
+                              onPaint(key);
+                              onStrokeEnd();
+                            }
+                          }}
+                          // Only the cells capture touch, so labels and gaps still scroll the page on a phone.
+                          className="h-12 min-w-0 touch-none rounded border border-ink-600 text-[10px] tabular-nums sm:text-xs"
+                          style={{
+                            backgroundColor: color,
+                            color: readableTextColor(color),
+                            gridColumnStart: offset + column + 1,
+                          }}
+                        >
+                          {segment}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 }
 
-function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; presetId?: string | undefined; initialDeviceId: string | null }) {
+function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string | undefined }) {
   const presets = usePresets();
+  const settings = useSettings();
+  const updateSettings = useUpdateSettings();
   const save = useSavePreset();
   const apply = useApplyDraft();
   const navigate = useNavigate();
 
-  const existing = presets.data?.find((p) => p.id === presetId);
-  const [layoutId, setLayoutId] = useState(
-    devices.find((d) => d.id === initialDeviceId)?.id ?? devices[0]?.id ?? '',
+  const [arrangement, setArrangement] = useState<PatternStringSetting[] | null>(null);
+  const strings = useMemo(
+    () => resolveStrings(devices, arrangement ?? settings.data?.patternStrings ?? []),
+    [devices, arrangement, settings.data?.patternStrings],
   );
-  const layout = devices.find((d) => d.id === layoutId);
-  const capability = segmentCapability(layout);
-  const segmentCount = capability?.segments.length ?? 0;
-  const rows = useMemo(() => serpentineRows(segmentCount, CELLS_PER_ROW), [segmentCount]);
+  const cells = useMemo(() => canvasCells(strings), [strings]);
+  const notPaintable = devices.filter((d) => d.discoveryStatus === 'present' && paintableDevices([d]).length === 0);
 
-  const [pattern, setPattern] = useState<PatternState>(() => emptyPattern(segmentCount));
+  const existing = presets.data?.find((p) => p.id === presetId);
+  const [pattern, setPattern] = useState<PatternState>(() => emptyPattern());
   const [undoStack, setUndoStack] = useState<PatternState[]>([]);
   const [redoStack, setRedoStack] = useState<PatternState[]>([]);
   const [fill, setFill] = useState('#ff0000');
@@ -185,12 +327,12 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
   const [brightness, setBrightness] = useState(100);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [target, setTarget] = useState(initialDeviceId ? `device:${initialDeviceId}` : '');
   const [loadedId, setLoadedId] = useState<string | null>(null);
+  const [notShown, setNotShown] = useState<string[]>([]);
 
-  // Open a saved pattern once, when it arrives. The editor is the owner of the state after that.
-  if (existing && loadedId !== existing.id && segmentCount > 0) {
-    const loaded = patternFromPreset(existing, segmentCount);
+  // Open a saved pattern once, when both it and the arrangement have arrived.
+  if (existing && loadedId !== existing.id && settings.data && strings.length > 0) {
+    const loaded = patternFromPreset(existing, strings);
     setLoadedId(existing.id);
     setPattern(loaded.state);
     setTurnOn(loaded.turnOn);
@@ -198,10 +340,14 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
     if (loaded.brightness !== null) setBrightness(loaded.brightness);
     setName(existing.name);
     setDescription(existing.description);
+    setNotShown(loaded.notShown);
   }
 
-  // A different light string can have a different number of segments.
-  if (pattern.cells.length !== segmentCount) setPattern(resizePattern(pattern, segmentCount));
+  const arrange = (next: PatternString[]) => {
+    const value = toSettings(next);
+    setArrangement(value);
+    updateSettings.mutate({ patternStrings: value });
+  };
 
   const strokeStart = useRef<PatternState | null>(null);
   const latest = useRef(pattern);
@@ -236,51 +382,37 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
   };
 
   const actions = useMemo(
-    () =>
-      patternToActions(pattern, {
-        turnOn,
-        brightness: useBrightness ? brightness : null,
-        maxPerCommand: capability?.maxSelect ?? segmentCount,
-      }),
-    [pattern, turnOn, useBrightness, brightness, capability, segmentCount],
+    () => patternToActions(pattern, strings, { turnOn, brightness: useBrightness ? brightness : null }),
+    [pattern, strings, turnOn, useBrightness, brightness],
   );
-  const parsedTarget = parseTarget(target);
-  const valid = isHexColor(fill) && isHexColor(pattern.background) && segmentCount > 0;
+  const seconds = slowestStringCommands(actions);
+  const shownCount = strings.filter((s) => s.included).length;
+  const valid = isHexColor(fill) && isHexColor(pattern.background) && cells.length > 0;
 
   const submitSave = () => {
-    const steps = actions.map((action) => ({ deviceId: null, action }));
     if (existing) {
-      save.mutate(
-        { id: existing.id, update: { name, description, actions: steps } },
-        { onSuccess: () => navigate('/presets') },
-      );
+      save.mutate({ id: existing.id, update: { name, description, actions } }, { onSuccess: () => navigate('/presets') });
     } else {
-      save.mutate({ create: { name, description, actions: steps } }, { onSuccess: () => navigate('/presets') });
+      save.mutate({ create: { name, description, actions } }, { onSuccess: () => navigate('/presets') });
     }
   };
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
       <div className="min-w-0 space-y-5">
+        <StringArrangement strings={strings} onChange={arrange} notPaintable={notPaintable} />
+        {updateSettings.isError ? <ErrorNotice error={updateSettings.error} title="The arrangement was not saved" /> : null}
+        {notShown.length > 0 ? (
+          <Notice tone="warn" title="This pattern also paints lights not shown here">
+            {notShown.join(', ')}. Saving will remove them from the pattern. Include them above first to keep them.
+          </Notice>
+        ) : null}
+
         <SectionCard
           title="Paint your lights"
-          description={`${layout?.name ?? 'This string'} reports ${segmentCount} segments. One cell is one segment, which may cover several bulbs.`}
+          description={`${cells.length} segments across ${shownCount} string${shownCount === 1 ? '' : 's'}. One cell is one segment, which may cover several bulbs.`}
         >
           <div className="space-y-4">
-            {devices.length > 1 ? (
-              <Field label="Light string">
-                {(props) => (
-                  <select {...props} className={inputClass} value={layoutId} onChange={(e) => setLayoutId(e.target.value)}>
-                    {devices.map((device) => (
-                      <option key={device.id} value={device.id}>
-                        {device.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </Field>
-            ) : null}
-
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <ColorChoice
                 label="Background"
@@ -320,35 +452,41 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
               </Button>
             </div>
 
-            <StringCanvas
-              pattern={pattern}
-              rows={rows}
-              onStrokeStart={() => {
-                strokeStart.current = latest.current;
-              }}
-              onPaint={(index) => {
-                const next = paintCell(latest.current, index, tool === 'paint' ? fill : null);
-                latest.current = next;
-                setPattern(next);
-              }}
-              onStrokeEnd={() => {
-                if (strokeStart.current) commit(strokeStart.current, latest.current);
-                strokeStart.current = null;
-              }}
-            />
+            {cells.length === 0 ? (
+              <p className="text-sm text-ink-300">Include at least one string above to start painting.</p>
+            ) : (
+              <SeriesCanvas
+                pattern={pattern}
+                strings={strings}
+                onStrokeStart={() => {
+                  strokeStart.current = latest.current;
+                }}
+                onPaint={(key) => {
+                  const next = paintCell(latest.current, key, tool === 'paint' ? fill : null);
+                  latest.current = next;
+                  setPattern(next);
+                }}
+                onStrokeEnd={() => {
+                  if (strokeStart.current) commit(strokeStart.current, latest.current);
+                  strokeStart.current = null;
+                }}
+              />
+            )}
 
             <div className="flex flex-wrap items-end gap-2 border-t border-ink-700/70 pt-4">
               <Button
                 size="sm"
                 icon={<Blend className="size-4" aria-hidden />}
-                onClick={() => change((state) => gradientFill(state, state.background, fill))}
+                disabled={cells.length === 0}
+                onClick={() => change((state) => gradientFill(state, cells, state.background, fill))}
               >
                 Gradient
               </Button>
               <Button
                 size="sm"
                 icon={<Repeat className="size-4" aria-hidden />}
-                onClick={() => change((state) => repeatFill(state, [fill, state.background], runLength))}
+                disabled={cells.length === 0}
+                onClick={() => change((state) => repeatFill(state, cells, [fill, state.background], runLength))}
               >
                 Repeat pattern
               </Button>
@@ -359,7 +497,7 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
                   aria-label="Segments in each run of the repeat pattern"
                   className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
                   min={1}
-                  max={Math.max(1, segmentCount)}
+                  max={Math.max(1, cells.length)}
                   value={runLength}
                   onChange={(e) => setRunLength(Number(e.target.value) || 1)}
                 />
@@ -367,8 +505,8 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
               </label>
             </div>
             <p className="text-xs text-ink-400">
-              Gradient blends from the background to the fill color. Repeat alternates them, such as red and green for
-              Christmas.
+              Both tools run along all the strings shown, carrying on from one to the next. Gradient blends from the
+              background to the fill color. Repeat alternates them, such as red and green for Christmas.
             </p>
           </div>
         </SectionCard>
@@ -383,14 +521,6 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
       <div className="space-y-5">
         <SectionCard title="Try it on the lights">
           <div className="space-y-4">
-            <Field label="Send to">
-              {(props) => (
-                <select {...props} className={inputClass} value={target} onChange={(e) => setTarget(e.target.value)}>
-                  <option value="">Choose a device or group</option>
-                  <TargetOptions />
-                </select>
-              )}
-            </Field>
             <label className="flex min-h-9 items-center gap-2 text-sm">
               <input type="checkbox" className="size-4" checked={turnOn} onChange={(e) => setTurnOn(e.target.checked)} />
               Turn the lights on first
@@ -407,23 +537,26 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
               </Field>
             ) : null}
             <p className="text-sm text-ink-300">
-              This takes {actions.length} command{actions.length === 1 ? '' : 's'} per light, about {actions.length} second
-              {actions.length === 1 ? '' : 's'}. The lights change a section at a time.
-              {actions.length > 10 ? ' Fewer colors means a quicker change.' : ''}
+              This takes about {seconds} second{seconds === 1 ? '' : 's'}: {actions.length} command
+              {actions.length === 1 ? '' : 's'} across {shownCount} string{shownCount === 1 ? '' : 's'}. Each string changes a
+              section at a time, and they are not in perfect sync.
+              {seconds > 10 ? ' Fewer colors means a quicker change.' : ''}
             </p>
             <Button
               variant="primary"
               className="w-full"
               icon={<Send className="size-4" aria-hidden />}
               busy={apply.isPending}
-              disabled={!parsedTarget || !valid}
-              onClick={() => {
-                if (parsedTarget) apply.mutate({ name: name || 'Pattern preview', target: parsedTarget, actions });
-              }}
+              disabled={!valid}
+              onClick={() => apply.mutate({ name: name || 'Pattern preview', actions })}
             >
-              Send to lights
+              Send to {shownCount} string{shownCount === 1 ? '' : 's'}
             </Button>
-            {apply.isPending ? <p className="text-sm text-ink-300" role="status">Sending a section at a time...</p> : null}
+            {apply.isPending ? (
+              <p className="text-sm text-ink-300" role="status">
+                Sending a section at a time...
+              </p>
+            ) : null}
             {apply.isError ? <ErrorNotice error={apply.error} /> : null}
             {apply.data ? <RunResults run={apply.data} /> : null}
             {apply.data ? (
@@ -434,7 +567,10 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
           </div>
         </SectionCard>
 
-        <SectionCard title="Save this pattern" description="Saved as an app preset, so you can apply it to a group or schedule it.">
+        <SectionCard
+          title="Save this pattern"
+          description="Saved as an app preset that paints these strings. To schedule it, make a group of the same strings and target that."
+        >
           <form
             className="space-y-4"
             onSubmit={(event) => {
@@ -465,12 +601,19 @@ function Editor({ devices, presetId, initialDeviceId }: { devices: DeviceDto[]; 
 
 export function PatternEditorPage() {
   const { presetId } = useParams();
-  const [params] = useSearchParams();
   const devices = useDevices();
+  const refreshDue = useRefreshDue();
 
-  const capable = (devices.data ?? []).filter(
-    (d) => d.discoveryStatus === 'present' && segmentCapability(d) !== undefined,
-  );
+  // So an offline string is flagged from current information, not last week's.
+  const hasDevices = (devices.data?.length ?? 0) > 0;
+  useEffect(() => {
+    if (hasDevices) refreshDue.mutate();
+    // Once when devices first appear.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasDevices]);
+
+  const list = devices.data ?? [];
+  const capable = paintableDevices(list);
 
   return (
     <>
@@ -480,19 +623,19 @@ export function PatternEditorPage() {
       </Link>
       <PageHeader
         title={presetId ? 'Edit pattern' : 'Paint a pattern'}
-        description="Choose colors for each section of your lights, try them out, and save the result."
+        description="All your light strings, one after another. Paint across them, try it out, and save the result."
       />
-      {devices.isPending ? <Loading label="Loading your lights" /> : null}
+      {devices.isPending ? <Loading label="Looking for your lights" /> : null}
       {devices.isError ? <ErrorNotice error={devices.error} /> : null}
       {devices.data && capable.length === 0 ? (
         <Card className="p-5">
           <EmptyState title="No light here reports segment control">
             Patterns need per-segment color from the Govee API. Groups made in the Govee Home app do not report it, but their
-            individual lights might.
+            individual lights might. Try refreshing the device list on the dashboard.
           </EmptyState>
         </Card>
       ) : null}
-      {capable.length > 0 ? <Editor devices={capable} presetId={presetId} initialDeviceId={params.get('device')} /> : null}
+      {capable.length > 0 ? <Editor devices={list} presetId={presetId} /> : null}
     </>
   );
 }

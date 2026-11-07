@@ -12,8 +12,8 @@ Current state of the project, so anyone can pick it up without the original conv
 
 | Piece | How it was checked |
 |---|---|
-| Backend, frontend, shared code | `npm test`: 337 tests (server 262, web 71, shared 4) |
-| Pattern editor | Real browser against the mock, production build: drag painting, repeat, send to a mixed group, phone width. Not yet sent to real lights. |
+| Backend, frontend, shared code | `npm test`: 352 tests (server 266, web 82, shared 4) |
+| Pattern editor, all strings in series | Real browser against the mock, production build: drag painting across strings, repeat, flip surviving a reload, per-string sending, phone width. Not yet sent to real lights. |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |

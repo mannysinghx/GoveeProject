@@ -190,10 +190,11 @@ export const presetActionInputSchema = z.object({
 export type PresetActionInput = z.infer<typeof presetActionInputSchema>;
 
 const presetDescriptionSchema = z.string().trim().max(500);
+// Large enough for a gradient across many strings, at one step per segment.
 const presetActionsSchema = z
   .array(presetActionInputSchema)
   .min(1, 'Add at least one action')
-  .max(100, 'A preset can hold at most 100 actions');
+  .max(500, 'A preset can hold at most 500 actions');
 
 export const presetCreateSchema = z.object({
   name: nameSchema,
@@ -219,8 +220,8 @@ export type PresetApplyRequest = z.infer<typeof presetApplyRequestSchema>;
 /** Tries out unsaved steps, such as a pattern in the editor. Nothing is stored as a preset. */
 export const presetDraftApplySchema = z.object({
   name: nameSchema.default('Pattern preview'),
-  target: targetSchema,
-  actions: z.array(deviceActionSchema).min(1).max(100),
+  target: targetSchema.optional(),
+  actions: presetActionsSchema,
 });
 export type PresetDraftApply = z.infer<typeof presetDraftApplySchema>;
 
@@ -366,6 +367,13 @@ export const activityQuerySchema = z.object({
 });
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;
 
+export const patternStringSettingSchema = z.object({
+  deviceId: z.string().min(1).max(64),
+  included: z.boolean(),
+  reversed: z.boolean(),
+});
+export type PatternStringSetting = z.infer<typeof patternStringSettingSchema>;
+
 export const settingsSchema = z.object({
   defaultTimeZone: timeZoneSchema,
   /** How often an open dashboard asks for a status refresh. */
@@ -378,6 +386,8 @@ export const settingsSchema = z.object({
   /** Optional defaults for sunrise and sunset schedules. Entered by hand. */
   latitude: z.number().min(-90).max(90).nullable(),
   longitude: z.number().min(-180).max(180).nullable(),
+  /** How the owner's light strings are arranged in the pattern editor, in order. */
+  patternStrings: z.array(patternStringSettingSchema).max(200),
 });
 export type AppSettings = z.infer<typeof settingsSchema>;
 
@@ -394,4 +404,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sliderIntervalMs: 1000,
   latitude: null,
   longitude: null,
+  patternStrings: [],
 };

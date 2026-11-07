@@ -13,6 +13,7 @@ import type {
   GroupCreate,
   GroupDto,
   GroupUpdate,
+  PresetActionInput,
   PresetCreate,
   PresetDto,
   PresetUpdate,
@@ -265,7 +266,7 @@ export function useApplyPreset() {
 export function useApplyDraft() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; target: Target; actions: DeviceAction[] }) =>
+    mutationFn: (body: { name: string; target?: Target; actions: PresetActionInput[] }) =>
       api<RunResultDto>('/presets/apply-draft', { method: 'POST', body }),
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.devices });

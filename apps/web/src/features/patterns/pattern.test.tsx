@@ -1,125 +1,237 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DeviceAction, PresetDto } from '@glm/shared';
+import { DEFAULT_SETTINGS, type DeviceDetailDto, type PresetActionInput, type PresetDto } from '@glm/shared';
 import { capabilities, device, mockApi, renderApp } from '../../test/fixtures';
 import { PatternEditorPage } from './PatternEditorPage';
 import {
+  canvasCells,
   cellColor,
+  cellKey,
   clearPattern,
   emptyPattern,
   gradientFill,
   isPatternPreset,
+  moveString,
+  paintableDevices,
   paintCell,
   patternFromPreset,
   patternToActions,
   repeatFill,
+  resolveStrings,
   serpentineRows,
+  slowestStringCommands,
+  toSettings,
 } from './pattern-model';
 
 afterEach(() => vi.unstubAllGlobals());
 
-const options = { turnOn: false, brightness: null, maxPerCommand: 27 };
-const colorSteps = (actions: DeviceAction[]) => actions.filter((a) => a.type === 'segmentColor');
+const string27 = (id: string, name: string, overrides: Partial<DeviceDetailDto> = {}) =>
+  device({
+    id,
+    name,
+    capabilities: [
+      capabilities.power,
+      { ...capabilities.segments, segments: Array.from({ length: 27 }, (_, i) => i), maxSelect: 27 },
+    ],
+    ...overrides,
+  });
+const left = string27('left', 'Outdoor Left');
+const center = string27('center', 'Outdoor Center', { connectivity: 'offline' });
+const right = string27('right', 'Outdoor Right');
+const group = device({ id: 'group', name: 'Christmas', sku: 'SameModeGroup', isGoveeGroup: true, capabilities: [capabilities.power] });
+const house = [right, group, center, left];
+const options = { turnOn: false, brightness: null };
+const colorSteps = (actions: PresetActionInput[]) => actions.filter((a) => a.action.type === 'segmentColor');
+
+describe('recognising the strings', () => {
+  it('finds everything paintable, and leaves out groups and missing lights', () => {
+    const gone = string27('gone', 'Gone', { discoveryStatus: 'missing' });
+    expect(paintableDevices([...house, gone]).map((d) => d.id).sort()).toEqual(['center', 'left', 'right']);
+  });
+
+  it('guesses left, center, right, then alphabetical, until arranged', () => {
+    const others = [string27('z', 'Zebra'), string27('a', 'Apple')];
+    expect(resolveStrings([...others, ...house], []).map((s) => s.name)).toEqual([
+      'Outdoor Left',
+      'Outdoor Center',
+      'Outdoor Right',
+      'Apple',
+      'Zebra',
+    ]);
+  });
+
+  it('keeps the saved order, with a new light joining at the end and a removed one dropping out', () => {
+    const saved = [
+      { deviceId: 'right', included: true, reversed: false },
+      { deviceId: 'removed', included: true, reversed: false },
+      { deviceId: 'left', included: false, reversed: true },
+    ];
+    const strings = resolveStrings(house, saved);
+    expect(strings.map((s) => s.deviceId)).toEqual(['right', 'left', 'center']);
+    expect(strings[1]).toMatchObject({ included: false, reversed: true });
+    expect(strings[1]?.segments[0]).toBe(26);
+    expect(strings[2]).toMatchObject({ included: true, reversed: false });
+  });
+
+  it('moves strings, stopping at the ends, and round trips the arrangement', () => {
+    const strings = resolveStrings(house, []);
+    const moved = moveString(strings, 'center', -1);
+    expect(moved.map((s) => s.deviceId)).toEqual(['center', 'left', 'right']);
+    expect(moveString(moved, 'center', -1)).toBe(moved);
+    expect(resolveStrings(house, toSettings(moved)).map((s) => s.deviceId)).toEqual(['center', 'left', 'right']);
+  });
+
+  it('lays out every included string in series', () => {
+    const strings = resolveStrings(house, [
+      { deviceId: 'left', included: true, reversed: false },
+      { deviceId: 'center', included: false, reversed: false },
+      { deviceId: 'right', included: true, reversed: true },
+    ]);
+    const cells = canvasCells(strings);
+    expect(cells).toHaveLength(54);
+    expect(cells[0]).toMatchObject({ deviceId: 'left', segment: 0 });
+    expect(cells[26]).toMatchObject({ deviceId: 'left', segment: 26 });
+    expect(cells[27]).toMatchObject({ deviceId: 'right', segment: 26 });
+    expect(cells[53]).toMatchObject({ deviceId: 'right', segment: 0 });
+  });
+});
 
 describe('pattern model', () => {
-  it('shows the background through unpainted cells, and through erased ones', () => {
-    let state = emptyPattern(3, '#ffffff');
-    state = paintCell(state, 1, '#ff0000');
-    expect([0, 1, 2].map((i) => cellColor(state, i))).toEqual(['#ffffff', '#ff0000', '#ffffff']);
+  const strings = resolveStrings(house, []);
+  const cells = canvasCells(strings);
+
+  it('shows the background through unpainted and erased cells', () => {
+    const key = cellKey('left', 1);
+    let state = paintCell(emptyPattern('#ffffff'), key, '#ff0000');
+    expect(cellColor(state, key)).toBe('#ff0000');
+    expect(cellColor(state, cellKey('left', 0))).toBe('#ffffff');
     state = { ...state, background: '#000000' };
-    expect(cellColor(state, 0)).toBe('#000000');
-    expect(cellColor(state, 1)).toBe('#ff0000');
-    state = paintCell(state, 1, null);
-    expect(cellColor(state, 1)).toBe('#000000');
+    expect(cellColor(state, cellKey('left', 0))).toBe('#000000');
+    expect(cellColor(state, key)).toBe('#ff0000');
+    state = paintCell(state, key, null);
+    expect(cellColor(state, key)).toBe('#000000');
   });
 
-  it('sends one command per color rather than one per segment', () => {
-    let state = emptyPattern(27, '#ffffff');
-    state = paintCell(paintCell(state, 3, '#ff0000'), 9, '#ff0000');
-    const steps = colorSteps(patternToActions(state, options));
-    expect(steps).toHaveLength(2);
-    expect(steps[0]).toMatchObject({ hex: '#ffffff' });
-    expect(steps[1]).toEqual({ type: 'segmentColor', hex: '#ff0000', segments: [3, 9] });
-  });
-
-  it('covers every segment exactly once', () => {
-    const state = repeatFill(emptyPattern(27), ['#ff0000', '#00ff00'], 3);
-    const covered = colorSteps(patternToActions(state, options)).flatMap((a) =>
-      a.type === 'segmentColor' ? a.segments : [],
+  it('keeps paint with its string when strings are reordered or flipped', () => {
+    const key = cellKey('right', 5);
+    const state = paintCell(emptyPattern(), key, '#ff0000');
+    const rearranged = resolveStrings(house, [{ deviceId: 'right', included: true, reversed: true }]);
+    const painted = patternToActions(state, rearranged, options).find(
+      (a) => a.deviceId === 'right' && a.action.type === 'segmentColor' && a.action.hex === '#ff0000',
     );
-    expect(covered.sort((a, b) => a - b)).toEqual(Array.from({ length: 27 }, (_, i) => i));
+    expect(painted?.action).toMatchObject({ segments: [5] });
   });
 
-  it('splits a command when the device limits how many segments one can name', () => {
-    const steps = colorSteps(patternToActions(emptyPattern(27), { ...options, maxPerCommand: 10 }));
-    expect(steps.map((a) => (a.type === 'segmentColor' ? a.segments.length : 0))).toEqual([10, 10, 7]);
+  it('sends each string only its own segments, in one command per color', () => {
+    let state = emptyPattern('#ffffff');
+    state = paintCell(paintCell(state, cellKey('center', 3), '#ff0000'), cellKey('center', 9), '#ff0000');
+    const actions = patternToActions(state, strings, options);
+    expect(actions.filter((a) => a.deviceId === 'left')).toHaveLength(1);
+    const middle = actions.filter((a) => a.deviceId === 'center');
+    expect(middle).toHaveLength(2);
+    expect(middle[1]?.action).toEqual({ type: 'segmentColor', hex: '#ff0000', segments: [3, 9] });
+    expect(slowestStringCommands(actions)).toBe(2);
   });
 
-  it('turns on and sets brightness before any color', () => {
-    const actions = patternToActions(emptyPattern(3), { turnOn: true, brightness: 40, maxPerCommand: 3 });
-    expect(actions.map((a) => a.type)).toEqual(['power', 'brightness', 'segmentColor']);
+  it('covers every segment of every string exactly once', () => {
+    const state = repeatFill(emptyPattern(), cells, ['#ff0000', '#00ff00'], 2);
+    for (const id of ['left', 'center', 'right']) {
+      const covered = colorSteps(patternToActions(state, strings, options))
+        .filter((a) => a.deviceId === id)
+        .flatMap((a) => (a.action.type === 'segmentColor' ? a.action.segments : []));
+      expect(covered.sort((a, b) => a - b)).toEqual(Array.from({ length: 27 }, (_, i) => i));
+    }
   });
 
-  it('repeats runs of colors', () => {
-    const state = repeatFill(emptyPattern(6), ['#ff0000', '#00ff00'], 2);
-    expect(state.cells).toEqual(['#ff0000', '#ff0000', '#00ff00', '#00ff00', '#ff0000', '#ff0000']);
+  it('carries a repeat and a gradient on from one string to the next', () => {
+    const repeated = repeatFill(emptyPattern(), cells, ['#ff0000', '#00ff00'], 2);
+    // Segment 26 and the next string's segment 0 fall in the same run of two.
+    expect(cellColor(repeated, cellKey('left', 26))).toBe('#00ff00');
+    expect(cellColor(repeated, cellKey('center', 0))).toBe('#00ff00');
+    expect(cellColor(repeated, cellKey('center', 1))).toBe('#ff0000');
+    const blended = gradientFill(emptyPattern(), cells, '#000000', '#ffffff');
+    expect(cellColor(blended, cellKey('left', 0))).toBe('#000000');
+    expect(cellColor(blended, cellKey('right', 26))).toBe('#ffffff');
+    expect(cellColor(blended, cellKey('center', 13))).toBe('#808080');
   });
 
-  it('blends a gradient from end to end', () => {
-    const state = gradientFill(emptyPattern(3), '#000000', '#ffffff');
-    expect(state.cells).toEqual(['#000000', '#808080', '#ffffff']);
+  it('splits a command when a device limits how many segments it can name', () => {
+    const limited = strings.map((s) => ({ ...s, maxSelect: 10 }));
+    const steps = patternToActions(emptyPattern(), limited, options).filter((a) => a.deviceId === 'left');
+    expect(steps.map((a) => (a.action.type === 'segmentColor' ? a.action.segments.length : 0))).toEqual([10, 10, 7]);
+  });
+
+  it('turns each string on and sets brightness before any color', () => {
+    const actions = patternToActions(emptyPattern(), strings, { turnOn: true, brightness: 40 }).filter((a) => a.deviceId === 'left');
+    expect(actions.map((a) => a.action.type)).toEqual(['power', 'brightness', 'segmentColor']);
+  });
+
+  it('sends nothing to a string that is left out', () => {
+    const without = strings.map((s) => (s.deviceId === 'center' ? { ...s, included: false } : s));
+    expect(patternToActions(emptyPattern(), without, options).some((a) => a.deviceId === 'center')).toBe(false);
   });
 
   it('lays rows out as a zigzag', () => {
     expect(serpentineRows(7, 3)).toEqual([[0, 1, 2], [5, 4, 3], [6]]);
   });
 
-  it('survives saving and reopening', () => {
-    let state = emptyPattern(5, '#ffffff');
-    state = paintCell(state, 2, '#ff0000');
-    const actions = patternToActions(state, { turnOn: true, brightness: 50, maxPerCommand: 5 });
-    const preset = {
-      id: 'p',
-      name: 'x',
-      description: '',
-      needsTarget: true,
-      createdAt: '',
-      updatedAt: '',
-      actions: actions.map((action, order) => ({ id: order, deviceId: null, deviceName: null, action, summary: '', order })),
-    } satisfies PresetDto;
+  const presetOf = (actions: PresetActionInput[]): PresetDto => ({
+    id: 'p',
+    name: 'x',
+    description: '',
+    needsTarget: false,
+    createdAt: '',
+    updatedAt: '',
+    actions: actions.map(({ deviceId, action }, order) => ({ id: order, deviceId, deviceName: deviceId, action, summary: '', order })),
+  });
+
+  it('survives saving and reopening, across strings', () => {
+    let state = emptyPattern('#ffffff');
+    state = paintCell(paintCell(state, cellKey('left', 2), '#ff0000'), cellKey('right', 26), '#00ff00');
+    const preset = presetOf(patternToActions(state, strings, { turnOn: true, brightness: 50 }));
     expect(isPatternPreset(preset)).toBe(true);
-    const loaded = patternFromPreset(preset, 5);
-    expect(loaded).toMatchObject({ turnOn: true, brightness: 50 });
-    expect([0, 1, 2, 3, 4].map((i) => cellColor(loaded.state, i))).toEqual([0, 1, 2, 3, 4].map((i) => cellColor(state, i)));
-    expect(cellColor(clearPattern(loaded.state), 2)).toBe('#ffffff');
+    const loaded = patternFromPreset(preset, strings);
+    expect(loaded).toMatchObject({ turnOn: true, brightness: 50, notShown: [] });
+    for (const cell of cells) expect(cellColor(loaded.state, cell.key)).toBe(cellColor(state, cell.key));
+    expect(cellColor(clearPattern(loaded.state), cellKey('left', 2))).toBe('#ffffff');
+  });
+
+  it('reports lights a saved pattern paints that are not shown, so saving cannot silently drop them', () => {
+    const preset = presetOf(patternToActions(emptyPattern(), strings, options));
+    const without = strings.map((s) => (s.deviceId === 'center' ? { ...s, included: false } : s));
+    expect(patternFromPreset(preset, without).notShown).toEqual(['center']);
+  });
+
+  it('opens a pattern from the earlier version, which named no device, on every string', () => {
+    const preset = presetOf([{ deviceId: null, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } }]);
+    const loaded = patternFromPreset(preset, strings);
+    expect(cellColor(loaded.state, cellKey('left', 0))).toBe('#ff0000');
+    expect(cellColor(loaded.state, cellKey('right', 0))).toBe('#ff0000');
+    expect(loaded.notShown).toEqual([]);
   });
 
   it('leaves ordinary presets to the ordinary editor', () => {
-    const base = { id: 'p', name: 'x', description: '', needsTarget: true, createdAt: '', updatedAt: '' };
-    const step = (action: DeviceAction) => ({ id: 0, deviceId: null, deviceName: null, action, summary: '', order: 0 });
-    expect(isPatternPreset({ ...base, actions: [step({ type: 'power', on: true })] })).toBe(false);
+    expect(isPatternPreset(presetOf([{ deviceId: null, action: { type: 'power', on: true } }]))).toBe(false);
     expect(
-      isPatternPreset({
-        ...base,
-        actions: [step({ type: 'segmentColor', segments: [0], hex: '#ff0000' }), step({ type: 'color', hex: '#ff0000' })],
-      }),
+      isPatternPreset(
+        presetOf([
+          { deviceId: null, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } },
+          { deviceId: null, action: { type: 'color', hex: '#ff0000' } },
+        ]),
+      ),
     ).toBe(false);
   });
 });
 
 describe('pattern editor', () => {
-  const string27 = device({
-    capabilities: [
-      capabilities.power,
-      { ...capabilities.segments, segments: Array.from({ length: 27 }, (_, i) => i), maxSelect: 27 },
-    ],
-  });
   const routes = {
-    'GET /devices': { json: { devices: [string27] } },
+    'GET /devices': { json: { devices: house } },
+    'POST /devices/refresh-due': { json: { devices: house } },
+    'GET /settings': { json: DEFAULT_SETTINGS },
+    'PATCH /settings': (body: unknown) => ({ json: { ...DEFAULT_SETTINGS, ...(body as object) } }),
     'GET /presets': { json: { presets: [] } },
-    'GET /groups': { json: { groups: [] } },
     'GET /dashboard/summary': { json: { upcoming: [], recentFailures: [] } },
   };
   const open = (route = '/patterns/new') =>
@@ -131,64 +243,100 @@ describe('pattern editor', () => {
       </Routes>,
       { route },
     );
+  const ready = () => screen.findByText('3 light strings found');
   const setColor = (label: string, hex: string) => fireEvent.change(screen.getByLabelText(label), { target: { value: hex } });
-  const cell = (index: number) => screen.getByRole('button', { name: new RegExp(`^Segment ${index},`) });
+  const cell = (name: string, segment: number) => screen.getByRole('button', { name: new RegExp(`^${name} segment ${segment},`) });
 
-  it('draws one cell per reported segment, and says a segment may not be one bulb', async () => {
+  it('says how many strings it found, and shows them all in series', async () => {
     mockApi(routes);
     open();
-    await screen.findByText(/reports 27 segments/);
-    expect(screen.getAllByRole('button', { name: /^Segment \d+,/ })).toHaveLength(27);
-    expect(screen.getByText(/may cover several bulbs/)).toBeInTheDocument();
+    await ready();
+    expect(screen.getByText('81 segments across 3 strings.', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /segment \d+,/ })).toHaveLength(81);
+    const titles = screen.getAllByText(/^\d\. Outdoor/).map((e) => e.textContent);
+    expect(titles[0]).toContain('1. Outdoor Left');
+    expect(titles[1]).toContain('2. Outdoor Center');
+    expect(titles[2]).toContain('3. Outdoor Right');
   });
 
-  it('explains when no light reports segments, without offering a fake editor', async () => {
-    mockApi({
-      ...routes,
-      'GET /devices': { json: { devices: [device({ sku: 'SameModeGroup', isGoveeGroup: true, capabilities: [capabilities.power] })] } },
+  it('flags an offline string, and explains why a group is not shown', async () => {
+    mockApi(routes);
+    open();
+    await ready();
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByText(/Not shown: Christmas/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Christmas segment/ })).not.toBeInTheDocument();
+  });
+
+  it('checks current status on opening, and re-checks with Govee on request', async () => {
+    const { calls } = mockApi({ ...routes, 'POST /devices/discover': { json: { total: 3, added: 0, updated: 3, noLongerDiscovered: 0, discoveredAt: '', devices: house } } });
+    open();
+    await ready();
+    await waitFor(() => expect(calls.some((c) => c.path === '/devices/refresh-due')).toBe(true));
+    await userEvent.click(screen.getByRole('button', { name: 'Check for lights' }));
+    await waitFor(() => expect(calls.some((c) => c.path === '/devices/discover')).toBe(true));
+    expect(await screen.findByText('Light list updated from Govee.')).toBeInTheDocument();
+  });
+
+  it('remembers a new order, flip and left-out string on the server', async () => {
+    const { calls } = mockApi(routes);
+    open();
+    await ready();
+    await userEvent.click(screen.getByRole('button', { name: 'Move Outdoor Right earlier' }));
+    await waitFor(() => expect(screen.getAllByText(/^\d\. Outdoor/)[1]?.textContent).toContain('2. Outdoor Right'));
+    await userEvent.click(screen.getByRole('button', { name: 'Flip Outdoor Left' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Include Outdoor Center' }));
+    await waitFor(() => expect(screen.getAllByRole('button', { name: /segment \d+,/ })).toHaveLength(54));
+
+    const saves = calls.filter((c) => c.method === 'PATCH' && c.path === '/settings');
+    expect(saves.at(-1)?.body).toEqual({
+      patternStrings: [
+        { deviceId: 'left', included: true, reversed: true },
+        { deviceId: 'right', included: true, reversed: false },
+        { deviceId: 'center', included: false, reversed: false },
+      ],
     });
-    open();
-    expect(await screen.findByText('No light here reports segment control')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Segment/ })).not.toBeInTheDocument();
+    // Flipped, the first cell on screen is the far end of the string.
+    const firstCell = screen.getAllByRole('button', { name: /segment \d+,/ })[0];
+    expect(firstCell).toHaveAccessibleName('Outdoor Left segment 26, #ffffff');
   });
 
-  it('paints by dragging, erases, and treats a whole drag as one undo', async () => {
+  it('lets a drag cross from one string to the next, as one undo', async () => {
     mockApi(routes);
     open();
-    await screen.findByText(/reports 27 segments/);
+    await ready();
     setColor('Fill color', '#ff0000');
-
-    fireEvent.pointerDown(cell(0));
-    fireEvent.pointerMove(cell(1));
-    fireEvent.pointerMove(cell(2));
+    fireEvent.pointerDown(cell('Outdoor Left', 26));
+    fireEvent.pointerMove(cell('Outdoor Center', 0));
     fireEvent.pointerUp(window);
-    for (const i of [0, 1, 2]) expect(cell(i)).toHaveAccessibleName(`Segment ${i}, #ff0000`);
-    expect(cell(3)).toHaveAccessibleName('Segment 3, #ffffff');
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ff0000');
+    expect(cell('Outdoor Right', 0)).toHaveAccessibleName('Outdoor Right segment 0, #ffffff');
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    for (const i of [0, 1, 2]) expect(cell(i)).toHaveAccessibleName(`Segment ${i}, #ffffff`);
-
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ffffff');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ffffff');
     await userEvent.click(screen.getByRole('button', { name: 'Redo' }));
-    expect(cell(1)).toHaveAccessibleName('Segment 1, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ff0000');
 
     await userEvent.click(screen.getByRole('button', { name: 'Erase' }));
-    fireEvent.pointerDown(cell(1));
+    fireEvent.pointerDown(cell('Outdoor Center', 0));
     fireEvent.pointerUp(window);
-    expect(cell(1)).toHaveAccessibleName('Segment 1, #ffffff');
-    expect(cell(0)).toHaveAccessibleName('Segment 0, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ffffff');
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ff0000');
   });
 
   it('can be painted from the keyboard', async () => {
     mockApi(routes);
     open();
-    await screen.findByText(/reports 27 segments/);
+    await ready();
     setColor('Fill color', '#00ff00');
-    cell(5).focus();
+    cell('Outdoor Right', 5).focus();
     await userEvent.keyboard('{Enter}');
-    expect(cell(5)).toHaveAccessibleName('Segment 5, #00ff00');
+    expect(cell('Outdoor Right', 5)).toHaveAccessibleName('Outdoor Right segment 5, #00ff00');
   });
 
-  it('sends the fewest commands, says how long it takes, and is honest about the result', async () => {
+  it('sends each string its own commands, says how long, and is honest about the result', async () => {
     const { calls } = mockApi({
       ...routes,
       'POST /presets/apply-draft': {
@@ -197,36 +345,50 @@ describe('pattern editor', () => {
           sourceType: 'preset',
           sourceId: null,
           sourceName: 'Pattern preview',
-          status: 'all_accepted',
+          status: 'partial',
           startedAt: '2026-11-07T00:00:00.000Z',
           completedAt: '2026-11-07T00:00:01.000Z',
           outcomes: [
-            { deviceId: 'dev-1', deviceName: 'Front Eaves', actionType: 'segmentColor', summary: 'Set segments', status: 'accepted', commandId: 'c', verification: 'unverified', reason: null, errorCategory: null },
+            { deviceId: 'left', deviceName: 'Outdoor Left', actionType: 'segmentColor', summary: 'Set segments', status: 'accepted', commandId: 'c', verification: 'unverified', reason: null, errorCategory: null },
+            { deviceId: 'center', deviceName: 'Outdoor Center', actionType: 'segmentColor', summary: 'Set segments', status: 'failed', commandId: 'd', verification: 'not_applicable', reason: 'Timed out', errorCategory: 'timeout' },
           ],
         },
       },
     });
-    open('/patterns/new?device=dev-1');
-    await screen.findByText(/reports 27 segments/);
+    open();
+    await ready();
     setColor('Fill color', '#ff0000');
     await userEvent.click(screen.getByRole('button', { name: 'Repeat pattern' }));
+    expect(screen.getByText(/This takes about 3 seconds: 9 commands across 3 strings/)).toBeInTheDocument();
+    expect(screen.getByText(/not in perfect sync/)).toBeInTheDocument();
 
-    expect(screen.getByText(/This takes 3 commands per light, about 3 seconds/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Send to lights' }));
-
+    await userEvent.click(screen.getByRole('button', { name: 'Send to 3 strings' }));
     await waitFor(() => expect(calls.find((c) => c.path === '/presets/apply-draft')).toBeTruthy());
-    const body = calls.find((c) => c.path === '/presets/apply-draft')?.body as { actions: DeviceAction[]; target: unknown };
-    expect(body.target).toEqual({ type: 'device', deviceId: 'dev-1' });
-    expect(body.actions.map((a) => a.type)).toEqual(['power', 'segmentColor', 'segmentColor']);
-    expect(await screen.findByText(/cannot confirm the pattern/)).toBeInTheDocument();
+    const body = calls.find((c) => c.path === '/presets/apply-draft')?.body as { actions: PresetActionInput[]; target?: unknown };
+    expect(body.target).toBeUndefined();
+    expect([...new Set(body.actions.map((a) => a.deviceId))]).toEqual(['left', 'center', 'right']);
+    expect(await screen.findByText('Partly accepted')).toBeInTheDocument();
+    expect(screen.getByText(/cannot confirm the pattern/)).toBeInTheDocument();
     expect(screen.queryByText(/^Confirmed/)).not.toBeInTheDocument();
   });
 
-  it('needs a target before sending', async () => {
+  it('cannot send or paint with no strings included', async () => {
     mockApi(routes);
     open();
-    await screen.findByText(/reports 27 segments/);
-    expect(screen.getByRole('button', { name: 'Send to lights' })).toBeDisabled();
+    await ready();
+    for (const name of ['Left', 'Center', 'Right']) {
+      await userEvent.click(screen.getByRole('checkbox', { name: `Include Outdoor ${name}` }));
+    }
+    expect(await screen.findByText('Include at least one string above to start painting.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send to 0 strings' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save pattern' })).toBeDisabled();
+  });
+
+  it('explains when no light reports segments, without offering a fake editor', async () => {
+    mockApi({ ...routes, 'GET /devices': { json: { devices: [group] } } });
+    open();
+    expect(await screen.findByText('No light here reports segment control')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /segment \d+,/ })).not.toBeInTheDocument();
   });
 
   it('is upfront that moving effects are not available', async () => {
@@ -236,33 +398,45 @@ describe('pattern editor', () => {
     expect(screen.queryByRole('button', { name: /clockwise|twinkle|breathe/i })).not.toBeInTheDocument();
   });
 
-  it('saves as a preset any light can use, and shows a save error', async () => {
+  it('saves steps tied to each string, and shows a save error', async () => {
     const { calls } = mockApi({
       ...routes,
       'POST /presets': { status: 409, json: { error: { code: 'name_taken', message: 'A preset named "Xmas" already exists.' } } },
     });
     open();
-    await screen.findByText(/reports 27 segments/);
+    await ready();
     await userEvent.type(screen.getByLabelText('Pattern name'), 'Xmas');
     await userEvent.click(screen.getByRole('button', { name: 'Save pattern' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('already exists');
-    const body = calls.find((c) => c.path === '/presets' && c.method === 'POST')?.body as { name: string; actions: { deviceId: string | null }[] };
+    const alert = await screen.findByRole('alert');
+    expect(within(alert).getByText(/already exists/)).toBeInTheDocument();
+    const body = calls.find((c) => c.path === '/presets' && c.method === 'POST')?.body as { name: string; actions: PresetActionInput[] };
     expect(body.name).toBe('Xmas');
-    expect(body.actions.every((a) => a.deviceId === null)).toBe(true);
+    expect([...new Set(body.actions.map((a) => a.deviceId))]).toEqual(['left', 'center', 'right']);
   });
 
   it('reopens a saved pattern and updates it in place', async () => {
+    const whole = (deviceId: string, hex: string, segments: number[], id: number) => ({
+      id,
+      deviceId,
+      deviceName: deviceId,
+      action: { type: 'segmentColor' as const, segments, hex },
+      summary: '',
+      order: id,
+    });
+    const allButFirst = Array.from({ length: 26 }, (_, i) => i + 1);
     const saved: PresetDto = {
       id: 'p1',
       name: 'Xmas',
       description: 'Red and white',
-      needsTarget: true,
+      needsTarget: false,
       createdAt: '',
       updatedAt: '',
       actions: [
-        { id: 1, deviceId: null, deviceName: null, action: { type: 'power', on: true }, summary: '', order: 0 },
-        { id: 2, deviceId: null, deviceName: null, action: { type: 'segmentColor', segments: Array.from({ length: 26 }, (_, i) => i + 1), hex: '#ffffff' }, summary: '', order: 1 },
-        { id: 3, deviceId: null, deviceName: null, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' }, summary: '', order: 2 },
+        { id: 0, deviceId: 'left', deviceName: 'left', action: { type: 'power', on: true }, summary: '', order: 0 },
+        whole('left', '#ffffff', allButFirst, 1),
+        whole('left', '#ff0000', [0], 2),
+        whole('center', '#ffffff', [...allButFirst, 0], 3),
+        whole('right', '#ffffff', [...allButFirst, 0], 4),
       ],
     };
     const { calls } = mockApi({
@@ -272,10 +446,10 @@ describe('pattern editor', () => {
     });
     open('/patterns/p1');
     await waitFor(() => expect(screen.getByLabelText('Pattern name')).toHaveValue('Xmas'));
-    expect(cell(0)).toHaveAccessibleName('Segment 0, #ff0000');
-    expect(cell(1)).toHaveAccessibleName('Segment 1, #ffffff');
+    expect(cell('Outdoor Left', 0)).toHaveAccessibleName('Outdoor Left segment 0, #ff0000');
+    expect(cell('Outdoor Left', 1)).toHaveAccessibleName('Outdoor Left segment 1, #ffffff');
     await userEvent.click(screen.getByRole('button', { name: 'Save pattern' }));
-    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.path).toBe('/presets/p1'));
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/presets/p1')).toBeTruthy());
     expect(await screen.findByText('Presets list')).toBeInTheDocument();
   });
 });

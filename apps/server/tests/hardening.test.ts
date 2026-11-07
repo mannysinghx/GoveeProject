@@ -530,34 +530,90 @@ describe('Govee groups, as the real API reports them', () => {
 });
 
 describe('sending an unsaved pattern', () => {
-  const pattern = {
-    name: 'Pattern preview',
-    actions: [
-      { type: 'power', on: true },
-      { type: 'segmentColor', segments: [0, 1], hex: '#ff0000' },
-      { type: 'segmentColor', segments: [2], hex: '#00ff00' },
-    ],
-  };
+  const second = () => ({ ...mockFullDevice(), device: 'AA:BB:CC:DD:EE:FF:00:09', deviceName: 'Second string' });
 
-  it('sends the steps in order, stores no preset, and records the run', async () => {
+  async function twoStrings() {
     const h = await harness();
-    const { client, device } = await withDevice(h);
+    h.mock.devices = [mockFullDevice(), second()];
+    const client = await authedClient(h.app);
+    const { devices } = (await client.post('/api/v1/devices/discover')).json() as DiscoveryResultDto;
+    return { h, client, a: devices.find((d) => d.goveeDeviceId.endsWith('01'))!, b: devices.find((d) => d.goveeDeviceId.endsWith('09'))! };
+  }
+
+  it('gives each string only its own segments, in order, and stores no preset', async () => {
+    const { h, client, a, b } = await twoStrings();
     const response = await client.post('/api/v1/presets/apply-draft', {
-      ...pattern,
-      target: { type: 'device', deviceId: device.id },
+      name: 'Pattern preview',
+      actions: [
+        { deviceId: a.id, action: { type: 'power', on: true } },
+        { deviceId: a.id, action: { type: 'segmentColor', segments: [0, 1], hex: '#ff0000' } },
+        { deviceId: b.id, action: { type: 'segmentColor', segments: [2], hex: '#00ff00' } },
+      ],
     });
     expect(response.statusCode).toBe(200);
     expect(response.json().status).toBe('all_accepted');
-    expect(h.mock.controlRequests().map((c) => c.capability)).toEqual([
-      { type: 'devices.capabilities.on_off', instance: 'powerSwitch', value: 1 },
-      { type: 'devices.capabilities.segment_color_setting', instance: 'segmentedColorRgb', value: { segment: [0, 1], rgb: 16711680 } },
-      { type: 'devices.capabilities.segment_color_setting', instance: 'segmentedColorRgb', value: { segment: [2], rgb: 65280 } },
-    ]);
+    const sentTo = (device: string) =>
+      h.mock.controlRequests().filter((c) => c.device === device).map((c) => c.capability.value);
+    expect(sentTo(a.goveeDeviceId)).toEqual([1, { segment: [0, 1], rgb: 16711680 }]);
+    expect(sentTo(b.goveeDeviceId)).toEqual([{ segment: [2], rgb: 65280 }]);
     expect(h.ctx.presets.list()).toEqual([]);
     expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM execution_runs').get()).toEqual({ n: 1 });
   });
 
-  it('skips a group the pattern cannot apply to, and still runs its power step', async () => {
+  it('reports one string failing while the other is accepted', async () => {
+    const { h, client, a, b } = await twoStrings();
+    h.mock.intercept = (request, res) => {
+      if (!request.path.endsWith('/control')) return false;
+      if ((request.body as { payload: { device: string } }).payload.device !== b.goveeDeviceId) return false;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ code: 400, msg: 'Invalid parameter format' }));
+      return true;
+    };
+    const run = (
+      await client.post('/api/v1/presets/apply-draft', {
+        actions: [
+          { deviceId: a.id, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } },
+          { deviceId: b.id, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } },
+        ],
+      })
+    ).json() as { status: string; outcomes: { deviceId: string; status: string }[] };
+    expect(run.status).toBe('partial');
+    expect(Object.fromEntries(run.outcomes.map((o) => [o.deviceId, o.status]))).toEqual({ [a.id]: 'accepted', [b.id]: 'rejected' });
+  });
+
+  it('saves a multi-string pattern that applies with no target, each string getting its own', async () => {
+    const { h, client, a, b } = await twoStrings();
+    const preset = (
+      await client.post('/api/v1/presets', {
+        name: 'Across two',
+        actions: [
+          { deviceId: a.id, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } },
+          { deviceId: b.id, action: { type: 'segmentColor', segments: [0], hex: '#0000ff' } },
+        ],
+      })
+    ).json();
+    expect(preset.needsTarget).toBe(false);
+    const run = (await client.post(`/api/v1/presets/${preset.id}/apply`, {})).json() as { status: string };
+    expect(run.status).toBe('all_accepted');
+    expect(h.mock.controlRequests().map((c) => [c.device, (c.capability.value as { rgb: number }).rgb]).sort()).toEqual(
+      [[a.goveeDeviceId, 16711680], [b.goveeDeviceId, 255]].sort(),
+    );
+  });
+
+  it('holds a full gradient across several strings', async () => {
+    const { client, a, b } = await twoStrings();
+    const steps = (deviceId: string) =>
+      Array.from({ length: 15 }, (_, i) => ({
+        deviceId,
+        action: { type: 'segmentColor', segments: [i], hex: `#0000${(i + 16).toString(16)}` },
+      }));
+    const many = [a.id, b.id, a.id, b.id, a.id, b.id, a.id, b.id, a.id, b.id].flatMap(steps);
+    expect(many.length).toBe(150);
+    const response = await client.post('/api/v1/presets', { name: 'Long', actions: many });
+    expect(response.statusCode).toBe(201);
+  });
+
+  it('skips steps a light cannot do, with the reason, and still runs its power step', async () => {
     const h = await harness();
     h.mock.devices = [
       {
@@ -568,22 +624,26 @@ describe('sending an unsaved pattern', () => {
     ];
     const client = await authedClient(h.app);
     const { devices } = (await client.post('/api/v1/devices/discover')).json() as DiscoveryResultDto;
+    const id = devices[0]!.id;
     const run = (
-      await client.post('/api/v1/presets/apply-draft', { ...pattern, target: { type: 'device', deviceId: devices[0]!.id } })
+      await client.post('/api/v1/presets/apply-draft', {
+        actions: [
+          { deviceId: id, action: { type: 'power', on: true } },
+          { deviceId: id, action: { type: 'segmentColor', segments: [0], hex: '#ff0000' } },
+        ],
+      })
     ).json() as { status: string; outcomes: { status: string; reason: string | null }[] };
     expect(run.status).toBe('partial');
-    expect(run.outcomes.map((o) => o.status)).toEqual(['accepted', 'skipped', 'skipped']);
+    expect(run.outcomes.map((o) => o.status)).toEqual(['accepted', 'skipped']);
     expect(run.outcomes[1]?.reason).toContain('does not report segment colour');
   });
 
-  it('rejects a segment the device does not report, per device, with nothing sent for it', async () => {
+  it('rejects a segment the device does not report, with nothing sent for it', async () => {
     const h = await harness();
     const { client, device } = await withDevice(h);
     const run = (
       await client.post('/api/v1/presets/apply-draft', {
-        name: 'Too long',
-        target: { type: 'device', deviceId: device.id },
-        actions: [{ type: 'segmentColor', segments: [99], hex: '#ff0000' }],
+        actions: [{ deviceId: device.id, action: { type: 'segmentColor', segments: [99], hex: '#ff0000' } }],
       })
     ).json() as { status: string; outcomes: { reason: string | null }[] };
     expect(run.status).toBe('skipped');
@@ -591,13 +651,27 @@ describe('sending an unsaved pattern', () => {
     expect(h.mock.controlRequests()).toHaveLength(0);
   });
 
-  it('requires a target and valid steps', async () => {
+  it('asks for a target for steps with no device, and rejects empty requests', async () => {
     const h = await harness();
     const client = await authedClient(h.app);
-    expect((await client.post('/api/v1/presets/apply-draft', { actions: pattern.actions })).statusCode).toBe(400);
-    expect(
-      (await client.post('/api/v1/presets/apply-draft', { target: { type: 'device', deviceId: 'x' }, actions: [] })).statusCode,
-    ).toBe(400);
+    const generic = await client.post('/api/v1/presets/apply-draft', {
+      actions: [{ deviceId: null, action: { type: 'power', on: true } }],
+    });
+    expect(generic.statusCode).toBe(400);
+    expect(generic.json().error.code).toBe('target_required');
+    expect((await client.post('/api/v1/presets/apply-draft', { actions: [] })).statusCode).toBe(400);
+  });
+});
+
+describe('string arrangement setting', () => {
+  it('persists and rejects anything malformed', async () => {
+    const h = await harness();
+    const client = await authedClient(h.app);
+    expect((await client.get('/api/v1/settings')).json().patternStrings).toEqual([]);
+    const value = [{ deviceId: 'a', included: true, reversed: true }];
+    expect((await client.patch('/api/v1/settings', { patternStrings: value })).json().patternStrings).toEqual(value);
+    expect((await client.get('/api/v1/settings')).json().patternStrings).toEqual(value);
+    expect((await client.patch('/api/v1/settings', { patternStrings: [{ deviceId: 'a' }] })).statusCode).toBe(400);
   });
 });
 

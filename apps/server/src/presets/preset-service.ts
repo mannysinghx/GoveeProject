@@ -276,19 +276,27 @@ export class PresetService {
     return { plans: [...plans.values()], skipped };
   }
 
-  /** Runs unsaved steps on a target, in order, with the same checks and reporting as a preset. */
-  async applyDraft(name: string, target: Target, actions: DeviceAction[], correlationId?: string): Promise<RunResultDto> {
+  /**
+   * Runs unsaved steps with the same checks and reporting as a preset. Steps name their own
+   * device, as a pattern across several strings does, or apply to the target when they do not.
+   */
+  async applyDraft(
+    name: string,
+    target: Target | undefined,
+    actions: PresetActionInput[],
+    correlationId?: string,
+  ): Promise<RunResultDto> {
     const draft: PresetDto = {
       id: 'draft',
       name,
       description: '',
-      needsTarget: true,
+      needsTarget: actions.some((a) => a.deviceId === null),
       createdAt: '',
       updatedAt: '',
-      actions: actions.map((action, order) => ({
+      actions: actions.map(({ deviceId, action }, order) => ({
         id: order,
-        deviceId: null,
-        deviceName: null,
+        deviceId,
+        deviceName: deviceId ? (this.devices.get(deviceId)?.name ?? null) : null,
         action,
         summary: describeAction(action),
         order,

@@ -1,78 +1,172 @@
-import { hexToRgb, rgbToHex, type DeviceAction, type PresetDto } from '@glm/shared';
+import {
+  hexToRgb,
+  rgbToHex,
+  type DeviceDto,
+  type PatternStringSetting,
+  type PresetActionInput,
+  type PresetDto,
+  type SegmentedColorCapability,
+} from '@glm/shared';
 
 /**
- * A pattern is what is painted on a light string: one colour per segment Govee reports.
- * A cell holds a colour, or null for "shows the background", so changing the background
- * recolours everything that was not painted. Patterns are saved as ordinary app presets,
- * so they can be applied to groups and used in schedules like any other preset.
+ * A canvas covers every connected light string, one after another. Paint belongs to a
+ * specific segment of a specific light, so it follows the string when strings are
+ * reordered, flipped or left out. A segment with no paint shows the background.
  */
 export interface PatternState {
   background: string;
-  cells: (string | null)[];
+  cells: Record<string, string>;
 }
 
-export function emptyPattern(segmentCount: number, background = '#ffffff'): PatternState {
-  return { background, cells: Array.from({ length: segmentCount }, () => null) };
+export interface PatternString {
+  deviceId: string;
+  name: string;
+  connectivity: DeviceDto['connectivity'];
+  /** Segment numbers in on-screen order. Flipped strings run high to low. */
+  segments: number[];
+  maxSelect: number;
+  included: boolean;
+  reversed: boolean;
 }
 
-export function cellColor(state: PatternState, index: number): string {
-  return state.cells[index] ?? state.background;
+export interface PatternCell {
+  key: string;
+  deviceId: string;
+  deviceName: string;
+  segment: number;
 }
 
-export function resizePattern(state: PatternState, segmentCount: number): PatternState {
-  if (state.cells.length === segmentCount) return state;
-  return {
-    ...state,
-    cells: Array.from({ length: segmentCount }, (_, i) => state.cells[i] ?? null),
-  };
+export function cellKey(deviceId: string, segment: number): string {
+  return `${deviceId}:${segment}`;
 }
 
-export function paintCell(state: PatternState, index: number, color: string | null): PatternState {
-  if (index < 0 || index >= state.cells.length || state.cells[index] === color) return state;
-  const cells = [...state.cells];
-  cells[index] = color;
+function segmentCapability(device: DeviceDto): SegmentedColorCapability | undefined {
+  return device.capabilities.find((c) => c.kind === 'segmentedColor') as SegmentedColorCapability | undefined;
+}
+
+/** Everything on the account that can be painted. Groups and other lights do not qualify. */
+export function paintableDevices(devices: DeviceDto[]): DeviceDto[] {
+  return devices.filter((d) => d.discoveryStatus === 'present' && segmentCapability(d) !== undefined);
+}
+
+/** A sensible first guess at the physical order, until the owner arranges it themselves. */
+function nameRank(name: string): number {
+  if (/\bleft\b/i.test(name)) return 0;
+  if (/\b(center|centre|middle)\b/i.test(name)) return 1;
+  if (/\bright\b/i.test(name)) return 2;
+  return 3;
+}
+
+/**
+ * Combines what Govee reports now with the saved arrangement. Saved order comes first.
+ * A newly added light joins at the end, and a light that has gone is simply not listed.
+ */
+export function resolveStrings(devices: DeviceDto[], saved: PatternStringSetting[]): PatternString[] {
+  const paintable = paintableDevices(devices);
+  const savedIndex = new Map(saved.map((entry, index) => [entry.deviceId, { entry, index }]));
+  const ordered = [...paintable].sort((a, b) => {
+    const left = savedIndex.get(a.id)?.index ?? Number.MAX_SAFE_INTEGER;
+    const right = savedIndex.get(b.id)?.index ?? Number.MAX_SAFE_INTEGER;
+    return left - right || nameRank(a.name) - nameRank(b.name) || a.name.localeCompare(b.name);
+  });
+  return ordered.map((device) => {
+    const capability = segmentCapability(device) as SegmentedColorCapability;
+    const entry = savedIndex.get(device.id)?.entry;
+    const reversed = entry?.reversed ?? false;
+    return {
+      deviceId: device.id,
+      name: device.name,
+      connectivity: device.connectivity,
+      segments: reversed ? [...capability.segments].reverse() : capability.segments,
+      maxSelect: capability.maxSelect,
+      included: entry?.included ?? true,
+      reversed,
+    };
+  });
+}
+
+export function toSettings(strings: PatternString[]): PatternStringSetting[] {
+  return strings.map(({ deviceId, included, reversed }) => ({ deviceId, included, reversed }));
+}
+
+export function moveString(strings: PatternString[], deviceId: string, direction: -1 | 1): PatternString[] {
+  const index = strings.findIndex((s) => s.deviceId === deviceId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= strings.length) return strings;
+  const next = [...strings];
+  const [item] = next.splice(index, 1);
+  if (item) next.splice(target, 0, item);
+  return next;
+}
+
+/** Every cell shown, in order along the whole run of lights. */
+export function canvasCells(strings: PatternString[]): PatternCell[] {
+  return strings
+    .filter((s) => s.included)
+    .flatMap((s) =>
+      s.segments.map((segment) => ({
+        key: cellKey(s.deviceId, segment),
+        deviceId: s.deviceId,
+        deviceName: s.name,
+        segment,
+      })),
+    );
+}
+
+export function emptyPattern(background = '#ffffff'): PatternState {
+  return { background, cells: {} };
+}
+
+export function cellColor(state: PatternState, key: string): string {
+  return state.cells[key] ?? state.background;
+}
+
+export function paintCell(state: PatternState, key: string, color: string | null): PatternState {
+  const current = state.cells[key] ?? null;
+  if (current === color) return state;
+  const cells = { ...state.cells };
+  if (color === null) delete cells[key];
+  else cells[key] = color;
   return { ...state, cells };
 }
 
 export function clearPattern(state: PatternState): PatternState {
-  return { ...state, cells: state.cells.map(() => null) };
+  return { ...state, cells: {} };
 }
 
-/** A fixed blend across the string. It does not move: that would need the lights' own effects. */
-export function gradientFill(state: PatternState, from: string, to: string): PatternState {
+/** A fixed blend along the whole run. It does not move: that needs the lights' own effects. */
+export function gradientFill(state: PatternState, cells: PatternCell[], from: string, to: string): PatternState {
   const a = hexToRgb(from);
   const b = hexToRgb(to);
-  const last = Math.max(1, state.cells.length - 1);
-  return {
-    ...state,
-    cells: state.cells.map((_, i) => {
-      const t = i / last;
-      return rgbToHex({
-        r: Math.round(a.r + (b.r - a.r) * t),
-        g: Math.round(a.g + (b.g - a.g) * t),
-        b: Math.round(a.b + (b.b - a.b) * t),
-      });
-    }),
-  };
+  const last = Math.max(1, cells.length - 1);
+  const next = { ...state.cells };
+  cells.forEach((cell, i) => {
+    const t = i / last;
+    next[cell.key] = rgbToHex({
+      r: Math.round(a.r + (b.r - a.r) * t),
+      g: Math.round(a.g + (b.g - a.g) * t),
+      b: Math.round(a.b + (b.b - a.b) * t),
+    });
+  });
+  return { ...state, cells: next };
 }
 
-/** Repeats runs of colours along the string, such as red and green for Christmas. */
-export function repeatFill(state: PatternState, colors: string[], runLength: number): PatternState {
+/** Repeats runs of colours along the whole run, carrying on from one string to the next. */
+export function repeatFill(state: PatternState, cells: PatternCell[], colors: string[], runLength: number): PatternState {
   const run = Math.max(1, Math.floor(runLength));
-  return {
-    ...state,
-    cells: state.cells.map((_, i) => colors[Math.floor(i / run) % colors.length] ?? null),
-  };
+  const next = { ...state.cells };
+  cells.forEach((cell, i) => {
+    const color = colors[Math.floor(i / run) % colors.length];
+    if (color) next[cell.key] = color;
+  });
+  return { ...state, cells: next };
 }
 
-/**
- * Serpentine rows, like a string zigzagging back and forth. Each row lists segment
- * indexes in display order, so every other row runs right to left.
- */
-export function serpentineRows(segmentCount: number, perRow: number): number[][] {
+/** Rows of cell positions that zigzag, so every other row runs right to left. */
+export function serpentineRows(count: number, perRow: number): number[][] {
   const rows: number[][] = [];
-  for (let start = 0; start < segmentCount; start += perRow) {
-    const row = Array.from({ length: Math.min(perRow, segmentCount - start) }, (_, i) => start + i);
+  for (let start = 0; start < count; start += perRow) {
+    const row = Array.from({ length: Math.min(perRow, count - start) }, (_, i) => start + i);
     rows.push(rows.length % 2 === 0 ? row : row.reverse());
   }
   return rows;
@@ -82,39 +176,42 @@ export interface PatternOptions {
   turnOn: boolean;
   /** Overall brightness, or null to leave it as it is. */
   brightness: number | null;
-  /** Most segments one command may name, from the device's capability. */
-  maxPerCommand: number;
 }
 
 /**
- * The fewest commands that produce the pattern: one per colour, not one per segment.
- * Each command takes real time at Govee's rate limits, so this is what keeps painting usable.
+ * What each light must be sent, in order. Each gets only its own segments, in the fewest
+ * commands: one per colour, not one per segment. Each command takes real time at Govee's
+ * rate limits, so this is what keeps painting usable.
  */
-export function patternToActions(state: PatternState, options: PatternOptions): DeviceAction[] {
-  const byColor = new Map<string, number[]>();
-  state.cells.forEach((_, index) => {
-    const hex = cellColor(state, index).toLowerCase();
-    byColor.set(hex, [...(byColor.get(hex) ?? []), index]);
-  });
-
-  const colorActions: DeviceAction[] = [];
-  const largestFirst = [...byColor.entries()].sort((a, b) => b[1].length - a[1].length);
-  const limit = Math.max(1, options.maxPerCommand);
-  for (const [hex, segments] of largestFirst) {
-    for (let i = 0; i < segments.length; i += limit) {
-      colorActions.push({ type: 'segmentColor', hex, segments: segments.slice(i, i + limit) });
-    }
-  }
-
-  return [
-    ...(options.turnOn ? [{ type: 'power', on: true } as const] : []),
-    ...(options.brightness !== null ? [{ type: 'brightness', value: options.brightness } as const] : []),
-    ...colorActions,
-  ];
+export function patternToActions(state: PatternState, strings: PatternString[], options: PatternOptions): PresetActionInput[] {
+  return strings
+    .filter((s) => s.included)
+    .flatMap((string) => {
+      const byColor = new Map<string, number[]>();
+      for (const segment of string.segments) {
+        const hex = cellColor(state, cellKey(string.deviceId, segment)).toLowerCase();
+        byColor.set(hex, [...(byColor.get(hex) ?? []), segment]);
+      }
+      const steps: PresetActionInput['action'][] = [];
+      if (options.turnOn) steps.push({ type: 'power', on: true });
+      if (options.brightness !== null) steps.push({ type: 'brightness', value: options.brightness });
+      const limit = Math.max(1, string.maxSelect);
+      const largestFirst = [...byColor.entries()].sort((a, b) => b[1].length - a[1].length);
+      for (const [hex, all] of largestFirst) {
+        const sorted = [...all].sort((a, b) => a - b);
+        for (let i = 0; i < sorted.length; i += limit) {
+          steps.push({ type: 'segmentColor', hex, segments: sorted.slice(i, i + limit) });
+        }
+      }
+      return steps.map((action) => ({ deviceId: string.deviceId, action }));
+    });
 }
 
-export function commandCount(state: PatternState, options: PatternOptions): number {
-  return patternToActions(state, options).length;
+/** The busiest light decides how long it takes, since lights change independently. */
+export function slowestStringCommands(actions: PresetActionInput[]): number {
+  const counts = new Map<string, number>();
+  for (const { deviceId } of actions) counts.set(deviceId ?? '', (counts.get(deviceId ?? '') ?? 0) + 1);
+  return Math.max(0, ...counts.values());
 }
 
 /** True when a preset could only have come from painting, so the editor can reopen it. */
@@ -129,30 +226,42 @@ export interface LoadedPattern {
   state: PatternState;
   turnOn: boolean;
   brightness: number | null;
+  /** Lights this pattern paints that are not on the canvas. Saving would drop them. */
+  notShown: string[];
 }
 
-export function patternFromPreset(preset: PresetDto, segmentCount: number): LoadedPattern {
-  const colors: (string | null)[] = Array.from({ length: segmentCount }, () => null);
+export function patternFromPreset(preset: PresetDto, strings: PatternString[]): LoadedPattern {
+  const colors = new Map<string, string>();
+  const notShown = new Set<string>();
+  const shown = strings.filter((s) => s.included);
   let turnOn = false;
   let brightness: number | null = null;
-  for (const { action } of preset.actions) {
+
+  for (const { action, deviceId, deviceName } of preset.actions) {
     if (action.type === 'power' && action.on) turnOn = true;
     if (action.type === 'brightness') brightness = action.value;
-    if (action.type === 'segmentColor') {
+    if (action.type !== 'segmentColor') continue;
+    if (deviceId !== null && !shown.some((s) => s.deviceId === deviceId)) {
+      notShown.add(deviceName ?? 'A light that is no longer available');
+      continue;
+    }
+    // A step with no device came from an earlier version, and applies to whichever lights are chosen.
+    const targets = deviceId === null ? shown : shown.filter((s) => s.deviceId === deviceId);
+    for (const string of targets) {
       for (const segment of action.segments) {
-        if (segment < segmentCount) colors[segment] = action.hex.toLowerCase();
+        if (string.segments.includes(segment)) colors.set(cellKey(string.deviceId, segment), action.hex.toLowerCase());
       }
     }
   }
+
   // The most common colour becomes the background, so erasing behaves as it did when painted.
   const counts = new Map<string, number>();
-  for (const color of colors) if (color) counts.set(color, (counts.get(color) ?? 0) + 1);
+  for (const color of colors.values()) counts.set(color, (counts.get(color) ?? 0) + 1);
   const background = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '#ffffff';
-  return {
-    turnOn,
-    brightness,
-    state: { background, cells: colors.map((c) => (c === background ? null : c)) },
-  };
+  const cells: Record<string, string> = {};
+  for (const [key, color] of colors) if (color !== background) cells[key] = color;
+
+  return { turnOn, brightness, notShown: [...notShown], state: { background, cells } };
 }
 
 /** Dark or light cell numbers, whichever is readable on this colour. */

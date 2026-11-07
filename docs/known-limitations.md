@@ -17,9 +17,11 @@
 
 - **Static only.** Clockwise, Twinkle, Breathe and similar effects run inside the lights, and the public API cannot send them.
 - **One cell is one segment.** An H805C reports 27. The Govee app paints individual bulbs, and the public API does not offer that.
-- **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across 27 segments takes about 27 seconds.
+- **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across three strings of 27 segments takes about 27 seconds, with the strings changing at the same time.
 - **No read-back.** Govee does not report segment colors, so the app cannot show what the lights are displaying.
-- **Lights change independently.** Sending to a group does not keep them in step.
+- **Lights change independently.** Strings shown in series are still separate lights, so they do not change in step.
+- **Scheduling a pattern across strings** needs a target that includes them all, such as a group in this app. With a smaller target, the other strings' steps are skipped and reported.
+- **The string order is what you set.** The API does not say how lights are physically arranged. The first guess uses "left", "center" and "right" in their names.
 
 ## Limits of this version
 

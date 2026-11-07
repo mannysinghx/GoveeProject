@@ -8,7 +8,9 @@ import { mockBasicDevice, mockFullDevice, MockGovee } from '../tests/support/moc
 const PORT = Number(process.env.MOCK_GOVEE_PORT ?? 8788);
 
 const mock = new MockGovee(process.env.GOVEE_API_KEY ?? 'dev-mock-key');
-mock.devices = [mockFullDevice(), mockBasicDevice()];
+const secondString = { ...mockFullDevice(), device: 'AA:BB:CC:DD:EE:FF:00:03', deviceName: 'Back Eaves (test data)' };
+mock.devices = [mockFullDevice(), secondString, mockBasicDevice()];
+mock.state.set(secondString.device, { powerSwitch: 1, brightness: 80 });
 mock.state.set(mockFullDevice().device, { powerSwitch: 1, brightness: 60, colorRgb: 16753920 });
 mock.state.set(mockBasicDevice().device, { powerSwitch: 0, brightness: 40 });
 

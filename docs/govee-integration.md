@@ -38,6 +38,8 @@ When Govee refuses a status request outright, the app stops polling that device 
 
 Govee's public API has no way to create or upload a DIY scene, or to send effects such as Clockwise, Twinkle or Breathe, which run inside the lights. The pattern editor instead sends `segmentedColorRgb` commands, one per colour, and saves the result as an app preset. Static patterns only. Sending motion over the cloud would be slow and uneven at these rate limits, so it is not offered.
 
+The editor counts as a string each device Govee currently lists with `segmentedColorRgb`, and draws them in series. That is an app-level view: the API has no idea how strings relate physically, so order and direction are the owner's to set, and each device still receives its own commands.
+
 To use a moving effect, make it in the Govee Home app. If the API lists it, activate it from **Scenes**.
 
 ## H805C

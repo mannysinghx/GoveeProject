@@ -16,8 +16,9 @@ Record: date, app version, firmware version from the Govee app, and H805C segmen
 | 6 | **Colour temperature,** if listed. | Range matches the capability. Warm is warm and cool is cool. | | |
 | 7 | **Refresh state.** Use Refresh status. | Values match the lights. Note which settings say Not reported. | | |
 | 8 | **Segments, only if listed.** Set one segment to red. Then build a multi-step arrangement. | Note how many bulbs one segment covers. Do not assume one segment is one bulb. | | |
-| 8a | **Pattern.** In Paint a pattern, send a repeating red and white pattern to one string. | Red and white in the expected places, starting from segment 0. Note which physical end is segment 0, and whether colors reach the far end of the string. | | |
-| 8b | **Pattern across strings.** Save it, then apply it to a group of your strings. | Each string shows it. Note how long they take. | | |
+| 8a | **One string.** In Paint a pattern, untick all but one string. Send a repeating red and white pattern. | Red and white in the expected places. Note which physical end is segment 0, and flip the string if it is the wrong way round. Check colors reach the far end. | | |
+| 8b | **All strings in series.** Tick them all, arrange their order, and paint across a join between two strings. | The paint crosses the join on the house where it does on screen. Note how long they take. | | |
+| 8c | **Saved pattern.** Save it, then apply it from Scenes & Presets. | The same result, with no target needed. | | |
 | 9 | **Scenes, only if listed.** Refresh scenes, then activate a dynamic scene, a device-list scene, a DIY scene and a snapshot, as available. | Each changes the lights. **Record any rejection and its message.** DIY control is undocumented, so it is the most likely to fail. | | |
 | 10 | **Scheduled action.** Create a one-time schedule for 2 minutes from now, then close the browser. | It runs on time. History shows the run. | | |
 | 11 | **Recurring schedule across a restart.** Create a daily schedule. Restart the app before it runs. | It still runs, once. | | |
