@@ -136,9 +136,9 @@ function categoryForCode(status: number): { category: TransportError['category']
 /** Govee's own text is kept for troubleshooting, trimmed and with the key stripped. */
 function withGoveeDetail(base: string, detail: string | undefined, apiKey: string | null): string {
   if (!detail) return base;
-  let safe = detail.slice(0, 200);
-  if (apiKey) safe = safe.split(apiKey).join('[REDACTED]');
-  return `${base} Govee said: ${safe}`;
+  // In this order: trimming first could cut the key in two and hide it from the replacement.
+  const scrubbed = apiKey ? detail.split(apiKey).join('[REDACTED]') : detail;
+  return `${base} Govee said: ${scrubbed.slice(0, 200)}`;
 }
 
 export class GoveeCloudTransport implements LightTransport {
@@ -245,6 +245,8 @@ export class GoveeCloudTransport implements LightTransport {
         },
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: controller.signal,
+        // fetch would otherwise resend the custom key header to wherever a redirect points.
+        redirect: 'error',
       });
       text = await response.text();
     } catch (error) {

@@ -92,7 +92,7 @@ describe('scheduler', () => {
       h.clock.set('2026-06-16T18:00:01Z');
       await tick();
       expect(controls()).toHaveLength(2);
-      expect(executions(schedule.id).map((e) => e.occurrenceKey)).toEqual(['2026-06-16T18:00', '2026-06-15T18:00']);
+      expect(executions(schedule.id).map((e) => e.occurrenceKey)).toEqual(['2026-06-16T18:00@UTC', '2026-06-15T18:00@UTC']);
     });
 
     it('does nothing while disabled, and treats that time as not missed', async () => {
@@ -137,7 +137,7 @@ describe('scheduler', () => {
       await tick();
       h.clock.set('2026-11-01T06:30:10Z'); // The second 01:30.
       await tick();
-      expect(executions(fall.id).filter((e) => e.occurrenceKey === '2026-11-01T01:30')).toHaveLength(1);
+      expect(executions(fall.id).filter((e) => e.occurrenceKey === '2026-11-01T01:30@America/New_York')).toHaveLength(1);
       expect(controls()).toHaveLength(1);
 
       h.clock.set('2027-03-13T12:00:00Z');
@@ -214,7 +214,7 @@ describe('scheduler', () => {
       h.ctx.db
         .prepare(
           `INSERT INTO schedule_executions (id, schedule_id, occurrence_key, scheduled_for, started_at, status, created_at)
-           VALUES ('stuck', ?, '2026-06-15T18:00', '2026-06-15T18:00:00.000Z', ?, 'running', ?)`,
+           VALUES ('stuck', ?, '2026-06-15T18:00@UTC', '2026-06-15T18:00:00.000Z', ?, 'running', ?)`,
         )
         .run(schedule.id, h.clock.nowIso(), h.clock.nowIso());
 
@@ -245,7 +245,7 @@ describe('scheduler', () => {
 
       expect(controls()).toHaveLength(0);
       const rows = executions(schedule.id);
-      expect(rows.map((e) => e.occurrenceKey)).toEqual(['2026-06-17T18:00', '2026-06-16T18:00', '2026-06-15T18:00']);
+      expect(rows.map((e) => e.occurrenceKey)).toEqual(['2026-06-17T18:00@UTC', '2026-06-16T18:00@UTC', '2026-06-15T18:00@UTC']);
       expect(rows.every((e) => e.status === 'missed')).toBe(true);
 
       const events = h.ctx.activity.list({ eventType: 'schedule', outcome: 'warning', limit: 10 }).events;
@@ -260,7 +260,7 @@ describe('scheduler', () => {
 
       expect(controls()).toHaveLength(1);
       const rows = executions(schedule.id);
-      expect(rows[0]).toMatchObject({ occurrenceKey: '2026-06-17T18:00', status: 'all_accepted', isRecovery: true });
+      expect(rows[0]).toMatchObject({ occurrenceKey: '2026-06-17T18:00@UTC', status: 'all_accepted', isRecovery: true });
       expect(rows.slice(1).every((e) => e.status === 'missed')).toBe(true);
       expect(rows).toHaveLength(3);
     });

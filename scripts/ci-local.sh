@@ -33,16 +33,17 @@ git archive "$SHA" | tar -x -C "$WORK"
 
 CONTAINER_IMAGE="node:26-bookworm-slim"
 echo "==> Running checks in $CONTAINER_IMAGE"
-docker run --rm \
-  -v "$WORK:/src:ro" \
+# Streamed in rather than bind-mounted, so this works whichever paths Docker shares.
+tar -C "$WORK" -cf - . | docker run --rm -i \
   --tmpfs /tmp:exec \
   -e CI=true \
   -e NPM_CONFIG_UPDATE_NOTIFIER=false \
   "$CONTAINER_IMAGE" \
   bash -euo pipefail -c '
+    mkdir /tmp/app
+    tar -xf - -C /tmp/app
     apt-get update -qq >/dev/null
     apt-get install -y -qq --no-install-recommends python3 make g++ >/dev/null
-    cp -r /src /tmp/app
     cd /tmp/app
     echo "--- node $(node -v), npm $(npm -v)"
     echo "--- npm ci"

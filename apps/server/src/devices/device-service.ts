@@ -415,7 +415,8 @@ export class DeviceService {
     if (online === false) return;
 
     const rows = this.db
-      .prepare(`SELECT * FROM capability_states WHERE device_id = ? AND verification = 'unverified'`)
+      // Mismatch is included because reports can lag: a later report may catch up.
+      .prepare(`SELECT * FROM capability_states WHERE device_id = ? AND verification IN ('unverified', 'mismatch')`)
       .all(id) as CapabilityStateRow[];
 
     const setVerification = this.db.prepare(

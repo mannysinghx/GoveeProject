@@ -11,6 +11,9 @@ import { getTimes } from 'suncalc';
  *  - Fall back: a wall-clock time that happens twice runs once, at the first
  *    (earlier) instant. The occurrence key holds the wall-clock time rather than
  *    the instant, so the repeated hour cannot produce a second run.
+ *
+ * Keys also hold the zone and coordinates. If those are edited, the same date is a
+ * genuinely different occurrence, and an old key must not swallow it.
  */
 
 export interface Occurrence {
@@ -69,18 +72,18 @@ export function occurrenceOnDate(recurrence: Recurrence, zone: string, date: str
     case 'once': {
       if (date !== recurrence.date) return null;
       const { at, note } = resolveLocalTime(date, recurrence.time, zone);
-      return { key: `once:${date}T${recurrence.time}`, at, localDate: date, note };
+      return { key: `once:${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
     }
     case 'daily': {
       if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
       const { at, note } = resolveLocalTime(date, recurrence.time, zone);
-      return { key: `${date}T${recurrence.time}`, at, localDate: date, note };
+      return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
     }
     case 'weekly': {
       if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
       if (!recurrence.weekdays.includes(weekdayOf(date, zone))) return null;
       const { at, note } = resolveLocalTime(date, recurrence.time, zone);
-      return { key: `${date}T${recurrence.time}`, at, localDate: date, note };
+      return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
     }
     case 'solar': {
       if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
@@ -88,7 +91,7 @@ export function occurrenceOnDate(recurrence: Recurrence, zone: string, date: str
       const instant = solarEvent(recurrence, zone, date);
       if (!instant) return null;
       return {
-        key: `${date}:${recurrence.event}:${recurrence.offsetMinutes}`,
+        key: `${date}:${recurrence.event}:${recurrence.offsetMinutes}:${recurrence.latitude},${recurrence.longitude}@${zone}`,
         at: instant,
         localDate: date,
         note: null,

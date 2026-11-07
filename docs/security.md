@@ -8,9 +8,9 @@
 | Passwords | Argon2id, using OWASP's minimum parameters (19 MiB, 2 iterations) |
 | Sessions | Random token in an HttpOnly, SameSite=Strict cookie. Only its SHA-256 hash is stored. Expires after 7 days. |
 | CSRF | A per-session token is required in a header on every state-changing request |
-| Login throttling | Lockouts per address that grow with repeated failures, plus a limit across all addresses. Survives restarts. |
-| First-run setup | Can complete once, enforced by a database constraint. Needs a code when reachable beyond loopback. |
-| Network | Binds to `127.0.0.1` by default. No CORS headers. Loopback binds reject unknown Host headers, which blocks DNS rebinding. |
+| Login throttling | Lockouts per address that grow with repeated failures, plus a limit across all addresses. Holds up under parallel requests and survives restarts. |
+| First-run setup | Can complete once, enforced by a database constraint. Needs a code unless the app is bound to loopback with no proxy or outside host name configured. |
+| Network | Binds to `127.0.0.1` by default. No CORS headers. Unknown Host headers are rejected on loopback binds and in the Docker Compose setup, which blocks DNS rebinding. |
 | Headers | A restrictive Content-Security-Policy with no inline or third-party scripts, plus the Helmet defaults |
 | Routes | Deny by default. Only health, session status, login and setup are public. |
 | Input | Validated with Zod on the server. Device limits are enforced server-side from stored capabilities. |
@@ -29,7 +29,7 @@ chmod 600 .env
 
 Replacing the key means editing `.env` and restarting. There is no way to enter it in the browser in this version.
 
-The app refuses to send the key to any host other than `openapi.api.govee.com`, apart from a loopback address for local testing.
+The app refuses to send the key to any host other than `openapi.api.govee.com`, apart from a loopback address for local testing. It also refuses to follow redirects from Govee, so the key cannot be forwarded elsewhere that way.
 
 ## Remote access
 
@@ -44,7 +44,7 @@ HOST=0.0.0.0
 ALLOWED_HOSTS=192.168.1.20,lights.home.arpa
 ```
 
-Docker: change the port mapping in `docker-compose.yml` to `"8787:8787"`, and set `ALLOWED_HOSTS`.
+Docker: change the port mapping in `docker-compose.yml` to `"8787:8787"`, and set `ALLOWED_HOSTS` in `.env`. Without it, requests using your LAN address are refused.
 
 This sends passwords and cookies over plain HTTP, so anyone able to watch your network could capture them. Use it only on a network you trust.
 
@@ -63,7 +63,9 @@ Do not forward a port directly to the app. Use one of these:
    ALLOWED_HOSTS=lights.example.com
    ```
 
-   With `COOKIE_SECURE=true`, HSTS and related headers are also enabled. Keep the app itself bound to loopback or a private interface, so traffic cannot bypass the proxy. Only set `TRUST_PROXY=true` when a proxy really is in front, or clients can forge their address and get around login throttling.
+   With `COOKIE_SECURE=true`, HSTS and related headers are also enabled. Setup then needs a code, because the bind address no longer says who can connect.
+
+   `TRUST_PROXY=true` means exactly one proxy: the app takes the client address from the last `X-Forwarded-For` entry. The proxy must append to that header, and must pass on the original `Host`. Keep the app bound to loopback or a private interface, so traffic cannot bypass the proxy. Only set this when a proxy really is in front, or clients can forge their address and get around login throttling.
 
 No particular tunnel or hosted service is needed.
 
@@ -155,4 +157,5 @@ They never include the API key, passwords, password hashes, session cookies, aut
 - **Local encryption.** The key lives in plain text in `.env`, and the database is not encrypted. Anyone with read access to the server's files has both. Disk encryption and file permissions are your protection here.
 - **Single account.** There are no roles. Anyone signed in has full control.
 - **Sign-in over HTTP.** Without HTTPS, credentials are unencrypted in transit. This is why the default is loopback.
-- **Login throttling** counts by address. Behind a proxy without `TRUST_PROXY=true`, all clients share one address.
+- **Login throttling** counts by address. Behind a proxy without `TRUST_PROXY=true`, all clients share one address. More than one proxy in a row is not supported, for the same reason.
+- **Lockout as nuisance.** The limit across all addresses means someone able to reach the sign-in page from many addresses could block sign-in for 5 minutes at a time. Sessions already signed in keep working, and schedules are unaffected. This is another reason to keep the app off the public internet.

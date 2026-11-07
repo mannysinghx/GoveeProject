@@ -12,7 +12,7 @@ For a direct install, logs go to the terminal, or to wherever your service manag
 
 ## Setup
 
-**The setup screen asks for a code.** The app is reachable beyond this computer, so a code is required. Inside Docker this is always the case:
+**The setup screen asks for a code.** Someone else might be able to reach the app, so a code is required. This applies in Docker, off loopback, and behind a proxy:
 
 ```bash
 docker compose logs app | grep setupCodeForFirstRun
@@ -20,7 +20,7 @@ docker compose logs app | grep setupCodeForFirstRun
 
 It changes on restart. Set `SETUP_TOKEN` in `.env` for a fixed one.
 
-**"This host name is not allowed."** You reached a loopback-bound app using a name other than `localhost` or `127.0.0.1`, or a name missing from `ALLOWED_HOSTS`. Add it to `ALLOWED_HOSTS` and restart.
+**"This host name is not allowed."** You reached the app using a name other than `localhost` or `127.0.0.1`, or a name missing from `ALLOWED_HOSTS`. Add it to `ALLOWED_HOSTS` and restart.
 
 **Blank page or "The web app has not been built."** Run `npm run build`.
 

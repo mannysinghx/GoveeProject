@@ -104,13 +104,14 @@ export class GoveeGateway {
         }
         if (!failure.retryable || attempt === maxAttempts) throw failure;
 
-        await this.clock.sleep(
-          computeBackoffMs(attempt, {
-            baseMs: retryBaseMs,
-            maxMs: retryMaxMs,
-            retryAfterMs: failure.retryAfterMs,
-          }),
-        );
+        const backoff = computeBackoffMs(attempt, {
+          baseMs: retryBaseMs,
+          maxMs: retryMaxMs,
+          retryAfterMs: failure.retryAfterMs,
+        });
+        // Someone is waiting on this request, so report a long wait instead of sitting through it.
+        if (backoff > READ_MAX_WAIT_MS) throw failure;
+        await this.clock.sleep(backoff);
       }
     }
     throw lastError ?? new TransportError('unknown', 'Unexpected error while calling Govee.');

@@ -356,7 +356,7 @@ describe('route protection', () => {
 
     it('accepts localhost names with any port', async () => {
       for (const host of ['localhost:8787', '127.0.0.1:8787', '[::1]:8787']) {
-        const response = await h.app.inject({ method: 'GET', url: '/api/v1/health', headers: { host } });
+        const response = await h.app.inject({ method: 'GET', url: '/api/v1/auth/session', headers: { host } });
         expect(response.statusCode, host).toBe(200);
       }
     });
@@ -364,8 +364,8 @@ describe('route protection', () => {
     it('honours ALLOWED_HOSTS', async () => {
       const allowed = await createHarness({ env: { ALLOWED_HOSTS: 'lights.home.arpa' } });
       try {
-        const good = await allowed.app.inject({ method: 'GET', url: '/api/v1/health', headers: { host: 'lights.home.arpa:8787' } });
-        const bad = await allowed.app.inject({ method: 'GET', url: '/api/v1/health', headers: { host: 'localhost' } });
+        const good = await allowed.app.inject({ method: 'GET', url: '/api/v1/auth/session', headers: { host: 'lights.home.arpa:8787' } });
+        const bad = await allowed.app.inject({ method: 'GET', url: '/api/v1/auth/session', headers: { host: 'localhost' } });
         expect(good.statusCode).toBe(200);
         expect(bad.statusCode).toBe(421);
       } finally {

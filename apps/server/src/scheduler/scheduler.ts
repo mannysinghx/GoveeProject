@@ -143,6 +143,9 @@ export class Scheduler {
           });
         }
       }
+    } catch (error) {
+      // The next tick tries again. Called from a timer, so nothing else would catch this.
+      this.logger.error({ err: error }, 'Scheduler tick failed');
     } finally {
       this.ticking = false;
     }

@@ -1,6 +1,6 @@
 import { buildApp } from './app/build-app.js';
 import { createContext } from './app/context.js';
-import { ConfigError, loadConfig, loadDotEnv } from './config/env.js';
+import { ConfigError, isLoopbackHost, loadConfig, loadDotEnv } from './config/env.js';
 
 async function main(): Promise<void> {
   loadDotEnv();
@@ -26,6 +26,10 @@ async function main(): Promise<void> {
     logger.warn({ baseUrl: config.govee.baseUrl }, 'Using a local test endpoint instead of the official Govee API');
   }
 
+  if (!isLoopbackHost(config.host) && !config.allowedHosts) {
+    logger.warn('Listening beyond loopback with no ALLOWED_HOSTS, so any Host header is accepted. See docs/security.md.');
+  }
+
   queue.recoverInterrupted();
 
   const app = await buildApp(ctx);
@@ -36,12 +40,18 @@ async function main(): Promise<void> {
     // It stops working the moment an owner exists, and it is regenerated on restart.
     logger.warn(
       { setupCodeForFirstRun: ctx.generatedSetupCode },
-      'First-run setup is open on a non-loopback address. Enter this code on the setup screen.',
+      'First-run setup may be reachable from other computers. Enter this code on the setup screen.',
     );
   }
 
   scheduler.start();
   maintenance.start();
+
+  // Background work handles its own errors. Anything reaching here is a bug, so restart clean.
+  process.on('unhandledRejection', (reason) => {
+    logger.fatal({ err: reason }, 'Unhandled rejection');
+    process.exit(1);
+  });
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {

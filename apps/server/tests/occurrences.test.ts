@@ -44,7 +44,7 @@ describe('daylight saving: spring forward', () => {
   it('runs exactly once on the transition day and returns to normal the next', () => {
     const daily: Recurrence = { kind: 'daily', time: '02:30' };
     const { occurrences } = occurrencesBetween(daily, NY, ms('2026-03-07T12:00:00Z'), ms('2026-03-09T12:00:00Z'), 10);
-    expect(occurrences.map((o) => o.key)).toEqual(['2026-03-08T02:30', '2026-03-09T02:30']);
+    expect(occurrences.map((o) => o.key)).toEqual(['2026-03-08T02:30@America/New_York', '2026-03-09T02:30@America/New_York']);
     expect(occurrences[0]?.at.toISO()).toBe('2026-03-08T07:30:00.000Z');
     expect(occurrences[1]?.at.toISO()).toBe('2026-03-09T06:30:00.000Z');
   });
@@ -69,13 +69,13 @@ describe('daylight saving: fall back', () => {
     const daily: Recurrence = { kind: 'daily', time: '01:30' };
     const { occurrences } = occurrencesBetween(daily, NY, ms('2026-11-01T00:00:00Z'), ms('2026-11-01T12:00:00Z'), 10);
     expect(occurrences).toHaveLength(1);
-    expect(occurrences[0]?.key).toBe('2026-11-01T01:30');
+    expect(occurrences[0]?.key).toBe('2026-11-01T01:30@America/New_York');
   });
 
   it('does not offer a second run between the two instants', () => {
     const daily: Recurrence = { kind: 'daily', time: '01:30' };
     const next = nextOccurrence(daily, NY, ms('2026-11-01T05:30:00Z'));
-    expect(next?.key).toBe('2026-11-02T01:30');
+    expect(next?.key).toBe('2026-11-02T01:30@America/New_York');
   });
 });
 
@@ -124,7 +124,9 @@ describe('sunrise and sunset', () => {
 
   it('builds a stable key from the date, event and offset', () => {
     const rule: Recurrence = { kind: 'solar', event: 'sunrise', offsetMinutes: 15, ...london };
-    expect(nextOccurrence(rule, 'Europe/London', ms('2026-06-21T00:00:00Z'))?.key).toBe('2026-06-21:sunrise:15');
+    expect(nextOccurrence(rule, 'Europe/London', ms('2026-06-21T00:00:00Z'))?.key).toBe(
+      '2026-06-21:sunrise:15:51.5,-0.12@Europe/London',
+    );
   });
 
   it('skips dates with no sunset (polar day) and resumes when the sun sets again', () => {

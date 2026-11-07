@@ -111,13 +111,15 @@ export class AuthService {
   }
 
   async login(username: string, password: string, ip: string): Promise<{ token: string; session: SessionInfo }> {
+    // Counted before the slow password check, with no await in between, so parallel guesses
+    // cannot all pass the lock check at once. A successful sign-in clears it again.
     this.assertNotLocked(ip);
+    this.recordFailure(ip);
     const owner = this.owner();
     // Verify against a dummy hash when the name is wrong, so timing does not reveal it.
     const stored = owner && owner.username.toLowerCase() === username.toLowerCase() ? owner.password_hash : await this.getDummyHash();
     const matches = await verify(stored, password).catch(() => false);
     if (!owner || owner.username.toLowerCase() !== username.toLowerCase() || !matches) {
-      this.recordFailure(ip);
       this.activity.record({ eventType: 'auth', outcome: 'failure', message: 'Failed login attempt.', details: { ip } });
       this.logger.warn({ ip }, 'Failed login attempt');
       throw new AppError(401, 'invalid_credentials', 'That username or password is not correct.');
@@ -173,7 +175,6 @@ export class AuthService {
   }
 
   async changePassword(
-    session: SessionInfo,
     currentPassword: string,
     newPassword: string,
     ip: string,
@@ -181,11 +182,12 @@ export class AuthService {
     this.assertNotLocked(ip);
     const owner = this.owner();
     if (!owner) throw new AppError(409, 'setup_required', 'No owner account exists yet.');
+    this.recordFailure(ip);
     const matches = await verify(owner.password_hash, currentPassword).catch(() => false);
     if (!matches) {
-      this.recordFailure(ip);
       throw new AppError(403, 'invalid_credentials', 'The current password is not correct.');
     }
+    this.clearFailures(ip);
     const passwordHash = await hashPassword(newPassword);
     this.db.transaction(() => {
       this.db
@@ -196,7 +198,6 @@ export class AuthService {
     })();
     this.activity.record({ eventType: 'auth', outcome: 'success', message: 'Owner password changed.', details: { ip } });
     this.logger.info({ ip }, 'Owner password changed');
-    void session;
     return this.createSession(owner.username);
   }
 

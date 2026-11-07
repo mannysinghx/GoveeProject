@@ -37,6 +37,9 @@ export class TokenBucket {
   }
 }
 
+/** One response can stop traffic for this long at most. A later 429 can extend it. */
+const MAX_PAUSE_MS = 3600 * 1000;
+
 /**
  * Client-side limits so the app stays below Govee's. Buckets are per account or
  * per device to match how Govee documents each endpoint. A 429 from Govee pauses
@@ -157,7 +160,7 @@ export class GoveeRateLimiter {
 
   /** Stops all Govee traffic for a while. Only ever extends an existing pause. */
   pause(ms: number): void {
-    this.pausedUntilMs = Math.max(this.pausedUntilMs, this.clock.nowMs() + ms);
+    this.pausedUntilMs = Math.max(this.pausedUntilMs, this.clock.nowMs() + Math.min(ms, MAX_PAUSE_MS));
   }
 
   pausedUntil(): string | null {

@@ -44,11 +44,11 @@ export class Maintenance {
     }
     const { discoveryRefreshHours, apiKeyConfigured } = this.config;
     if (!apiKeyConfigured || discoveryRefreshHours <= 0) return;
-    const last = this.system.lastDiscovery();
-    // Discovery stays manual until the owner has run it once.
-    if (!last) return;
-    if (this.clock.nowMs() - Date.parse(last) < discoveryRefreshHours * HOUR_MS) return;
     try {
+      const last = this.system.lastDiscovery();
+      // Discovery stays manual until the owner has run it once.
+      if (!last) return;
+      if (this.clock.nowMs() - Date.parse(last) < discoveryRefreshHours * HOUR_MS) return;
       await this.devices.discover();
     } catch (error) {
       this.logger.warn({ err: error }, 'Background discovery refresh failed');

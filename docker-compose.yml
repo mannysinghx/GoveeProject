@@ -12,6 +12,8 @@ services:
       HOST: 0.0.0.0
       PORT: "8787"
       DATABASE_PATH: /data/govee-light-manager.sqlite
+      # The container binds to all interfaces, so the app cannot infer this. Blocks DNS rebinding.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,[::1]}
       # Schedules can set their own zone. This only affects the default for new ones.
       TZ: ${TZ:-UTC}
     ports:

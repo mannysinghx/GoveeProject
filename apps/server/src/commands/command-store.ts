@@ -199,7 +199,7 @@ export class CommandStore {
            SELECT id FROM command_history
            WHERE device_id = ? AND instance = ? AND status = 'accepted'
            ORDER BY accepted_at DESC, rowid DESC LIMIT 1
-         ) AND verification = 'unverified'`,
+         ) AND verification IN ('unverified', 'mismatch')`,
       )
       .run(verification, deviceId, instance);
   }

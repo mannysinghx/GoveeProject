@@ -97,7 +97,7 @@ Your browser's time zone becomes the default for new schedules. You can change i
 | `GOVEE_API_KEY` | none | Your Govee key |
 | `HOST` | `127.0.0.1` | Address to listen on. Read [Remote access](security.md#remote-access) before changing it. |
 | `PORT` | `8787` | Port to listen on |
-| `ALLOWED_HOSTS` | localhost names | Host names browsers may use |
+| `ALLOWED_HOSTS` | localhost names on loopback binds and in Docker Compose; otherwise any | Host names browsers may use |
 | `COOKIE_SECURE` | `auto` | Secure session cookies. Set to `true` behind HTTPS. |
 | `DATABASE_PATH` | `./data/govee-light-manager.sqlite` | Where data is kept |
 | `SETUP_TOKEN` | none | Your own setup code |

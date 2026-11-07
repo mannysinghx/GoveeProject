@@ -32,6 +32,8 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** Routes without this flag require a signed-in session. Secure by default. */
     public?: boolean;
+    /** Skips the Host check. Only for the health route, which container health checks call by IP. */
+    anyHost?: boolean;
   }
 }
 
@@ -52,6 +54,15 @@ function hostnameOf(hostHeader: string | undefined): string {
   return lower.split(':')[0] ?? '';
 }
 
+function isApiPath(url: string): boolean {
+  const path = url.split('?')[0] ?? '';
+  try {
+    return decodeURIComponent(path).startsWith('/api/');
+  } catch {
+    return path.startsWith('/api/');
+  }
+}
+
 function errorBody(request: FastifyRequest, code: string, message: string, details?: unknown): ApiErrorBody {
   return { error: { code, message, requestId: request.id, ...(details === undefined ? {} : { details }) } };
 }
@@ -61,7 +72,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
 
   const app = Fastify({
     loggerInstance: logger as unknown as FastifyBaseLogger,
-    trustProxy: config.trustProxy,
+    // One hop, not "true": with "true" the client-supplied left end of X-Forwarded-For
+    // would become the client address, and forging it would defeat login throttling.
+    trustProxy: config.trustProxy ? (_address: string, hop: number) => hop < 1 : false,
     bodyLimit: 256 * 1024,
     genReqId: (req) => {
       const inbound = req.headers['x-request-id'];
@@ -74,6 +87,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   const allowedHosts = allowedHostSet(ctx);
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
+    if (request.routeOptions.config.anyHost) return;
     if (allowedHosts && !allowedHosts.has(hostnameOf(request.headers.host))) {
       throw new AppError(421, 'host_not_allowed', 'This host name is not allowed. Set ALLOWED_HOSTS on the server.');
     }
@@ -103,22 +117,6 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   });
   await app.register(cookie);
 
-  // Default deny: anything under /api/ needs a session unless the route says public.
-  app.addHook('onRequest', async (request) => {
-    if (!request.url.startsWith('/api/')) return;
-    request.session = ctx.auth.validateSession(request.cookies[SESSION_COOKIE]);
-    if (request.routeOptions.config.public) return;
-    if (!request.session) {
-      throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
-    }
-    if (MUTATING_METHODS.has(request.method)) {
-      const header = request.headers['x-csrf-token'];
-      if (typeof header !== 'string' || !constantTimeEqual(header, request.session.csrfToken)) {
-        throw new AppError(403, 'csrf_failed', 'The security token is missing or out of date. Reload the page.');
-      }
-    }
-  });
-
   app.setErrorHandler((error: FastifyError | AppError, request: FastifyRequest, reply: FastifyReply) => {
     if (error instanceof AppError) {
       if (error.statusCode >= 500) {
@@ -143,6 +141,22 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
 
   await app.register(
     async (api) => {
+      // Default deny. This hook is attached to the routes in this plugin rather than
+      // matching the URL text, so no spelling of a path (such as /%61pi/) can skip it.
+      api.addHook('onRequest', async (request) => {
+        request.session = ctx.auth.validateSession(request.cookies[SESSION_COOKIE]);
+        if (request.routeOptions.config.public) return;
+        if (!request.session) {
+          throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
+        }
+        if (MUTATING_METHODS.has(request.method)) {
+          const header = request.headers['x-csrf-token'];
+          if (typeof header !== 'string' || !constantTimeEqual(header, request.session.csrfToken)) {
+            throw new AppError(403, 'csrf_failed', 'The security token is missing or out of date. Reload the page.');
+          }
+        }
+      });
+
       registerAuthRoutes(api, ctx);
       registerSystemRoutes(api, ctx);
       registerDeviceRoutes(api, ctx);
@@ -176,7 +190,11 @@ async function registerFrontend(app: FastifyInstance, ctx: AppContext): Promise<
   }
 
   app.setNotFoundHandler((request, reply) => {
-    if (request.url.startsWith('/api/')) {
+    if (isApiPath(request.url)) {
+      // Signed-out callers cannot use this to find out which endpoints exist.
+      if (!ctx.auth.validateSession(request.cookies[SESSION_COOKIE])) {
+        return reply.status(401).send(errorBody(request, 'unauthenticated', 'Sign in to continue.'));
+      }
       return reply.status(404).send(errorBody(request, 'not_found', 'That endpoint does not exist.'));
     }
     if (hasFrontend && request.method === 'GET') {

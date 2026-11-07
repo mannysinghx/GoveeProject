@@ -53,7 +53,6 @@ export function registerAuthRoutes(api: FastifyInstance, ctx: AppContext): void 
   api.post('/auth/change-password', async (request, reply) => {
     const body = parseInput(changePasswordRequestSchema, request.body);
     const { token, session } = await auth.changePassword(
-      request.session as SessionInfo,
       body.currentPassword,
       body.newPassword,
       clientIp(request),

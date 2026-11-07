@@ -69,10 +69,18 @@ export function readVersion(): string {
   }
 }
 
-/** Binding beyond loopback means others could reach setup first, so a code is required. */
+/**
+ * If anyone else could reach setup first, a code is required. That covers a non-loopback
+ * bind, and a loopback bind behind a reverse proxy, where the bind address says nothing
+ * about who can connect.
+ */
 function resolveSetupCode(config: AppConfig): { code: string | null; generated: boolean } {
   if (config.setupToken) return { code: config.setupToken, generated: false };
-  if (isLoopbackHost(config.host)) return { code: null, generated: false };
+  const reachableByOthers =
+    !isLoopbackHost(config.host) ||
+    config.trustProxy ||
+    (config.allowedHosts ?? []).some((host) => !isLoopbackHost(host));
+  if (!reachableByOthers) return { code: null, generated: false };
   return { code: crypto.randomBytes(9).toString('base64url'), generated: true };
 }
 

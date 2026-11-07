@@ -32,7 +32,7 @@ Official Govee cloud API --> your Govee devices
 - **The client never supplies Govee addresses or capability structures.** It names a device by internal id, and an action in the app's own vocabulary. `devices/command-builder.ts` turns that into a Govee payload, using limits from the stored capabilities. Scene values come from the server's cache and are looked up by key.
 - **The transport knows nothing about the database, and vice versa.** Services above the `LightTransport` interface never see HTTP.
 - **Controls are data-driven.** `govee/capabilities.ts` normalizes raw capabilities, and the UI renders from the result. Nothing checks a model number, apart from a cosmetic highlight for the H805C.
-- **Authentication is deny by default.** A global hook requires a session on everything under `/api/`, unless a route explicitly declares itself public.
+- **Authentication is deny by default.** A hook attached to every route under `/api/v1` requires a session unless the route declares itself public. It does not look at URL text, so no spelling of a path can avoid it.
 
 ## Command lifecycle
 
@@ -61,7 +61,7 @@ Separately, `verification` records what a later Govee report showed:
 |---|---|
 | `unverified` | No later report yet |
 | `confirmed` | A later report, from an online device, shows the same value |
-| `mismatch` | A later report shows a different value |
+| `mismatch` | A later report shows a different value. Can still become `confirmed`, since reports can lag. |
 | `not_reported` | Govee gives no value for this setting |
 
 The app stores requested, accepted and reported values separately for each setting (`capability_states`), with timestamps, so the UI can show each without implying the others.
@@ -73,7 +73,7 @@ The app stores requested, accepted and reported values separately for each setti
 - **One FIFO per device, one request in flight per device.** A later command cannot overtake an earlier one. Devices do not block each other.
 - **Coalescing.** A queued brightness is replaced by a newer brightness. Colour, temperature and scene share a key, because each overrides the others. Replacement only happens between neighbours in the queue, so ordering that later commands might depend on is never disturbed. Commands from presets, groups and segment plans are never coalesced.
 - **Retries.** Bounded, with exponential backoff and jitter, honouring `Retry-After`. Only rate limits, timeouts, network errors and 5xx responses are retried. Commands set absolute values, so a retry after a timeout cannot compound.
-- **Rate limits.** See [Govee integration](govee-integration.md#rate-limits). A 429 pauses all Govee traffic for the requested time. A command that would wait longer than `QUEUE_MAX_WAIT_MS` fails rather than firing long after anyone expected it.
+- **Rate limits.** See [Govee integration](govee-integration.md#rate-limits). A 429 pauses all Govee traffic for the requested time, up to an hour per response. A command that cannot be sent within `QUEUE_MAX_WAIT_MS` of being queued fails, rather than firing long after anyone expected it.
 
 ## Multi-device runs
 
@@ -97,7 +97,7 @@ Each tick, every 15 seconds:
 
 **No in-memory timers hold schedule state.** On startup, the first tick finds everything that came due while the app was down.
 
-**Duplicate prevention.** `UNIQUE (schedule_id, occurrence_key)` is the guard. The key is built from the wall-clock date and time rather than the instant. An occurrence can only be claimed once, across restarts, across a rewound schedule row, and even by a second process.
+**Duplicate prevention.** `UNIQUE (schedule_id, occurrence_key)` is the guard. The key is built from the wall-clock date and time rather than the instant, along with the zone and any coordinates, so editing those creates a genuinely new occurrence. An occurrence can only be claimed once, across restarts, across a rewound schedule row, and even by a second process.
 
 **Crash policy.** A run still marked `running` at startup becomes `interrupted` and is not retried. It may have partly executed, and repeating lighting commands blindly is worse than reporting it.
 

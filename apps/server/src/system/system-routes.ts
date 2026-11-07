@@ -8,7 +8,7 @@ export function registerSystemRoutes(api: FastifyInstance, ctx: AppContext): voi
   const { config, db, scheduler, settings, system, queue, limiter, devices, schedules, activity, clock, version } = ctx;
 
   /** Public on purpose, for container health checks. Reveals nothing sensitive. */
-  api.get('/health', { config: { public: true } }, async (_request, reply) => {
+  api.get('/health', { config: { public: true, anyHost: true } }, async (_request, reply) => {
     const databaseOk = checkDatabase(db);
     const body: HealthDto = {
       status: databaseOk ? 'ok' : 'degraded',

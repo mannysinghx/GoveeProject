@@ -33,6 +33,9 @@ interface Entry {
   commandId: string;
   requestId: string;
   input: EnqueueInput;
+  command: CommandDto;
+  /** A command past this time fails rather than firing long after anyone expected it. */
+  deadlineMs: number;
   resolve: (result: CommandDto) => void;
 }
 
@@ -125,7 +128,14 @@ export class CommandQueue {
     const done = new Promise<CommandDto>((r) => {
       resolve = r;
     });
-    queue.push({ commandId: command.id, requestId: command.requestId, input, resolve });
+    queue.push({
+      commandId: command.id,
+      requestId: command.requestId,
+      input,
+      command,
+      deadlineMs: this.clock.nowMs() + this.config.queue.maxWaitMs,
+      resolve,
+    });
     this.queues.set(input.deviceId, queue);
     this.startDrain(input.deviceId);
     return { command, done };
@@ -183,11 +193,15 @@ export class CommandQueue {
 
   private startDrain(deviceId: string): void {
     if (this.drains.has(deviceId)) return;
-    const drain = this.drain(deviceId).finally(() => {
-      this.drains.delete(deviceId);
-      // A command may have arrived between the last check and this cleanup.
-      if ((this.queues.get(deviceId)?.length ?? 0) > 0 && !this.stopped) this.startDrain(deviceId);
-    });
+    const drain = this.drain(deviceId)
+      .catch((error: unknown) => {
+        this.logger.error({ err: error, deviceId }, 'Command queue stopped unexpectedly');
+      })
+      .finally(() => {
+        this.drains.delete(deviceId);
+        // A command may have arrived between the last check and this cleanup.
+        if ((this.queues.get(deviceId)?.length ?? 0) > 0 && !this.stopped) this.startDrain(deviceId);
+      });
     this.drains.set(deviceId, drain);
   }
 
@@ -206,12 +220,27 @@ export class CommandQueue {
         // Execute handles expected failures. Anything else is a bug, and it must not
         // leave the promise hanging or stop later commands for this device.
         this.logger.error({ err: error, commandId: entry.commandId }, 'Unexpected command queue error');
-        entry.resolve(
-          this.store.markFinished(entry.commandId, 'failed', 0, 'unknown', 'Unexpected error while sending the command.'),
-        );
+        entry.resolve(this.failSafely(entry));
       } finally {
         this.inFlight.delete(deviceId);
       }
+    }
+  }
+
+  /** Answers the caller even if the database cannot record the outcome. */
+  private failSafely(entry: Entry): CommandDto {
+    const message = 'Unexpected error while sending the command.';
+    try {
+      return this.store.markFinished(entry.commandId, 'failed', 0, 'unknown', message);
+    } catch (error) {
+      this.logger.error({ err: error, commandId: entry.commandId }, 'Could not record a command outcome');
+      return {
+        ...entry.command,
+        status: 'failed',
+        verification: 'not_applicable',
+        errorCategory: 'unknown',
+        errorMessage: message,
+      };
     }
   }
 
@@ -223,7 +252,7 @@ export class CommandQueue {
 
     while (attempt < maxAttempts) {
       try {
-        await this.limiter.acquire('control', input.deviceId, this.config.queue.maxWaitMs);
+        await this.limiter.acquire('control', input.deviceId, Math.max(0, entry.deadlineMs - this.clock.nowMs()));
       } catch (error) {
         const failure = this.asTransportError(error);
         this.gateway.noteFailure(failure, { deviceId: input.deviceId, endpoint: 'control' });
@@ -247,13 +276,15 @@ export class CommandQueue {
         if (!failure.retryable || attempt >= maxAttempts) {
           return this.finishFailure(entry, attempt, failure);
         }
-        await this.clock.sleep(
-          computeBackoffMs(attempt, {
-            baseMs: retryBaseMs,
-            maxMs: retryMaxMs,
-            retryAfterMs: failure.retryAfterMs,
-          }),
-        );
+        const backoff = computeBackoffMs(attempt, {
+          baseMs: retryBaseMs,
+          maxMs: retryMaxMs,
+          retryAfterMs: failure.retryAfterMs,
+        });
+        if (this.clock.nowMs() + backoff > entry.deadlineMs) {
+          return this.finishFailure(entry, attempt, failure);
+        }
+        await this.clock.sleep(backoff);
       }
     }
     return this.finishFailure(
