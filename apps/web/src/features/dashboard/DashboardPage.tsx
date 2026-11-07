@@ -11,6 +11,7 @@ import { Badge, Button, Card, EmptyState, ErrorNotice, Loading, Notice, PageHead
 import { dateTime, formatStateValue, timeAgo } from '../../lib/format';
 import { useVisibleInterval } from '../../lib/hooks';
 import {
+  useConnectionReport,
   useDeviceControl,
   useDevices,
   useDiagnostics,
@@ -160,6 +161,25 @@ function QuickPresets({ presets }: { presets: PresetDto[] }) {
   );
 }
 
+/** Points to the Connections page when the background checks have found something. */
+function ConnectionAlert() {
+  const report = useConnectionReport();
+  if (!report.data || (report.data.overall !== 'problem' && report.data.overall !== 'attention')) return null;
+  const first = report.data.advice[0];
+  const waiting = report.data.waiting.length;
+  return (
+    <Notice
+      tone={report.data.overall === 'problem' ? 'bad' : 'warn'}
+      title={first?.title ?? `${waiting} light${waiting === 1 ? '' : 's'} missed a pattern`}
+      action={
+        <Link to="/connections" className="shrink-0 text-sm font-medium underline">
+          See what to try
+        </Link>
+      }
+    />
+  );
+}
+
 export function DashboardPage() {
   const devices = useDevices();
   const diagnostics = useDiagnostics();
@@ -205,6 +225,7 @@ export function DashboardPage() {
 
       <div className="space-y-5">
         {diagnostics.data ? <ConnectionBanner diagnostics={diagnostics.data} /> : null}
+        <ConnectionAlert />
         {diagnostics.data?.govee.usingLocalTestEndpoint ? (
           <Notice tone="warn" title="Test mode">
             Connected to a local test endpoint, not Govee. The devices below are test data.

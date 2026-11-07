@@ -9,6 +9,8 @@ import {
   canvasCells,
   cellColor,
   cellKey,
+  ledsInSegment,
+  modelSize,
   clearPattern,
   emptyPattern,
   gradientFill,
@@ -23,6 +25,8 @@ import {
   serpentineRows,
   slowestStringCommands,
   toSettings,
+  withLedCount,
+  type PatternString,
 } from './pattern-model';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -225,6 +229,58 @@ describe('pattern model', () => {
   });
 });
 
+describe('LEDs on a string', () => {
+  const strings = resolveStrings([left], []);
+  const string = strings[0] as PatternString;
+
+  it('works out the count from the model', () => {
+    expect(modelSize('H805C')).toEqual({ lengthFeet: 150, ledsPer100Feet: 72, leds: 108 });
+    expect(modelSize('h805c')?.leds).toBe(108);
+    expect(modelSize('H9999')).toBeNull();
+    expect(string).toMatchObject({ sku: 'H805C', ledCount: 108, ledSource: 'model' });
+  });
+
+  it('gives each H805C segment 4 LEDs, covering all 108 exactly once, in order', () => {
+    expect(ledsInSegment(string, 0)).toEqual([1, 2, 3, 4]);
+    expect(ledsInSegment(string, 26)).toEqual([105, 106, 107, 108]);
+    const all = string.segments.flatMap((segment) => ledsInSegment(string, segment));
+    expect(all).toEqual(Array.from({ length: 108 }, (_, i) => i + 1));
+  });
+
+  it('keeps LEDs tied to their segment when a string is flipped', () => {
+    const flipped = resolveStrings([left], [{ deviceId: 'left', included: true, reversed: true }])[0] as PatternString;
+    expect(flipped.segments[0]).toBe(26);
+    expect(ledsInSegment(flipped, 26)).toEqual([108, 107, 106, 105]);
+    expect(ledsInSegment(flipped, 0)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('spreads LEDs that do not divide evenly, losing none', () => {
+    const uneven = { ...string, ledCount: 100 };
+    const sizes = string.segments.map((segment) => ledsInSegment(uneven, segment).length);
+    expect(sizes.reduce((a, b) => a + b)).toBe(100);
+    expect(Math.max(...sizes) - Math.min(...sizes)).toBe(1);
+  });
+
+  it('never allows fewer LEDs than segments, since each segment needs one', () => {
+    const saved = resolveStrings([left], [{ deviceId: 'left', included: true, reversed: false, ledCount: 5 }])[0] as PatternString;
+    expect(saved).toMatchObject({ ledCount: 27, ledSource: 'owner' });
+    expect(withLedCount(strings, 'left', 3)[0]).toMatchObject({ ledCount: 27, ledSource: 'owner' });
+  });
+
+  it('only saves a count the owner set, and goes back to the model when cleared', () => {
+    expect(toSettings(strings)[0]).toEqual({ deviceId: 'left', included: true, reversed: false });
+    const set = withLedCount(strings, 'left', 54);
+    expect(toSettings(set)[0]).toEqual({ deviceId: 'left', included: true, reversed: false, ledCount: 54 });
+    expect(withLedCount(set, 'left', null)[0]).toMatchObject({ ledCount: 108, ledSource: 'model' });
+  });
+
+  it('changes nothing about what is sent to the lights', () => {
+    const state = paintCell(emptyPattern(), cellKey('left', 0), '#ff0000');
+    const withoutCount = patternToActions(state, [{ ...string, ledCount: null, ledSource: null }], options);
+    expect(patternToActions(state, strings, options)).toEqual(withoutCount);
+  });
+});
+
 describe('pattern editor', () => {
   const routes = {
     'GET /devices': { json: { devices: house } },
@@ -257,6 +313,73 @@ describe('pattern editor', () => {
     expect(titles[0]).toContain('1. Outdoor Left');
     expect(titles[1]).toContain('2. Outdoor Center');
     expect(titles[2]).toContain('3. Outdoor Right');
+  });
+
+  it('draws one box per LED, worked out from the model, and says where the count comes from', async () => {
+    mockApi(routes);
+    const { container } = open();
+    await ready();
+    expect(container.querySelectorAll('[data-led]')).toHaveLength(324);
+    expect(screen.getByText('324 LEDs in 81 segments across 3 strings.', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText('H805C: 150 ft at about 72 LEDs per 100 ft.')).toHaveLength(3);
+    expect(screen.getByText(/can only color whole segments/)).toBeInTheDocument();
+  });
+
+  it('colors every LED in a segment together, because that is what the lights will do', async () => {
+    mockApi(routes);
+    const { container } = open();
+    await ready();
+    setColor('Fill color', '#ff0000');
+    const led = cell('Outdoor Left', 0).querySelector('[data-led="3"]') as HTMLElement;
+    fireEvent.pointerDown(led);
+    fireEvent.pointerUp(window);
+    const boxes = [...cell('Outdoor Left', 0).querySelectorAll<HTMLElement>('[data-led]')];
+    expect(boxes.map((b) => b.dataset.led)).toEqual(['1', '2', '3', '4']);
+    for (const box of boxes) expect(box.style.backgroundColor).toBe('rgb(255, 0, 0)');
+    const next = container.querySelector('[data-cell="left:1"] [data-led]') as HTMLElement;
+    expect(next.style.backgroundColor).toBe('rgb(255, 255, 255)');
+  });
+
+  it('keeps the LEDs in string order along rows that run right to left', async () => {
+    mockApi(routes);
+    const { container } = open();
+    await ready();
+    const numbers = (segment: number) =>
+      [...container.querySelectorAll<HTMLElement>(`[data-cell="left:${segment}"] [data-led]`)].map((b) => Number(b.dataset.led));
+    expect(numbers(5)).toEqual([21, 22, 23, 24]); // First row, left to right.
+    expect(numbers(6)).toEqual([28, 27, 26, 25]); // Second row, right to left.
+  });
+
+  it('lets the owner correct the count for a string that was cut or extended, and remembers it', async () => {
+    const { calls } = mockApi(routes);
+    const { container } = open();
+    await ready();
+    const input = screen.getByRole('spinbutton', { name: 'LEDs on Outdoor Left' });
+    fireEvent.change(input, { target: { value: '54' } });
+    fireEvent.blur(input);
+    await waitFor(() => expect(container.querySelectorAll('[data-cell^="left:"] [data-led]')).toHaveLength(54));
+    let saved = calls.filter((c) => c.method === 'PATCH' && c.path === '/settings').at(-1)?.body as { patternStrings: { deviceId: string; ledCount?: number }[] };
+    expect(saved.patternStrings.find((s) => s.deviceId === 'left')?.ledCount).toBe(54);
+    expect(saved.patternStrings.find((s) => s.deviceId === 'right')).not.toHaveProperty('ledCount');
+    expect(screen.getByText('You set this.')).toBeInTheDocument();
+
+    const again = screen.getByRole('spinbutton', { name: 'LEDs on Outdoor Left' });
+    fireEvent.change(again, { target: { value: '' } });
+    fireEvent.blur(again);
+    await waitFor(() => expect(container.querySelectorAll('[data-cell^="left:"] [data-led]')).toHaveLength(108));
+    saved = calls.filter((c) => c.method === 'PATCH' && c.path === '/settings').at(-1)?.body as typeof saved;
+    expect(saved.patternStrings.find((s) => s.deviceId === 'left')).not.toHaveProperty('ledCount');
+  });
+
+  it('falls back to one box per segment, and says so, for a model with no known size', async () => {
+    const unknown = [string27('other', 'Patio', { sku: 'H9999' })];
+    mockApi({ ...routes, 'GET /devices': { json: { devices: unknown } } });
+    const { container } = open();
+    await screen.findByText('1 light string found');
+    expect(container.querySelectorAll('[data-led]')).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /segment \d+,/ })).toHaveLength(27);
+    expect(screen.getByText(/Count them and enter it/)).toBeInTheDocument();
+    expect(screen.queryByText(/can only color whole segments/)).not.toBeInTheDocument();
   });
 
   it('flags an offline string, and explains why a group is not shown', async () => {
@@ -298,7 +421,7 @@ describe('pattern editor', () => {
     });
     // Flipped, the first cell on screen is the far end of the string.
     const firstCell = screen.getAllByRole('button', { name: /segment \d+,/ })[0];
-    expect(firstCell).toHaveAccessibleName('Outdoor Left segment 26, #ffffff');
+    expect(firstCell).toHaveAccessibleName('Outdoor Left segment 26, LEDs 105 to 108, #ffffff');
   });
 
   it('lets a drag cross from one string to the next, as one undo', async () => {
@@ -309,21 +432,21 @@ describe('pattern editor', () => {
     fireEvent.pointerDown(cell('Outdoor Left', 26));
     fireEvent.pointerMove(cell('Outdoor Center', 0));
     fireEvent.pointerUp(window);
-    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ff0000');
-    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ff0000');
-    expect(cell('Outdoor Right', 0)).toHaveAccessibleName('Outdoor Right segment 0, #ffffff');
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, LEDs 105 to 108, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, LEDs 1 to 4, #ff0000');
+    expect(cell('Outdoor Right', 0)).toHaveAccessibleName('Outdoor Right segment 0, LEDs 1 to 4, #ffffff');
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ffffff');
-    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ffffff');
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, LEDs 105 to 108, #ffffff');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, LEDs 1 to 4, #ffffff');
     await userEvent.click(screen.getByRole('button', { name: 'Redo' }));
-    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, LEDs 1 to 4, #ff0000');
 
     await userEvent.click(screen.getByRole('button', { name: 'Erase' }));
     fireEvent.pointerDown(cell('Outdoor Center', 0));
     fireEvent.pointerUp(window);
-    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, #ffffff');
-    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, #ff0000');
+    expect(cell('Outdoor Center', 0)).toHaveAccessibleName('Outdoor Center segment 0, LEDs 1 to 4, #ffffff');
+    expect(cell('Outdoor Left', 26)).toHaveAccessibleName('Outdoor Left segment 26, LEDs 105 to 108, #ff0000');
   });
 
   it('can be painted from the keyboard', async () => {
@@ -333,7 +456,7 @@ describe('pattern editor', () => {
     setColor('Fill color', '#00ff00');
     cell('Outdoor Right', 5).focus();
     await userEvent.keyboard('{Enter}');
-    expect(cell('Outdoor Right', 5)).toHaveAccessibleName('Outdoor Right segment 5, #00ff00');
+    expect(cell('Outdoor Right', 5)).toHaveAccessibleName('Outdoor Right segment 5, LEDs 21 to 24, #00ff00');
   });
 
   it('sends each string its own commands, says how long, and is honest about the result', async () => {
@@ -446,8 +569,8 @@ describe('pattern editor', () => {
     });
     open('/patterns/p1');
     await waitFor(() => expect(screen.getByLabelText('Pattern name')).toHaveValue('Xmas'));
-    expect(cell('Outdoor Left', 0)).toHaveAccessibleName('Outdoor Left segment 0, #ff0000');
-    expect(cell('Outdoor Left', 1)).toHaveAccessibleName('Outdoor Left segment 1, #ffffff');
+    expect(cell('Outdoor Left', 0)).toHaveAccessibleName('Outdoor Left segment 0, LEDs 1 to 4, #ff0000');
+    expect(cell('Outdoor Left', 1)).toHaveAccessibleName('Outdoor Left segment 1, LEDs 5 to 8, #ffffff');
     await userEvent.click(screen.getByRole('button', { name: 'Save pattern' }));
     await waitFor(() => expect(calls.find((c) => c.method === 'PATCH' && c.path === '/presets/p1')).toBeTruthy());
     expect(await screen.findByText('Presets list')).toBeInTheDocument();

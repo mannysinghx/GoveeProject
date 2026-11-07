@@ -36,6 +36,8 @@ import {
   clearPattern,
   emptyPattern,
   gradientFill,
+  ledsInSegment,
+  modelSize,
   moveString,
   paintableDevices,
   paintCell,
@@ -47,11 +49,48 @@ import {
   serpentineRows,
   slowestStringCommands,
   toSettings,
+  withLedCount,
   type PatternState,
   type PatternString,
 } from './pattern-model';
 
-const CELLS_PER_ROW = 9;
+/** Fewer per row when each segment shows several LED boxes, so the boxes stay visible on a phone. */
+function segmentsPerRow(string: PatternString): number {
+  return (string.ledCount ?? 0) > string.segments.length ? 6 : 9;
+}
+
+/** Where a string's LED count comes from, because Govee's API does not report it. */
+function ledCountSource(string: PatternString): string {
+  const size = modelSize(string.sku);
+  if (string.ledSource === 'owner') return 'You set this.';
+  if (size) return `${string.sku}: ${size.lengthFeet} ft at about ${size.ledsPer100Feet} LEDs per 100 ft.`;
+  return 'Govee does not report this for your model. Count them and enter it to get one box per LED.';
+}
+
+function LedCountInput({ string, onCommit }: { string: PatternString; onCommit: (count: number | null) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-ink-300">
+      LEDs
+      <input
+        // Starts afresh when the value changes elsewhere, such as after being limited.
+        key={`${string.ledSource}-${string.ledCount}`}
+        type="number"
+        aria-label={`LEDs on ${string.name}`}
+        className="min-h-9 w-20 rounded-lg border border-ink-700 bg-ink-850 px-2 text-sm text-ink-100"
+        min={string.segments.length}
+        max={1000}
+        placeholder="Count"
+        defaultValue={string.ledCount ?? ''}
+        onBlur={(event) => {
+          const text = event.target.value.trim();
+          const count = Math.min(1000, Math.floor(Number(text)));
+          const next = text === '' || !Number.isFinite(count) || count < 1 ? null : count;
+          if (next !== string.ledCount) onCommit(next);
+        }}
+      />
+    </label>
+  );
+}
 /** Finer than the narrowest cell on a phone, so a stroke cannot jump over one. */
 const STROKE_SAMPLE_PX = 8;
 
@@ -116,9 +155,14 @@ function StringArrangement({
               />
               <span className="min-w-0">
                 <span className="block font-medium break-words">{string.name}</span>
-                <span className="block text-xs text-ink-400">{string.segments.length} segments</span>
+                <span className="block text-xs text-ink-400">
+                  {string.ledCount !== null ? `${string.ledCount} LEDs in ` : ''}
+                  {string.segments.length} segments
+                </span>
+                <span className="block text-xs text-ink-400">{ledCountSource(string)}</span>
               </span>
             </label>
+            <LedCountInput string={string} onCommit={(count) => onChange(withLedCount(strings, string.deviceId, count))} />
             {string.connectivity === 'offline' ? <Badge tone="bad">Offline</Badge> : null}
             {string.reversed ? <Badge tone="info">Flipped</Badge> : null}
             <div className="ml-auto flex gap-1">
@@ -212,7 +256,7 @@ function SeriesCanvas({
   return (
     <div
       role="group"
-      aria-label="Your light strings in series. Each cell is one segment."
+      aria-label="Your light strings in series. Each small box is one LED, and LEDs in a segment change together."
       className="space-y-4 select-none"
       onPointerDown={(event: ReactPointerEvent) => {
         const key = cellAtPoint(event.clientX, event.clientY, event.target);
@@ -239,62 +283,86 @@ function SeriesCanvas({
         lastPoint.current = { x: event.clientX, y: event.clientY };
       }}
     >
-      {shown.map((string, stringIndex) => (
-        <div key={string.deviceId}>
-          <p className="mb-1.5 text-sm font-medium text-ink-200">
-            {stringIndex + 1}. {string.name}
-            {string.connectivity === 'offline' ? <span className="ml-2 text-xs font-normal text-bad">offline</span> : null}
-          </p>
-          <div className="space-y-1">
-            {serpentineRows(string.segments.length, CELLS_PER_ROW).map((row, rowIndex) => {
-              const reversed = rowIndex % 2 === 1;
-              const offset = reversed ? CELLS_PER_ROW - row.length : 0;
-              return (
-                <div key={rowIndex}>
-                  {rowIndex > 0 ? (
-                    // Where the string turns: the right end after a left-to-right row, then the left.
-                    <div className={`mb-1 flex ${reversed ? 'justify-end' : 'justify-start'}`} aria-hidden>
-                      <div className="h-3 w-[calc((100%-2rem)/9)] border-x-2 border-dashed border-ink-600" />
+      {shown.map((string, stringIndex) => {
+        const perRow = segmentsPerRow(string);
+        return (
+          <div key={string.deviceId}>
+            <p className="mb-1.5 text-sm font-medium text-ink-200">
+              {stringIndex + 1}. {string.name}
+              {string.ledCount !== null ? <span className="ml-2 text-xs font-normal text-ink-400">{string.ledCount} LEDs</span> : null}
+              {string.connectivity === 'offline' ? <span className="ml-2 text-xs font-normal text-bad">offline</span> : null}
+            </p>
+            <div className="space-y-1">
+              {serpentineRows(string.segments.length, perRow).map((row, rowIndex) => {
+                const reversed = rowIndex % 2 === 1;
+                const offset = reversed ? perRow - row.length : 0;
+                return (
+                  <div key={rowIndex}>
+                    {rowIndex > 0 ? (
+                      // Where the string turns: the right end after a left-to-right row, then the left.
+                      <div className={`mb-1 flex ${reversed ? 'justify-end' : 'justify-start'}`} aria-hidden>
+                        <div className="h-3 border-x-2 border-dashed border-ink-600" style={{ width: `${100 / perRow}%` }} />
+                      </div>
+                    ) : null}
+                    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }}>
+                      {row.map((position, column) => {
+                        const segment = string.segments[position] as number;
+                        const key = cellKey(string.deviceId, segment);
+                        const color = cellColor(pattern, key);
+                        const leds = ledsInSegment(string, segment);
+                        const ledText = leds.length === 0 ? '' : ` LEDs ${Math.min(...leds)} to ${Math.max(...leds)},`;
+                        return (
+                          // One button per segment, because that is the smallest part Govee can colour.
+                          <button
+                            key={key}
+                            type="button"
+                            data-cell={key}
+                            aria-label={`${string.name} segment ${segment},${ledText} ${color}`}
+                            title={leds.length > 1 ? `LEDs ${Math.min(...leds)} to ${Math.max(...leds)} change together` : undefined}
+                            // A pointer paints on pointerdown. detail is 0 only for Enter or Space.
+                            onClick={(event) => {
+                              if (event.detail === 0) {
+                                onStrokeStart();
+                                onPaint(key);
+                                onStrokeEnd();
+                              }
+                            }}
+                            // Only the cells capture touch, so labels and gaps still scroll the page on a phone.
+                            className="flex h-12 min-w-0 touch-none gap-px rounded border border-ink-500 p-px"
+                            style={{ gridColumnStart: offset + column + 1 }}
+                          >
+                            {leds.length === 0 ? (
+                              <span
+                                className="flex h-full min-w-0 flex-1 items-center justify-center rounded-sm text-[10px] tabular-nums sm:text-xs"
+                                style={{ backgroundColor: color, color: readableTextColor(color) }}
+                              >
+                                {segment}
+                              </span>
+                            ) : (
+                              // A row running right to left reads backwards, inside each segment too.
+                              (reversed ? [...leds].reverse() : leds).map((led) => (
+                                <span
+                                  key={led}
+                                  data-led={led}
+                                  className="flex h-full min-w-0 flex-1 items-center justify-center rounded-sm text-[9px] tabular-nums"
+                                  style={{ backgroundColor: color, color: readableTextColor(color) }}
+                                >
+                                  {/* Too narrow for numbers on a phone. */}
+                                  <span className="hidden sm:inline">{led}</span>
+                                </span>
+                              ))
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
-                  ) : null}
-                  <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${CELLS_PER_ROW}, minmax(0, 1fr))` }}>
-                    {row.map((position, column) => {
-                      const segment = string.segments[position] as number;
-                      const key = cellKey(string.deviceId, segment);
-                      const color = cellColor(pattern, key);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          data-cell={key}
-                          aria-label={`${string.name} segment ${segment}, ${color}`}
-                          // A pointer paints on pointerdown. detail is 0 only for Enter or Space.
-                          onClick={(event) => {
-                            if (event.detail === 0) {
-                              onStrokeStart();
-                              onPaint(key);
-                              onStrokeEnd();
-                            }
-                          }}
-                          // Only the cells capture touch, so labels and gaps still scroll the page on a phone.
-                          className="h-12 min-w-0 touch-none rounded border border-ink-600 text-[10px] tabular-nums sm:text-xs"
-                          style={{
-                            backgroundColor: color,
-                            color: readableTextColor(color),
-                            gridColumnStart: offset + column + 1,
-                          }}
-                        >
-                          {segment}
-                        </button>
-                      );
-                    })}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -387,6 +455,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   );
   const seconds = slowestStringCommands(actions);
   const shownCount = strings.filter((s) => s.included).length;
+  const shownLeds = strings.filter((s) => s.included).reduce((sum, s) => sum + (s.ledCount ?? 0), 0);
   const valid = isHexColor(fill) && isHexColor(pattern.background) && cells.length > 0;
 
   const submitSave = () => {
@@ -410,9 +479,20 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
 
         <SectionCard
           title="Paint your lights"
-          description={`${cells.length} segments across ${shownCount} string${shownCount === 1 ? '' : 's'}. One cell is one segment, which may cover several bulbs.`}
+          description={
+            shownLeds > 0
+              ? `${shownLeds} LEDs in ${cells.length} segments across ${shownCount} string${shownCount === 1 ? '' : 's'}. Each small box is one LED.`
+              : `${cells.length} segments across ${shownCount} string${shownCount === 1 ? '' : 's'}. One cell is one segment, which may cover several bulbs.`
+          }
         >
           <div className="space-y-4">
+            {shownLeds > cells.length ? (
+              <Notice title="LEDs in a segment change together">
+                Govee's API can only color whole segments, so painting one box colors every LED in its outlined group. Single-LED
+                control isn't available through the API, and the LED count is worked out from published specs, so check it
+                against your lights.
+              </Notice>
+            ) : null}
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <ColorChoice
                 label="Background"

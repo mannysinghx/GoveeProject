@@ -348,6 +348,7 @@ export const activityEventTypes = [
   'schedule',
   'auth',
   'rate_limit',
+  'connection',
   'settings',
   'system',
 ] as const;
@@ -371,6 +372,8 @@ export const patternStringSettingSchema = z.object({
   deviceId: z.string().min(1).max(64),
   included: z.boolean(),
   reversed: z.boolean(),
+  /** LEDs on this string, set by the owner when it differs from the model's published count. */
+  ledCount: z.number().int().min(1).max(1000).optional(),
 });
 export type PatternStringSetting = z.infer<typeof patternStringSettingSchema>;
 
@@ -388,6 +391,8 @@ export const settingsSchema = z.object({
   longitude: z.number().min(-180).max(180).nullable(),
   /** How the owner's light strings are arranged in the pattern editor, in order. */
   patternStrings: z.array(patternStringSettingSchema).max(200),
+  /** Resend what a light missed when it comes back online. Off by default: lights may change at any hour. */
+  catchUpEnabled: z.boolean(),
 });
 export type AppSettings = z.infer<typeof settingsSchema>;
 
@@ -405,4 +410,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   latitude: null,
   longitude: null,
   patternStrings: [],
+  catchUpEnabled: false,
 };

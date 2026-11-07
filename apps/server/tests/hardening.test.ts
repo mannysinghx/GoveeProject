@@ -484,7 +484,8 @@ describe('Govee groups, as the real API reports them', () => {
       await client.post('/api/v1/devices/refresh-due');
     }
     expect(stateCalls(h)).toBe(1);
-    expect(h.ctx.activity.list({ eventType: 'state', outcome: 'failure', limit: 50 }).events).toHaveLength(1);
+    // Background polls report through connection incidents, not the activity log.
+    expect(h.ctx.activity.list({ eventType: 'state', outcome: 'failure', limit: 50 }).events).toHaveLength(0);
   });
 
   it('tries again the next day, and always when asked by hand', async () => {

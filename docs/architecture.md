@@ -139,6 +139,17 @@ Reads through `GET /devices` come from the app's own cache and never call Govee.
 
 A device is shown as `stale` once its last report is older than a configurable age (default 5 minutes), and a report made while Govee says the device is offline is marked historical. Govee's own documentation says such values have no reference significance.
 
+## Connection monitoring
+
+`apps/server/src/connection/` checks every monitorable light in the background, whether or not a browser is open. The interval is `CONNECTION_CHECK_SECONDS` (default 120), lengthened when needed so checks stay within a quarter of the daily budget: with 3 lights and the default budget, every 130 seconds, or about 2,000 requests a day. Govee groups are skipped because Govee gives no status for them.
+
+- **Incidents** (`connection_incidents`) record each problem once, with a unique index allowing one open incident per problem, so restarts and repeated checks cannot duplicate them.
+- **Diagnosis** (`diagnosis.ts`) is a set of fixed rules, with no model, that compares what is and is not working: one light offline while others are online, all offline, every status request failing, or the key rejected. It reports a likely cause. It cannot see inside a light or a home network.
+- **Self-healing** covers only what software can reach: rechecking the device list at most hourly when something is missing, and carrying on through temporary failures.
+- **Catch-up** (`missed_deliveries`) keeps only the newest thing each light could not receive because it was offline. It is off by default (`catchUpEnabled`). A delivery is claimed before anything is sent, so a crash cannot repeat it. It is not sent if it is older than `MISSED_DELIVERY_MAX_HOURS` (default 24), or if the light has accepted something newer since.
+
+Background status failures are recorded as incidents, not as a line in the activity log per check.
+
 ## Database
 
 SQLite in WAL mode, with foreign keys on, through better-sqlite3. Hand-written SQL migrations in `migrations/` run at startup, each in a transaction, and are checksummed so a changed migration stops startup. Related writes use transactions. Old activity and command history is pruned after `HISTORY_RETENTION_DAYS` (default 90).

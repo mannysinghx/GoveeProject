@@ -18,8 +18,8 @@ function GeneralSettings({ settings }: { settings: AppSettings }) {
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    // The string arrangement is edited in the pattern editor. A stale copy must not overwrite it.
-    const { patternStrings: _patternStrings, ...rest } = form;
+    // These are edited on their own screens. A stale copy here must not overwrite them.
+    const { patternStrings: _patternStrings, catchUpEnabled: _catchUpEnabled, ...rest } = form;
     update.mutate({
       ...rest,
       latitude: latitude === '' ? null : Number(latitude),

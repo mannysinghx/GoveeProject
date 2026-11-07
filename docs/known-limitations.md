@@ -16,7 +16,8 @@
 ## Limits of patterns
 
 - **Static only.** Clockwise, Twinkle, Breathe and similar effects run inside the lights, and the public API cannot send them.
-- **One cell is one segment.** An H805C reports 27. The Govee app paints individual bulbs, and the public API does not offer that.
+- **One box is one LED, but LEDs can only change in groups.** An H805C reports 27 segments, so its 108 LED boxes change 4 at a time. The Govee app may offer finer control, and the public API does not.
+- **The LED count is calculated, not reported.** It comes from published specs for the model, and only the H805C is listed so far. Other models show one box per segment until you enter a count. See [LEDs per string](govee-integration.md#leds-per-string).
 - **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across three strings of 27 segments takes about 27 seconds, with the strings changing at the same time.
 - **No read-back.** Govee does not report segment colors, so the app cannot show what the lights are displaying.
 - **Lights change independently.** Strings shown in series are still separate lights, so they do not change in step.
@@ -36,6 +37,15 @@
 - **Scene names and segment counts** reflect the last discovery or refresh, so they can be out of date until you refresh.
 - **A device re-added in the Govee app** may get a new identifier and appear as a new device. Presets tied to the old one will not follow it.
 - **Presets tied to a device** cannot be moved to another device in one step. Edit their steps instead.
+
+## Limits of connection monitoring
+
+- **It diagnoses and retries. It does not repair.** Govee's public API has no restart, Wi-Fi or firmware commands, and a hosted server cannot reach your home network.
+- **Causes are likely, not certain.** They come from comparing which lights respond.
+- **Alerts appear only in the app.** There is no email or text alert.
+- **Delay.** A drop can take a couple of minutes to appear, and a shorter drop between checks can go unnoticed.
+- **Accepted is not confirmed.** A resent pattern is reported as accepted by Govee, which does not report segment colors.
+- **Catching up restores segment colors, not everything.** Only what the app tried to send while the light was offline is kept, and only the newest for each light. Changes made in the Govee Home app are not known to it.
 
 ## Features not implemented, and why
 

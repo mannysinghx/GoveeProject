@@ -133,6 +133,16 @@ function categoryForCode(status: number): { category: TransportError['category']
   return { category: 'application_error', message: 'Govee returned an unexpected status.' };
 }
 
+/**
+ * Govee reports an offline light as a 400, with the reason only in its message. Treating
+ * that as an invalid request would wrongly suggest the app sent something bad.
+ */
+function isOfflineMessage(text: string | undefined): boolean {
+  return text !== undefined && /\boffline\b/i.test(text);
+}
+
+const OFFLINE_MESSAGE = 'Govee says this light is offline. Check its power and Wi-Fi.';
+
 /** Govee's own text is kept for troubleshooting, trimmed and with the key stripped. */
 function withGoveeDetail(base: string, detail: string | undefined, apiKey: string | null): string {
   if (!detail) return base;
@@ -277,6 +287,13 @@ export class GoveeCloudTransport implements LightTransport {
     const envelope = envelopeSchema.safeParse(json);
     const goveeText = envelope.success ? (envelope.data.message ?? envelope.data.msg) : undefined;
     const retryAfterMs = parseRetryAfter(response.headers, Date.now());
+
+    if (isOfflineMessage(goveeText) && (!response.ok || (envelope.success && envelope.data.code !== 200))) {
+      throw new TransportError('device_offline', OFFLINE_MESSAGE, {
+        httpStatus: response.status,
+        goveeCode: envelope.success ? envelope.data.code : undefined,
+      });
+    }
 
     if (!response.ok) {
       const { category, message } = categoryForCode(response.status);

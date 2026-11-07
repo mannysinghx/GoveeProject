@@ -1,14 +1,15 @@
-import { Activity, CalendarClock, Layers, Lightbulb, LogOut, Settings, Sparkles } from 'lucide-react';
+import { Activity, CalendarClock, Layers, Lightbulb, LogOut, Settings, Sparkles, Wifi } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { useLogout } from '../features/auth/useSession';
 
 const NAV = [
-  { to: '/', label: 'Dashboard', icon: Lightbulb, end: true },
+  { to: '/', label: 'Dashboard', short: 'Home', icon: Lightbulb, end: true },
   { to: '/presets', label: 'Scenes & Presets', short: 'Presets', icon: Sparkles },
   { to: '/groups', label: 'Groups', icon: Layers },
-  { to: '/schedules', label: 'Schedules', icon: CalendarClock },
+  { to: '/schedules', label: 'Schedules', short: 'Timers', icon: CalendarClock },
+  { to: '/connections', label: 'Connections', short: 'Health', icon: Wifi },
   { to: '/activity', label: 'Activity', icon: Activity },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -70,7 +71,7 @@ export function AppShell({ username, children }: { username: string; children: R
 
       <nav
         aria-label="Main"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t border-ink-700 bg-ink-900 pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-ink-700 bg-ink-900 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         {NAV.map(({ to, label, short, icon: Icon, end }) => (
           <NavLink

@@ -150,6 +150,8 @@ export type CommandSourceType = 'manual' | 'preset' | 'group' | 'schedule';
 
 export type ErrorCategory =
   | 'not_configured'
+  /** Govee answered, and says this light is offline. */
+  | 'device_offline'
   | 'auth'
   | 'rate_limited'
   | 'timeout'
@@ -450,6 +452,83 @@ export interface DiagnosticsDto {
     enabledSchedules: number;
   };
   queue: { pending: number; pausedUntil: string | null };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Connection monitoring                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type IncidentKind =
+  | 'device_offline'
+  | 'device_missing'
+  | 'govee_unreachable'
+  | 'api_key_rejected'
+  | 'api_key_missing'
+  | 'rate_limited';
+
+export interface ConnectionIncidentDto {
+  id: number;
+  kind: IncidentKind;
+  deviceId: string | null;
+  deviceName: string | null;
+  openedAt: string;
+  lastSeenAt: string;
+  closedAt: string | null;
+}
+
+export type DeviceHealthState = 'online' | 'offline' | 'unknown' | 'missing' | 'not_monitored';
+
+export interface DeviceHealthDto {
+  deviceId: string;
+  name: string;
+  sku: string;
+  state: DeviceHealthState;
+  /** When the current offline or missing stretch began. */
+  problemSince: string | null;
+  lastOnlineAt: string | null;
+  lastCheckedAt: string | null;
+  /** How many times this light has gone offline in the last 7 days. */
+  dropsLast7Days: number;
+  note: string | null;
+}
+
+export interface ConnectionAdviceDto {
+  id: string;
+  severity: 'problem' | 'attention' | 'info';
+  title: string;
+  explanation: string;
+  /** Things the owner can try. The app cannot do these itself. */
+  steps: string[];
+}
+
+export type MissedDeliveryStatus = 'waiting' | 'delivering' | 'delivered' | 'failed' | 'replaced' | 'expired' | 'dismissed';
+
+export interface MissedDeliveryDto {
+  id: number;
+  deviceId: string;
+  deviceName: string;
+  runName: string;
+  stepCount: number;
+  status: MissedDeliveryStatus;
+  detail: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+export interface ConnectionReportDto {
+  overall: 'healthy' | 'attention' | 'problem' | 'unknown';
+  monitor: {
+    status: 'running' | 'stopped' | 'disabled';
+    lastCheckAt: string | null;
+    intervalSeconds: number;
+  };
+  catchUpEnabled: boolean;
+  advice: ConnectionAdviceDto[];
+  devices: DeviceHealthDto[];
+  waiting: MissedDeliveryDto[];
+  recentDeliveries: MissedDeliveryDto[];
+  incidents: ConnectionIncidentDto[];
+  automaticActions: ActivityEventDto[];
 }
 
 export interface DashboardSummaryDto {

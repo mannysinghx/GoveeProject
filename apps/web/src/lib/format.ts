@@ -40,6 +40,7 @@ export const VERIFICATION_LABEL: Record<Verification, string> = {
 
 export const ERROR_CATEGORY_LABEL: Record<ErrorCategory, string> = {
   not_configured: 'API key not set',
+  device_offline: 'Light is offline',
   auth: 'API key rejected',
   rate_limited: 'Rate limited',
   timeout: 'Timed out',

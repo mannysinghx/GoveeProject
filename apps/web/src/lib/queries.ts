@@ -4,6 +4,7 @@ import type {
   ActivityQuery,
   AppSettings,
   CommandDto,
+  ConnectionReportDto,
   DashboardSummaryDto,
   DeviceAction,
   DeviceDetailDto,
@@ -364,6 +365,41 @@ export function useDiagnostics() {
   });
 }
 
+export function useConnectionReport() {
+  return useQuery({
+    queryKey: ['connection'],
+    queryFn: () => api<ConnectionReportDto>('/connection/report'),
+    refetchInterval: 30_000,
+  });
+}
+
+/** Checking, sending and dismissing all answer with the new report. */
+function useConnectionAction<Input>(call: (input: Input) => Promise<ConnectionReportDto>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: call,
+    onSuccess: (report) => client.setQueryData(['connection'], report),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.devices });
+      void client.invalidateQueries({ queryKey: keys.summary });
+    },
+  });
+}
+
+export function useRunConnectionCheck() {
+  return useConnectionAction(() =>
+    api<{ ran: boolean; report: ConnectionReportDto }>('/connection/check', { method: 'POST' }).then((r) => r.report),
+  );
+}
+
+export function useSendMissed() {
+  return useConnectionAction((id: number) => api<ConnectionReportDto>(`/connection/missed/${id}/send`, { method: 'POST' }));
+}
+
+export function useDismissMissed() {
+  return useConnectionAction((id: number) => api<ConnectionReportDto>(`/connection/missed/${id}/dismiss`, { method: 'POST' }));
+}
+
 export function useSummary() {
   return useQuery({
     queryKey: keys.summary,
@@ -384,6 +420,9 @@ export function useUpdateSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (changes: SettingsUpdate) => api<AppSettings>('/settings', { method: 'PATCH', body: changes }),
-    onSuccess: (data) => client.setQueryData(keys.settings, data),
+    onSuccess: (data) => {
+      client.setQueryData(keys.settings, data);
+      void client.invalidateQueries({ queryKey: ['connection'] });
+    },
   });
 }

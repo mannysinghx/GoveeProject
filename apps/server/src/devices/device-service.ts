@@ -53,6 +53,10 @@ interface CapabilityStateRow {
   verification: Verification | null;
 }
 
+export function isGoveeGroup(device: { sku: string }): boolean {
+  return /group/i.test(device.sku);
+}
+
 function canonical(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
   if (value && typeof value === 'object') {
@@ -70,6 +74,7 @@ function toTransportError(error: unknown): TransportError {
 
 const HTTP_FOR_CATEGORY: Partial<Record<ErrorCategory, number>> = {
   not_configured: 503,
+  device_offline: 409,
   auth: 502,
   rate_limited: 429,
   timeout: 504,
@@ -188,7 +193,7 @@ export class DeviceService {
       name: device.name,
       deviceType: device.deviceType,
       isPrimaryModel: device.sku.toUpperCase() === PRIMARY_MODEL,
-      isGoveeGroup: /group/i.test(device.sku),
+      isGoveeGroup: isGoveeGroup(device),
       discoveryStatus: device.discoveryStatus,
       lastDiscoveredAt: device.lastDiscoveredAt,
       missingSince: device.missingSince,
@@ -316,14 +321,18 @@ export class DeviceService {
     } catch (error) {
       const failure = toTransportError(error);
       this.recordStatusError(id, failure);
-      this.activity.record({
-        eventType: 'state',
-        outcome: 'failure',
-        deviceId: id,
-        correlationId,
-        message: `Status refresh failed for ${device.name}: ${failure.message}`,
-        details: { category: failure.category },
-      });
+      // Background checks repeat, so they report through connection incidents rather
+      // than adding a line to the activity log every couple of minutes.
+      if (source !== 'poll') {
+        this.activity.record({
+          eventType: 'state',
+          outcome: 'failure',
+          deviceId: id,
+          correlationId,
+          message: `Status refresh failed for ${device.name}: ${failure.message}`,
+          details: { category: failure.category },
+        });
+      }
       throw httpErrorFromTransport(failure);
     }
 
@@ -347,6 +356,11 @@ export class DeviceService {
       }
     }
     return this.list();
+  }
+
+  /** False for lights Govee gives no status for, so there is nothing to monitor. */
+  statusAvailable(device: DeviceRecord): boolean {
+    return device.discoveryStatus === 'present' && !isGoveeGroup(device) && !this.statusRefused(device);
   }
 
   private statusRefused(device: DeviceRecord): boolean {

@@ -18,9 +18,34 @@ export interface PatternState {
   cells: Record<string, string>;
 }
 
+/**
+ * Published sizes, because Govee's API reports neither length nor LED count. H805C is the
+ * Permanent Outdoor Lights Elite: its manual lists 150 ft, and it has about 72 LEDs per 100 ft.
+ */
+const MODEL_SPECS: Record<string, { lengthFeet: number; ledsPer100Feet: number }> = {
+  H805C: { lengthFeet: 150, ledsPer100Feet: 72 },
+};
+
+export interface ModelSize {
+  lengthFeet: number;
+  ledsPer100Feet: number;
+  leds: number;
+}
+
+/** Works out a string's LEDs from its model, or null when the model is not known. */
+export function modelSize(sku: string): ModelSize | null {
+  const spec = MODEL_SPECS[sku.toUpperCase()];
+  if (!spec) return null;
+  return { ...spec, leds: Math.round((spec.lengthFeet * spec.ledsPer100Feet) / 100) };
+}
+
 export interface PatternString {
   deviceId: string;
   name: string;
+  sku: string;
+  /** LEDs on this string, or null when neither the model nor the owner says. */
+  ledCount: number | null;
+  ledSource: 'owner' | 'model' | null;
   connectivity: DeviceDto['connectivity'];
   /** Segment numbers in on-screen order. Flipped strings run high to low. */
   segments: number[];
@@ -73,9 +98,15 @@ export function resolveStrings(devices: DeviceDto[], saved: PatternStringSetting
     const capability = segmentCapability(device) as SegmentedColorCapability;
     const entry = savedIndex.get(device.id)?.entry;
     const reversed = entry?.reversed ?? false;
+    const fromModel = modelSize(device.sku)?.leds ?? null;
+    const count = entry?.ledCount ?? fromModel;
     return {
       deviceId: device.id,
       name: device.name,
+      sku: device.sku,
+      // Every segment has at least one LED, so there cannot be fewer LEDs than segments.
+      ledCount: count === null ? null : Math.max(count, capability.segments.length),
+      ledSource: entry?.ledCount !== undefined ? 'owner' : fromModel !== null ? 'model' : null,
       connectivity: device.connectivity,
       segments: reversed ? [...capability.segments].reverse() : capability.segments,
       maxSelect: capability.maxSelect,
@@ -86,7 +117,43 @@ export function resolveStrings(devices: DeviceDto[], saved: PatternStringSetting
 }
 
 export function toSettings(strings: PatternString[]): PatternStringSetting[] {
-  return strings.map(({ deviceId, included, reversed }) => ({ deviceId, included, reversed }));
+  return strings.map(({ deviceId, included, reversed, ledCount, ledSource }) => ({
+    deviceId,
+    included,
+    reversed,
+    ...(ledSource === 'owner' && ledCount !== null ? { ledCount } : {}),
+  }));
+}
+
+/** Applies the owner's count, or goes back to the model's when given null. */
+export function withLedCount(strings: PatternString[], deviceId: string, count: number | null): PatternString[] {
+  return strings.map((s) => {
+    if (s.deviceId !== deviceId) return s;
+    if (count !== null) return { ...s, ledCount: Math.max(count, s.segments.length), ledSource: 'owner' };
+    const fromModel = modelSize(s.sku)?.leds ?? null;
+    return {
+      ...s,
+      ledCount: fromModel === null ? null : Math.max(fromModel, s.segments.length),
+      ledSource: fromModel === null ? null : 'model',
+    };
+  });
+}
+
+/**
+ * The LEDs a segment covers, numbered from the start of the string, in on-screen order.
+ * Empty when the LED count is not known. Govee can only colour whole segments, so these
+ * LEDs always change together. LEDs that do not divide evenly are spread along the string.
+ */
+export function ledsInSegment(string: Pick<PatternString, 'segments' | 'ledCount' | 'reversed'>, segment: number): number[] {
+  if (string.ledCount === null) return [];
+  const total = string.segments.length;
+  const position = string.segments.indexOf(segment);
+  if (position < 0) return [];
+  const index = string.reversed ? total - 1 - position : position;
+  const start = Math.floor((index * string.ledCount) / total);
+  const end = Math.floor(((index + 1) * string.ledCount) / total);
+  const leds = Array.from({ length: end - start }, (_, i) => start + i + 1);
+  return string.reversed ? leds.reverse() : leds;
 }
 
 export function moveString(strings: PatternString[], deviceId: string, direction: -1 | 1): PatternString[] {

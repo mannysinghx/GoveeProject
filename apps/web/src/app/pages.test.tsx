@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, type DiagnosticsDto, type PresetDto, type ScheduleDto
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { DeviceDetailPage } from '../features/devices/DeviceDetailPage';
 import { ActivityPage } from '../features/activity/ActivityPage';
+import { ConnectionPage } from '../features/connection/ConnectionPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
 import { PresetsPage } from '../features/presets/PresetsPage';
 import { SchedulesPage } from '../features/schedules/SchedulesPage';
@@ -582,6 +583,98 @@ describe('schedules', () => {
     expect(await within(dialog).findByText(/no future runs/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save schedule' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('would never run');
+  });
+});
+
+describe('connections', () => {
+  const light = (name: string, state: string) => ({
+    deviceId: name,
+    name,
+    sku: 'H805C',
+    state,
+    problemSince: state === 'offline' ? '2026-11-01T02:43:00.000Z' : null,
+    lastOnlineAt: state === 'offline' ? null : '2026-11-01T10:00:00.000Z',
+    lastCheckedAt: '2026-11-01T10:00:00.000Z',
+    dropsLast7Days: state === 'offline' ? 1 : 0,
+    note: null,
+  });
+  const report = (overrides: object = {}) => ({
+    overall: 'attention',
+    monitor: { status: 'running', lastCheckAt: '2026-11-01T10:00:00.000Z', intervalSeconds: 130 },
+    catchUpEnabled: false,
+    advice: [
+      {
+        id: 'offline-center',
+        severity: 'attention',
+        title: 'Outdoor Center is offline',
+        explanation: 'Outdoor Left is online, so the app looks fine.',
+        steps: ['Unplug its power adapter for about 30 seconds.'],
+      },
+    ],
+    devices: [light('Outdoor Left', 'online'), light('Outdoor Center', 'offline')],
+    waiting: [
+      { id: 7, deviceId: 'Outdoor Center', deviceName: 'Outdoor Center', runName: 'Xmas', stepCount: 3, status: 'waiting', detail: null, createdAt: '2026-11-01T09:00:00.000Z', finishedAt: null },
+    ],
+    recentDeliveries: [],
+    incidents: [
+      { id: 1, kind: 'device_offline', deviceId: 'Outdoor Center', deviceName: 'Outdoor Center', openedAt: '2026-11-01T02:43:00.000Z', lastSeenAt: '2026-11-01T10:00:00.000Z', closedAt: null },
+    ],
+    automaticActions: [],
+    ...overrides,
+  });
+
+  it('says what is wrong, what to try, and what it cannot fix', async () => {
+    mockApi({ 'GET /connection/report': { json: report() } });
+    renderApp(<ConnectionPage />);
+    expect(await screen.findByText('Outdoor Center is offline')).toBeInTheDocument();
+    expect(screen.getByText(/Unplug its power adapter/)).toBeInTheDocument();
+    expect(screen.getByText(/Checks about every 2 minutes/)).toBeInTheDocument();
+    expect(screen.getByText('Still happening.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/It cannot restart a controller/)).toBeInTheDocument();
+    expect(screen.queryByText(/\bAI\b/)).not.toBeInTheDocument();
+  });
+
+  it('will not send a missed pattern to a light that is still offline', async () => {
+    mockApi({ 'GET /connection/report': { json: report() } });
+    renderApp(<ConnectionPage />);
+    expect(await screen.findByText('Outdoor Center missed "Xmas"')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send now' })).toBeDisabled();
+  });
+
+  it('sends a missed pattern once the light is back, and can dismiss one', async () => {
+    const back = report({ devices: [light('Outdoor Center', 'online')], advice: [] });
+    const { calls } = mockApi({
+      'GET /connection/report': { json: back },
+      'POST /connection/missed/7/send': { json: report({ devices: back.devices, advice: [], waiting: [] }) },
+    });
+    renderApp(<ConnectionPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Send now' }));
+    await waitFor(() => expect(calls.some((c) => c.path === '/connection/missed/7/send')).toBe(true));
+    expect(await screen.findByText('Nothing is waiting.')).toBeInTheDocument();
+  });
+
+  it('leaves catch-up off until the owner turns it on, and saves the choice', async () => {
+    const { calls } = mockApi({
+      'GET /connection/report': { json: report() },
+      'PATCH /settings': { json: { ...DEFAULT_SETTINGS, catchUpEnabled: true } },
+    });
+    renderApp(<ConnectionPage />);
+    const toggle = await screen.findByRole('checkbox', { name: /Resend automatically/ });
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    await waitFor(() => expect(calls.find((c) => c.method === 'PATCH')?.body).toEqual({ catchUpEnabled: true }));
+  });
+
+  it('points to the page from the dashboard only when something is wrong', async () => {
+    mockApi({ ...dashboardRoutes, 'GET /devices': { json: { devices: [device()] } }, 'GET /connection/report': { json: report() } });
+    const first = renderApp(<DashboardPage />);
+    expect(await screen.findByRole('link', { name: 'See what to try' })).toHaveAttribute('href', '/connections');
+    first.unmount();
+
+    mockApi({ ...dashboardRoutes, 'GET /devices': { json: { devices: [device()] } }, 'GET /connection/report': { json: report({ overall: 'healthy', advice: [], waiting: [] }) } });
+    renderApp(<DashboardPage />);
+    await screen.findByText('Dashboard');
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'See what to try' })).not.toBeInTheDocument());
   });
 });
 

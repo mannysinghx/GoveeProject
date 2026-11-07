@@ -99,12 +99,14 @@ Govee lists the H805C as supported, but that does not guarantee every feature is
 
 - Scenes in the Govee app may not all be exposed through the API.
 - DIY scenes can be activated if listed, but not created or edited here.
-- Patterns need segment control, which only appears if your device reports it. A segment is not necessarily one bulb.
+- Patterns need segment control, which only appears if your device reports it. A segment is usually several LEDs. On an H805C, the editor shows 108 LED boxes, and every 4 change together, because Govee's API can only color the 27 segments.
 - Govee does not report segment colors, so a pattern cannot show as confirmed. Check the lights themselves.
 - Groups made in the Govee Home app offer power only, with no status. To paint them, use a group in this app with the individual lights.
 - Commands reach lights through Govee's cloud, so smooth fast animation is not possible.
 
 ## Troubleshooting a missing or offline device
+
+**Connections** checks every light in the background, even with no browser open. It says which light is affected, the likely cause and what to try, and keeps a history of each drop. It can recheck the device list, retry through temporary Govee failures and, if you turn it on, resend a pattern a light missed. It cannot restart a controller, change Wi-Fi settings or repair hardware, because Govee's public API offers no way to.
 
 **Not in the list?** Check that it is in the Govee Home app on the same account as your key, then choose **Refresh device list**. Models not on [Govee's supported list](https://developer.govee.com/docs/support-product-model) will not appear.
 

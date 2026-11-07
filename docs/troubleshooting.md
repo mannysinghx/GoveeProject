@@ -41,6 +41,12 @@ It changes on restart. Set `SETUP_TOKEN` in `.env` for a fixed one.
 
 ## Devices
 
+**A light is offline.** Open **Connections** for the likely cause and what to try. If some lights are online, look at that light's power and Wi-Fi. If all of them are offline, look at what they share: your router, internet or power. The app cannot fix these itself. It can resend a missed pattern when the light returns, if you turn that on under **Patterns lights missed**.
+
+**A painted box changes other boxes too.** LEDs in the same outlined group are one segment, the smallest part Govee's API can color.
+
+**The LED count looks wrong.** It is worked out from the model's published specs. If you cut or extended a string, enter your count next to it in the pattern editor.
+
 **A device is not listed.**
 
 1. Check that it appears in the Govee Home app, on the same account as your key.

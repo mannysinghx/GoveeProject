@@ -12,7 +12,8 @@ Current state of the project, so anyone can pick it up without the original conv
 
 | Piece | How it was checked |
 |---|---|
-| Backend, frontend, shared code | `npm test`: 352 tests (server 266, web 82, shared 4) |
+| Backend, frontend, shared code | `npm test`: 404 tests (server 301, web 99, shared 4) |
+| Connection monitor, offline detection, catch-up, one box per LED | Real browser against the mock, production build, with one mock light offline, on desktop and at phone width. The mock answers the way the real API did. Not yet tried on real lights. |
 | Pattern editor, all strings in series | Real browser against the mock, production build: drag painting across strings, repeat, flip surviving a reload, per-string sending, phone width. Not yet sent to real lights. |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
@@ -23,22 +24,26 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-Nothing.
+The connection monitor and LED boxes are committed locally and **not pushed**, waiting for the owner's approval of one deployment. It adds migration `002_connection.sql` (two new tables) and starts background status checks in production, about 2,000 Govee requests a day.
 
 ## Open findings and decisions
 
 | Item | Where | Severity | Who decides |
 |---|---|---|---|
 | Real-device behaviour is unverified, especially DIY scenes | `docs/acceptance-checklist.md`, `docs/govee-integration.md` | High until tested | Owner, with real lights |
+| The H805C has 108 LEDs and 4 per segment: calculated from a manual, a third-party comparison and 27 reported segments, not stated by Govee | `docs/govee-integration.md`, `apps/web/src/features/patterns/pattern-model.ts` | Medium | Owner, by counting LEDs on real lights |
+| Outdoor Center has been offline since 2026-11-07 02:43 UTC, with Left and Right online | Production read | High for that light | Owner: check its power and Wi-Fi |
+| Offline detection matches the word "offline" in Govee's message | `apps/server/src/govee/cloud-transport.ts` | Low | Revisit if Govee changes the wording |
 | License is MIT, copyright "mannysinghx" | `LICENSE` | Low | Owner can change it |
 | GitHub Actions: none exist, and CI runs locally by policy | `scripts/ci-local.sh` | None | Owner |
 | The global login limit could be used to block sign-in for 5 minutes at a time | `docs/security.md` | Low while off the public internet | Owner, if exposing it |
 
 ## Next steps, in order
 
-1. Send a pattern to one real H805C string and check it, starting with step 8a of `docs/acceptance-checklist.md`.
-2. Work through the rest of the checklist.
-3. Correct anything the checklist disproves. Adapters are isolated in `apps/server/src/govee/`, and each open question is listed in `docs/govee-integration.md`.
+1. Get approval, push once, and verify live. Check the new tables exist, the monitor runs, and Connections names Outdoor Center.
+2. Send a pattern to one real H805C string and check it, including the LED count, with `docs/acceptance-checklist.md`.
+3. Work through the rest of the checklist.
+4. Correct anything the checklist disproves. Adapters are isolated in `apps/server/src/govee/`, and each open question is listed in `docs/govee-integration.md`.
 
 ## How to resume
 

@@ -90,6 +90,10 @@ const envSchema = z.object({
   SCHEDULE_CATCHUP_MAX_HOURS: positiveInt(12),
 
   HISTORY_RETENTION_DAYS: positiveInt(90),
+
+  CONNECTION_MONITOR_ENABLED: booleanString(true),
+  CONNECTION_CHECK_SECONDS: positiveInt(120),
+  MISSED_DELIVERY_MAX_HOURS: positiveInt(24),
 });
 
 export interface AppConfig {
@@ -138,6 +142,11 @@ export interface AppConfig {
     catchUpMaxHours: number;
   };
   historyRetentionDays: number;
+  connection: {
+    enabled: boolean;
+    checkSeconds: number;
+    missedMaxHours: number;
+  };
 }
 
 export class ConfigError extends Error {}
@@ -228,6 +237,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       catchUpMaxHours: e.SCHEDULE_CATCHUP_MAX_HOURS,
     },
     historyRetentionDays: e.HISTORY_RETENTION_DAYS,
+    connection: {
+      enabled: e.CONNECTION_MONITOR_ENABLED,
+      checkSeconds: e.CONNECTION_CHECK_SECONDS,
+      missedMaxHours: e.MISSED_DELIVERY_MAX_HOURS,
+    },
   };
 }
 

@@ -18,6 +18,7 @@ import type { Clock } from '../shared/clock.js';
 import { AppError } from '../shared/errors.js';
 import type { CommandQueue } from './command-queue.js';
 import type { CommandStore } from './command-store.js';
+import type { MissedDeliveryStore } from '../connection/missed-delivery-store.js';
 
 export interface DevicePlan {
   device: DeviceRecord;
@@ -48,6 +49,7 @@ export class ActionService {
     private readonly commands: CommandStore,
     private readonly activity: ActivityService,
     private readonly clock: Clock,
+    private readonly missed: MissedDeliveryStore,
   ) {}
 
   /** Sends one action from the UI. Waits for the outcome, up to a limit. */
@@ -102,6 +104,11 @@ export class ActionService {
       .run(runId, source.type, source.id ?? null, source.name, startedAt);
 
     const perDevice = await Promise.all(plans.map((plan) => this.runDevicePlan(plan, source, runId)));
+    plans.forEach((plan, index) => {
+      if (perDevice[index]?.some((outcome) => outcome.errorCategory === 'device_offline')) {
+        this.missed.record(plan.device.id, source.name, plan.actions);
+      }
+    });
     const skipped: ActionOutcomeDto[] = preSkipped.map((skip) => ({
       deviceId: skip.deviceId,
       deviceName: skip.deviceName,

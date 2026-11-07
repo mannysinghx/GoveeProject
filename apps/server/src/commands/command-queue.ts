@@ -14,7 +14,13 @@ import type { Clock } from '../shared/clock.js';
 import { AppError } from '../shared/errors.js';
 import type { CommandStore } from './command-store.js';
 
-const REFUSED_BY_GOVEE: ReadonlySet<ErrorCategory> = new Set(['auth', 'bad_request', 'not_found', 'application_error']);
+const REFUSED_BY_GOVEE: ReadonlySet<ErrorCategory> = new Set([
+  'auth',
+  'bad_request',
+  'not_found',
+  'application_error',
+  'device_offline',
+]);
 
 export interface EnqueueInput {
   deviceId: string;

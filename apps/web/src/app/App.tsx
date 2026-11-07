@@ -7,6 +7,7 @@ import { SetupPage } from '../features/auth/SetupPage';
 import { useSession } from '../features/auth/useSession';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { ConnectPage } from '../features/dashboard/ConnectPage';
+import { ConnectionPage } from '../features/connection/ConnectionPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { DeviceDetailPage } from '../features/devices/DeviceDetailPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
@@ -53,6 +54,7 @@ export function App() {
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/activity" element={<ActivityPage />} />
+        <Route path="/connections" element={<ConnectionPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

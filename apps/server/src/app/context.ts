@@ -7,6 +7,8 @@ import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
 import { CommandStore } from '../commands/command-store.js';
 import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
+import { ConnectionMonitor } from '../connection/connection-monitor.js';
+import { MissedDeliveryStore } from '../connection/missed-delivery-store.js';
 import { openDatabase, runMigrations, type Db } from '../database/database.js';
 import { DeviceService } from '../devices/device-service.js';
 import { SceneStore } from '../devices/scene-store.js';
@@ -51,6 +53,8 @@ export interface AppContext {
   schedules: ScheduleService;
   scheduler: Scheduler;
   maintenance: Maintenance;
+  missed: MissedDeliveryStore;
+  connection: ConnectionMonitor;
 }
 
 export interface ContextOverrides {
@@ -135,7 +139,8 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
       postCommandRefreshMs: config.queue.postCommandRefreshMs,
     },
   );
-  const actions = new ActionService(db, scenes, queue, commands, activity, clock);
+  const missed = new MissedDeliveryStore(db, clock);
+  const actions = new ActionService(db, scenes, queue, commands, activity, clock, missed);
   const groups = new GroupService(db, devices.repository, actions, activity, clock);
   const presets = new PresetService(db, devices.repository, scenes, groups, actions, activity, clock);
   const schedules = new ScheduleService(db, devices.repository, groups, presets, activity, clock);
@@ -155,6 +160,19 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     discoveryRefreshHours: config.discoveryRefreshHours,
     apiKeyConfigured: transport.isConfigured(),
   });
+
+  const connection = new ConnectionMonitor(
+    db,
+    devices,
+    actions,
+    missed,
+    activity,
+    () => settings.get(),
+    () => transport.isConfigured(),
+    logger,
+    clock,
+    { ...config.connection, dailyBudget: config.limits.dailyBudget },
+  );
 
   return {
     config,
@@ -182,5 +200,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     schedules,
     scheduler,
     maintenance,
+    missed,
+    connection,
   };
 }

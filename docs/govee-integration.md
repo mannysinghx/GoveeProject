@@ -30,6 +30,10 @@ Base URL `https://openapi.api.govee.com`, authenticated with the header `Govee-A
 
 No private or reverse-engineered APIs are used. The configured base URL must be the official host. The only exception is a loopback address, which exists for local testing and is flagged clearly in the UI. Anything else stops startup, so a mistake cannot send your key elsewhere.
 
+## Offline lights
+
+A command to an offline light has been seen to return HTTP 200 with a body `code` of 400 and the message "Device is offline. Please check the Wi-Fi connection." The app detects the word *offline* in Govee's message and reports `device_offline`, not `bad_request`, so it does not suggest the app sent something invalid. It is not retried. Matching on message text is fragile: if Govee changes the wording, this goes back to reading as an invalid request.
+
 ## Status requests Govee refuses
 
 When Govee refuses a status request outright, the app stops polling that device for 24 hours, rather than failing every minute forever. Asking by hand still goes through, and a successful report clears this. Temporary failures, such as timeouts and 5xx responses, keep polling as normal.
@@ -51,6 +55,16 @@ Govee's supported-model list includes `H805C`. The list says nothing about which
 - that every scene in the Govee app is available through the API
 - that DIY scenes can be created through the API
 - that an accepted command changed anything physically
+
+### LEDs per string
+
+Govee's API reports neither length nor LED count, so these come from outside it:
+
+- The H805C is the Permanent Outdoor Lights Elite. Its [manual listing](https://manuals.plus/govee/h805c-permanent-outdoor-light-elite-manual) gives 150 ft.
+- A [third-party comparison](https://www.glowtraxusa.com/blogs/articles/govee-permanent-lights-original-vs-2-vs-elite-vs-pro-what-is-actually-different) gives about 72 lights per 100 ft for the Elite, which works out to 108. A search summary of a retailer listing also said 108, but that page could not be read directly, and no Govee page was found stating it.
+- Real H805C lights report segments 0 to 26, with nothing finer. 108 / 27 is 4 LEDs per segment. **This is arithmetic, not something Govee documents.** Check it by painting one segment and counting the LEDs that change.
+
+The owner can enter a different count per string, such as after cutting or extending one. The editor then spreads the LEDs evenly across the segments.
 
 ## Decisions made where the documentation is unclear
 

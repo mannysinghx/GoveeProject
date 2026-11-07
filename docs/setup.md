@@ -106,3 +106,11 @@ Your browser's time zone becomes the default for new schedules. You can change i
 | `GOVEE_LIMIT_*` | below Govee's limits | See [Govee integration](govee-integration.md#rate-limits) |
 
 Restart the app after changing `.env`.
+
+Connection monitor settings, all optional:
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `CONNECTION_MONITOR_ENABLED` | `true` | Check lights in the background |
+| `CONNECTION_CHECK_SECONDS` | `120` | Shortest time between checks. More lights are checked less often, to stay within a quarter of the daily budget. |
+| `MISSED_DELIVERY_MAX_HOURS` | `24` | Oldest missed pattern that will still be resent |

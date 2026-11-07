@@ -29,6 +29,15 @@ Record: date, app version, firmware version from the Govee app, and H805C segmen
 | 16 | **Group,** if you have more than one device. | Results per device. Unsupported actions are skipped with a reason. | | |
 | 17 | **Rate limit behaviour.** Move sliders quickly for a minute. | No errors shown, or a clear rate-limit message. Check for rate-limit events in Activity. | | |
 
+## LED boxes and connection monitoring
+
+These need your real lights:
+
+1. **Paint one segment.** Set the background to one color, paint one outlined group in another, and send it. Count the LEDs that change. The editor assumes 4 on an H805C. If it differs, or the group is in the wrong place, report it, because the LED layout is calculated, not reported by Govee.
+2. **Check the direction.** Paint LEDs 1 to 4. They should be at the controller end. If they are at the far end, use **Flip**.
+3. **Unplug one string.** Within a few minutes, **Connections** should show it offline and name it. Plug it back in, and it should show as back online, with how long it was out.
+4. **Send a pattern while it is unplugged.** It should say the light is offline and list the pattern as missed. Turn on automatic resending, plug it back in, and check the colors arrive.
+
 ## Questions these tests should answer
 
 Please note the answers, since the documentation does not settle them:

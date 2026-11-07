@@ -61,6 +61,8 @@ export class Maintenance {
     const events = this.activity.prune(cutoff);
     const commands = this.commands.prune(cutoff);
     this.db.prepare(`DELETE FROM execution_runs WHERE started_at < ? AND status != 'running'`).run(cutoff);
+    this.db.prepare('DELETE FROM connection_incidents WHERE closed_at IS NOT NULL AND closed_at < ?').run(cutoff);
+    this.db.prepare(`DELETE FROM missed_deliveries WHERE finished_at IS NOT NULL AND finished_at < ?`).run(cutoff);
     if (events + commands > 0) {
       this.logger.info({ events, commands, cutoff }, 'Pruned old history');
     }

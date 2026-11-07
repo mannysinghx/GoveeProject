@@ -285,6 +285,10 @@ describe('route protection', () => {
       ['PATCH', '/api/v1/settings'],
       ['GET', '/api/v1/system/status'],
       ['GET', '/api/v1/dashboard/summary'],
+      ['GET', '/api/v1/connection/report'],
+      ['POST', '/api/v1/connection/check'],
+      ['POST', '/api/v1/connection/missed/1/send'],
+      ['POST', '/api/v1/connection/missed/1/dismiss'],
       ['POST', '/api/v1/auth/logout'],
       ['POST', '/api/v1/auth/change-password'],
     ];

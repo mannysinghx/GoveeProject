@@ -11,3 +11,4 @@ One line per action with a side effect outside the working tree: timestamp · wh
 - 2026-11-07 · Read the production database over `railway ssh`, read-only, for device capabilities and status errors · to design patterns from real data · nothing changed · yes
 - 2026-11-07 · Deployed the pattern editor and the group status fix to Railway · owner asked for DIY-style patterns; status polling failed every minute on a Govee group · redeploy the previous deployment in Railway; no database changes · see `docs/PROGRESS.md`
 - 2026-11-07 · Deployed the multi-string pattern editor to Railway · owner asked for all strings shown in series · redeploy the previous deployment in Railway; adds one optional setting, no migration · see `docs/PROGRESS.md`
+- 2026-11-07 · Read device capabilities from the production database over `railway ssh`, read-only · to check whether real lights expose anything finer than segments · nothing changed · yes, they report segments 0 to 26 only
