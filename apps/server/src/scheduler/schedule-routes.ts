@@ -4,6 +4,7 @@ import {
   idParamSchema,
   holidayEnabledSchema,
   holidaySkipSchema,
+  holidayUpdateSchema,
   scheduleCreateSchema,
   schedulePreviewRequestSchema,
   scheduleUpdateSchema,
@@ -20,6 +21,11 @@ export function registerScheduleRoutes(api: FastifyInstance, ctx: AppContext): v
   api.get('/schedules', async () => ({ schedules: schedules.list() }));
 
   api.get('/holidays', async () => ({ holidays: holidays.list() }));
+
+  api.patch('/holidays/:key', async (request) => {
+    const { key } = parseInput(holidayParamSchema, request.params);
+    return { holidays: holidays.update(key, parseInput(holidayUpdateSchema, request.body)) };
+  });
 
   api.post('/holidays/:key/enabled', async (request) => {
     const { key } = parseInput(holidayParamSchema, request.params);

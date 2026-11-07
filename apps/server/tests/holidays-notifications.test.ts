@@ -62,6 +62,12 @@ async function house() {
   return { h, client, sender, center: devices.find((d) => d.name === 'Outdoor Center')?.id as string };
 }
 
+async function houseWithLeft() {
+  const context = await house();
+  const left = context.h.ctx.devices.repository.list().find((d) => d.name === 'Outdoor Left')?.id as string;
+  return { ...context, left };
+}
+
 async function runAt(h: Harness, iso: string) {
   h.clock.advance(Date.parse(iso) - h.clock.nowMs());
   await h.ctx.scheduler.tick();
@@ -145,6 +151,200 @@ describe('the holiday calendar', () => {
       '2027-10-28',
       '2028-10-17',
     ]);
+  });
+});
+
+describe('editing a holiday', () => {
+  const groupTarget = (h: Harness) => ({ type: 'group' as const, groupId: h.ctx.groups.list().find((g) => g.name === 'All light strings')?.id as string });
+  const presetId = (h: Harness, key: string) => (h.ctx.presets.list().find((p: PresetDto) => p.builtin?.key === key) as PresetDto).id;
+  const rows = (h: Harness, key: string) => h.ctx.schedules.list().filter((s) => s.builtinShow === key);
+
+  it('changes the time, what it shows, and when it ends, through the API', async () => {
+    const { h, client } = await house();
+    const response = await client.patch('/api/v1/holidays/veterans-day', {
+      steps: [{ time: '18:15', presetId: presetId(h, 'veterans-salute') }],
+      endTime: '22:45',
+      target: groupTarget(h),
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(holiday(h, 'veterans-day')).toMatchObject({ startTime: '18:15', endTime: '22:45', customized: true, nextDate: '2026-11-11' });
+    expect(holiday(h, 'veterans-day').description).toContain('Veterans Day: Salute');
+    const first = rows(h, 'veterans-day').find((s) => s.action.type === 'preset');
+    expect(first?.nextRun?.at).toBe('2026-11-12T02:15:00.000Z'); // 6:15 PM in Los Angeles.
+  });
+
+  it('runs at the new time, not the old one', async () => {
+    const { h } = await house();
+    await runAt(h, '2026-11-12T00:59:00.000Z');
+    h.ctx.holidays.update('veterans-day', { steps: [{ time: '18:15', presetId: presetId(h, 'veterans-salute') }], endTime: '23:00', target: groupTarget(h) });
+    h.mock.requests.length = 0;
+    await runAt(h, '2026-11-12T01:00:00.000Z'); // The old 5 PM.
+    expect(h.mock.controlRequests()).toEqual([]);
+    await runAt(h, '2026-11-12T02:15:00.000Z');
+    expect(h.mock.controlRequests().length).toBeGreaterThan(0);
+  });
+
+  it('keeps the schedules and their history when only the pattern changes', async () => {
+    const { h } = await house();
+    await justBeforeDiwali(h);
+    await runAt(h, NOV_8_5PM);
+    const before = rows(h, 'diwali').find((s) => s.name === 'Diwali');
+    expect(before?.lastExecution).toBeTruthy();
+    const current = holiday(h, 'diwali');
+    h.ctx.holidays.update('diwali', {
+      steps: current.steps.map((s, i) => ({ time: s.time, presetId: i === 0 ? presetId(h, 'veterans-salute') : s.presetId })),
+      endTime: current.endTime,
+      target: current.target,
+    });
+    const after = rows(h, 'diwali').find((s) => s.name === 'Diwali');
+    expect(after?.id).toBe(before?.id);
+    expect(after?.lastExecution?.id).toBe(before?.lastExecution?.id);
+  });
+
+  it('cannot make a step that already ran today run again by saving', async () => {
+    const { h } = await house();
+    await justBeforeDiwali(h);
+    await runAt(h, NOV_8_5PM);
+    const current = holiday(h, 'diwali');
+    h.ctx.holidays.update('diwali', { steps: current.steps.map((s) => ({ time: s.time, presetId: s.presetId })), endTime: current.endTime, target: current.target });
+    h.mock.requests.length = 0;
+    await runAt(h, '2026-11-09T01:00:20.000Z');
+    expect(h.mock.controlRequests()).toEqual([]);
+  });
+
+  it('adds and removes steps, keeping only the first one notifying', async () => {
+    const { h } = await house();
+    const colors = presetId(h, 'diwali-colors');
+    const fire = presetId(h, 'diwali-fireworks');
+    h.ctx.holidays.update('diwali', {
+      // Out of order on purpose: they run in time order.
+      steps: [
+        { time: '19:00', presetId: fire },
+        { time: '18:00', presetId: colors },
+      ],
+      endTime: '21:00',
+      target: groupTarget(h),
+    });
+    const list = rows(h, 'diwali').sort((a, b) => ('time' in a.recurrence && 'time' in b.recurrence ? a.recurrence.time.localeCompare(b.recurrence.time) : 0));
+    expect(list.map((s) => [s.name, s.quiet])).toEqual([
+      ['Diwali', false],
+      ['Diwali: Fireworks (19:00)', true],
+      ['Diwali: end', true],
+    ]);
+    expect(holiday(h, 'diwali')).toMatchObject({ startTime: '18:00', endTime: '21:00' });
+
+    h.ctx.holidays.update('diwali', {
+      steps: [
+        { time: '18:00', presetId: colors },
+        { time: '18:30', presetId: fire },
+        { time: '19:00', presetId: colors },
+      ],
+      endTime: '21:00',
+      target: groupTarget(h),
+    });
+    expect(rows(h, 'diwali')).toHaveLength(4);
+    expect(rows(h, 'diwali').filter((s) => !s.quiet).map((s) => s.name)).toEqual(['Diwali']);
+  });
+
+  it('can remove the end, and add it back', async () => {
+    const { h } = await house();
+    const steps = [{ time: '17:00', presetId: presetId(h, 'christmas-classic') }];
+    h.ctx.holidays.update('christmas-day', { steps, endTime: null, target: groupTarget(h) });
+    expect(holiday(h, 'christmas-day').endTime).toBeNull();
+    expect(rows(h, 'christmas-day')).toHaveLength(1);
+    h.ctx.holidays.update('christmas-day', { steps, endTime: '22:00', target: groupTarget(h) });
+    const end = rows(h, 'christmas-day').find((s) => s.action.type === 'power');
+    expect(end).toMatchObject({ name: "Christmas Day: end", quiet: true, missedRunPolicy: 'run_latest' });
+    expect(holiday(h, 'christmas-day')).toMatchObject({ endTime: '22:00', customized: true });
+  });
+
+  it('counts as original again when set back', async () => {
+    const { h } = await house();
+    const original = presetId(h, 'christmas-classic');
+    h.ctx.holidays.update('christmas-day', { steps: [{ time: '18:00', presetId: original }], endTime: '23:00', target: groupTarget(h) });
+    expect(holiday(h, 'christmas-day').customized).toBe(true);
+    h.ctx.holidays.update('christmas-day', { steps: [{ time: '17:00', presetId: original }], endTime: '23:00', target: groupTarget(h) });
+    expect(holiday(h, 'christmas-day')).toMatchObject({ customized: false, description: 'Red and green.' });
+  });
+
+  it('can use your own preset, and shows its colors', async () => {
+    const { h, left } = await houseWithLeft();
+    const mine = h.ctx.presets.create({ name: 'Mine', description: '', actions: [{ deviceId: left, action: { type: 'segmentColor', segments: [0], hex: '#123456' } }] });
+    h.ctx.holidays.update('halloween', { steps: [{ time: '19:00', presetId: mine.id }], endTime: '23:00', target: groupTarget(h) });
+    expect(holiday(h, 'halloween')).toMatchObject({ colors: ['#123456'], description: 'Shows Mine.' });
+  });
+
+  it('keeps the fireworks on January 1 when their time changes', async () => {
+    const { h } = await house();
+    h.ctx.holidays.update('new-year-fireworks', { steps: [{ time: '00:05', presetId: presetId(h, 'new-year-fireworks') }], endTime: '01:00', target: groupTarget(h) });
+    const show = rows(h, 'new-year-fireworks').find((s) => s.action.type === 'preset');
+    expect(show?.recurrence).toEqual({ kind: 'yearly', month: 1, day: 1, time: '00:05' });
+    expect(show?.nextRun?.at).toBe('2027-01-01T08:05:00.000Z');
+  });
+
+  it('changes which lights it uses, on the end too', async () => {
+    const { h, center } = await house();
+    h.ctx.holidays.update('labor-day', { steps: [{ time: '19:30', presetId: presetId(h, 'holiday-labor') }], endTime: '23:00', target: { type: 'device', deviceId: center } });
+    expect(rows(h, 'labor-day').every((s) => s.target.type === 'device')).toBe(true);
+    expect(holiday(h, 'labor-day').targetName).toBe('Outdoor Center');
+  });
+
+  it('keeps a turned-off show off, and a skip in place', async () => {
+    const { h } = await house();
+    const steps = [{ time: '18:00', presetId: presetId(h, 'holiday-easter') }];
+    h.ctx.holidays.setEnabled('easter', false);
+    h.ctx.holidays.update('easter', { steps, endTime: '22:00', target: groupTarget(h) });
+    expect(rows(h, 'easter').every((s) => !s.enabled && s.nextRun === null)).toBe(true);
+
+    h.ctx.holidays.setSkipped('labor-day', true);
+    h.ctx.holidays.update('labor-day', { steps: [{ time: '19:00', presetId: presetId(h, 'holiday-labor') }], endTime: '23:00', target: groupTarget(h) });
+    expect(holiday(h, 'labor-day').skipped).toBe(true);
+  });
+
+  it('leaves other holidays alone, and is not undone by the next sync', async () => {
+    const { h } = await house();
+    const before = holiday(h, 'thanksgiving');
+    h.ctx.holidays.update('labor-day', { steps: [{ time: '19:00', presetId: presetId(h, 'holiday-labor') }], endTime: '23:00', target: groupTarget(h) });
+    await h.ctx.builtins.sync();
+    expect(holiday(h, 'labor-day').startTime).toBe('19:00');
+    expect(holiday(h, 'thanksgiving')).toEqual(before);
+  });
+
+  it('records one line in the activity log', async () => {
+    const { h } = await house();
+    h.ctx.holidays.update('labor-day', { steps: [{ time: '19:00', presetId: presetId(h, 'holiday-labor') }], endTime: '22:00', target: groupTarget(h) });
+    const lines = h.ctx.activity.list({ eventType: 'schedule', limit: 10 }).events.filter((e) => e.message.startsWith('Changed Labor Day'));
+    expect(lines.map((e) => e.message)).toEqual(['Changed Labor Day: 7:00 PM to 10:00 PM, 1 step(s).']);
+  });
+
+  it.each([
+    ['no steps', { steps: [], endTime: null }],
+    ['two steps at once', { steps: [{ time: '18:00' }, { time: '18:00' }], endTime: null }],
+    ['an end before the last step', { steps: [{ time: '18:00' }], endTime: '17:00' }],
+    ['an end at the last step', { steps: [{ time: '18:00' }], endTime: '18:00' }],
+    ['a bad time', { steps: [{ time: '25:00' }], endTime: null }],
+  ])('refuses %s', async (_name, body) => {
+    const { h, client } = await house();
+    const preset = presetId(h, 'holiday-labor');
+    const before = rows(h, 'labor-day').map((s) => s.updatedAt);
+    const response = await client.patch('/api/v1/holidays/labor-day', {
+      steps: body.steps.map((s) => ({ ...s, presetId: preset })),
+      endTime: body.endTime,
+      target: groupTarget(h),
+    });
+    expect(response.statusCode).toBe(400);
+    expect(rows(h, 'labor-day').map((s) => s.updatedAt)).toEqual(before);
+  });
+
+  it('refuses a preset or lights that do not exist, changing nothing', async () => {
+    const { h, client } = await house();
+    const before = holiday(h, 'labor-day');
+    const preset = presetId(h, 'holiday-labor');
+    expect((await client.patch('/api/v1/holidays/labor-day', { steps: [{ time: '19:00', presetId: 'nope' }], endTime: null, target: groupTarget(h) })).statusCode).toBe(422);
+    const badTarget = await client.patch('/api/v1/holidays/labor-day', { steps: [{ time: '19:00', presetId: preset }], endTime: null, target: { type: 'group', groupId: 'nope' } });
+    expect(badTarget.statusCode).toBe(422);
+    expect(holiday(h, 'labor-day')).toEqual(before);
+    expect((await client.patch('/api/v1/holidays/nope', { steps: [{ time: '19:00', presetId: preset }], endTime: null, target: groupTarget(h) })).statusCode).toBe(404);
   });
 });
 

@@ -12,6 +12,7 @@ import type {
   DiagnosticsDto,
   DiscoveryResultDto,
   HolidayDto,
+  HolidayUpdate,
   NotificationAction,
   NotificationDto,
   NotificationListDto,
@@ -425,6 +426,12 @@ function useHolidayChange<Input>(call: (input: Input) => Promise<{ holidays: Hol
     onSuccess: ({ holidays }) => client.setQueryData(HOLIDAYS_KEY, holidays),
     onSettled: () => void client.invalidateQueries({ queryKey: keys.schedules }),
   });
+}
+
+export function useUpdateHoliday() {
+  return useHolidayChange(({ key, update }: { key: string; update: HolidayUpdate }) =>
+    api<{ holidays: HolidayDto[] }>(`/holidays/${key}`, { method: 'PATCH', body: update }),
+  );
 }
 
 export function useSetHolidayEnabled() {

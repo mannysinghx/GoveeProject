@@ -287,6 +287,7 @@ describe('route protection', () => {
       ['GET', '/api/v1/dashboard/summary'],
       ['GET', '/api/v1/connection/report'],
       ['GET', '/api/v1/holidays'],
+      ['PATCH', '/api/v1/holidays/diwali'],
       ['POST', '/api/v1/holidays/diwali/enabled'],
       ['POST', '/api/v1/holidays/diwali/skip'],
       ['GET', '/api/v1/notifications'],

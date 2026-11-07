@@ -157,6 +157,8 @@ The New Year show is set up once, recorded in `builtin_installs`, so a schedule 
 
 A show is several schedules marked with the same `builtin_show`: one per step, then an end. They use the `holiday` recurrence and are set up once, each in a transaction, recorded in `builtin_installs`, so deleted stays deleted. Later steps and ends are `quiet`, so they only notify on failure. Missed starts are skipped; a missed end runs late, so lights are not left on. Skipping adds a row to `show_skips` for that show and local date, and each step records `skipped` rather than running. A show is never kept for catch-up.
 
+Editing a show (`PATCH /holidays/:key`) updates its schedules in place, adding or removing rows only when the number of steps changes. That keeps their history, and the guard against running one date and time twice. A timing change also resets what counts as missed, so a time already past today waits for the next date. The first step by time is the one that notifies; the rest are quiet. Fixed-date shows such as the fireworks keep their kind of date. The original settings stay in the catalog, so the editor can fill them back in.
+
 Yearly and holiday schedules jump directly to each year's date, not testing every day, because there are about 50 of these and the schedule list is read often.
 
 ## Notifications

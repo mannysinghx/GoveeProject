@@ -471,3 +471,24 @@ export const pushUnsubscribeSchema = z.object({ endpoint: z.url().max(2048) });
 
 export const holidayEnabledSchema = z.object({ enabled: z.boolean() });
 export const holidaySkipSchema = z.object({ skip: z.boolean() });
+
+export const holidayUpdateSchema = z
+  .object({
+    steps: z
+      .array(z.object({ time: timeOfDaySchema, presetId: z.string().min(1, 'Choose what each step shows').max(64) }))
+      .min(1, 'A holiday needs at least one step')
+      .max(12, 'A holiday can have at most 12 steps'),
+    /** When the lights go off, on the same date, or null to leave them on. */
+    endTime: timeOfDaySchema.nullable(),
+    target: targetSchema,
+  })
+  .superRefine((value, ctx) => {
+    const times = value.steps.map((step) => step.time);
+    if (new Set(times).size !== times.length) {
+      ctx.addIssue({ code: 'custom', path: ['steps'], message: 'Two steps have the same time. Give each its own.' });
+    }
+    if (value.endTime !== null && times.some((time) => time >= (value.endTime as string))) {
+      ctx.addIssue({ code: 'custom', path: ['endTime'], message: 'The lights can only go off after the last step, on the same date.' });
+    }
+  });
+export type HolidayUpdate = z.infer<typeof holidayUpdateSchema>;

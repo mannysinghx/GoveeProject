@@ -175,7 +175,7 @@ export function SchedulesPage() {
       {holidaySteps.length > 0 ? (
         <details className="mt-6">
           <summary className="min-h-9 cursor-pointer py-2 text-sm font-medium text-ink-200">
-            Change holiday times ({holidaySteps.length} schedules)
+            See each holiday step ({holidaySteps.length} schedules, with their history)
           </summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {holidaySteps.map((schedule) => (

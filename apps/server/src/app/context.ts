@@ -182,7 +182,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     { ...config.connection, dailyBudget: config.limits.dailyBudget },
   );
 
-  const holidays = new HolidayCalendar(db, schedules, activity, clock);
+  const holidays = new HolidayCalendar(db, schedules, presets, activity, clock);
   // Web Push needs a contact address for the app. Its own address is the natural one.
   const pushSubject = config.allowedHosts?.[0]
     ? `https://${config.allowedHosts[0]}`

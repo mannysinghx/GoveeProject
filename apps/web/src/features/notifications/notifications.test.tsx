@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type HolidayDto, type NotificationDto, type ScheduleDto } from '@glm/shared';
@@ -181,7 +181,14 @@ const holiday = (overrides: Partial<HolidayDto> = {}): HolidayDto => ({
   endTime: '20:00',
   timeZone: 'America/Los_Angeles',
   skipped: false,
+  customized: false,
   colors: ['#ffaa00', '#e6007e'],
+  steps: [
+    { time: '17:00', presetId: 'colors', presetName: 'Diwali: Festival Colors' },
+    { time: '17:30', presetId: 'fire', presetName: 'Diwali: Fireworks' },
+  ],
+  target: { type: 'group', groupId: 'g1' },
+  targetName: 'All light strings',
   problem: null,
   ...overrides,
 });
@@ -195,6 +202,118 @@ describe('the holiday calendar', () => {
     expect(screen.getByText(/Your other schedules still run on these days/)).toBeInTheDocument();
     expect(screen.getByText(/other calendars can differ by a day/)).toBeInTheDocument();
     expect(screen.getByText(/those are suggestions/)).toBeInTheDocument();
+  });
+
+  describe('editing', () => {
+    const preset = (id: string, name: string, key: string | null) => ({
+      id,
+      name,
+      description: '',
+      actions: [],
+      needsTarget: false,
+      builtin: key ? { key, occasion: 'Diwali', when: '', colors: ['#ffaa00'], isAutomaticShow: false } : null,
+      createdAt: '',
+      updatedAt: '',
+    });
+    const editorRoutes = (extra: object = {}) => ({
+      'GET /holidays': { json: { holidays: [holiday()] } },
+      'GET /presets': { json: { presets: [preset('mine', 'My pattern', null), preset('colors', 'Diwali: Festival Colors', 'diwali-colors'), preset('fire', 'Diwali: Fireworks', 'diwali-fireworks')] } },
+      'GET /groups': { json: { groups: [{ id: 'g1', name: 'All light strings', deviceIds: ['d'] }, { id: 'g2', name: 'Front only', deviceIds: ['d'] }] } },
+      'GET /devices': { json: { devices: [] } },
+      'GET /schedules': { json: { schedules: [] } },
+      'PATCH /holidays/diwali': { json: { holidays: [holiday({ customized: true })] } },
+      ...extra,
+    });
+    const openEditor = async () => {
+      await userEvent.click(await screen.findByRole('button', { name: 'Edit Diwali' }));
+      return screen.findByRole('heading', { name: 'Edit Diwali' });
+    };
+    const saved = (calls: { method: string; body: unknown }[]) => calls.find((c) => c.method === 'PATCH')?.body;
+
+    it('opens with the current settings, and saves a change to time, pattern, end and lights', async () => {
+      const { calls } = mockApi(editorRoutes());
+      renderApp(<HolidayCalendar />);
+      await openEditor();
+      const start = screen.getByLabelText('Starts at');
+      expect(start).toHaveValue('17:00');
+      expect(screen.getByLabelText('Step 2 at')).toHaveValue('17:30');
+      expect(screen.getByLabelText('Off at')).toHaveValue('20:00');
+      await screen.findAllByRole('option', { name: 'My pattern' });
+      await screen.findByRole('option', { name: 'Front only' });
+
+      fireEvent.change(start, { target: { value: '16:30' } });
+      await userEvent.selectOptions(screen.getByLabelText('Step 2 shows'), 'mine');
+      fireEvent.change(screen.getByLabelText('Off at'), { target: { value: '21:15' } });
+      await userEvent.selectOptions(screen.getByLabelText('Which lights'), 'group:g2');
+      await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(saved(calls)).toEqual({
+          steps: [
+            { time: '16:30', presetId: 'colors' },
+            { time: '17:30', presetId: 'mine' },
+          ],
+          endTime: '21:15',
+          target: { type: 'group', groupId: 'g2' },
+        }),
+      );
+      await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit Diwali' })).not.toBeInTheDocument());
+      expect(await screen.findByText(/Changed by you/)).toBeInTheDocument();
+    });
+
+    it('adds and removes steps, and can leave the lights on', async () => {
+      const { calls } = mockApi(editorRoutes());
+      renderApp(<HolidayCalendar />);
+      await openEditor();
+      await userEvent.click(screen.getByRole('button', { name: 'Add a step' }));
+      expect(screen.getByLabelText('Step 3 at')).toHaveValue('18:00');
+      await userEvent.click(screen.getByRole('button', { name: 'Remove step 1' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Turn the lights off afterward' }));
+      expect(screen.queryByLabelText('Off at')).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      await waitFor(() =>
+        expect(saved(calls)).toMatchObject({
+          steps: [
+            { time: '17:30', presetId: 'fire' },
+            { time: '18:00', presetId: 'fire' },
+          ],
+          endTime: null,
+        }),
+      );
+    });
+
+    it('explains a clash, and will not save it', async () => {
+      const { calls } = mockApi(editorRoutes());
+      renderApp(<HolidayCalendar />);
+      await openEditor();
+      fireEvent.change(screen.getByLabelText('Off at'), { target: { value: '17:15' } });
+      expect(await screen.findByText(/can only go off after the last step/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Off at'), { target: { value: '20:00' } });
+      fireEvent.change(screen.getByLabelText('Step 2 at'), { target: { value: '17:00' } });
+      expect(await screen.findByText(/Two steps have the same time/)).toBeInTheDocument();
+      expect(saved(calls)).toBeUndefined();
+    });
+
+    it('can fill in the original settings, which still need saving', async () => {
+      const { calls } = mockApi(editorRoutes({ 'GET /holidays': { json: { holidays: [holiday({ customized: true, steps: [{ time: '16:00', presetId: 'mine', presetName: 'My pattern' }], endTime: null })] } } }));
+      renderApp(<HolidayCalendar />);
+      await openEditor();
+      await userEvent.click(await screen.findByRole('button', { name: 'Fill in original settings' }));
+      expect(screen.getByLabelText('Starts at')).toHaveValue('17:00');
+      expect(screen.getByLabelText('Step 6 at')).toHaveValue('19:30');
+      expect(screen.getByLabelText('Off at')).toHaveValue('20:00');
+      expect(saved(calls)).toBeUndefined();
+    });
+
+    it('shows why a save failed, and stays open', async () => {
+      mockApi(editorRoutes({ 'PATCH /holidays/diwali': { status: 422, json: { error: { code: 'unknown_preset', message: 'One of those presets no longer exists.', requestId: 'r' } } } }));
+      renderApp(<HolidayCalendar />);
+      await openEditor();
+      await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+      expect(await screen.findByText(/One of those presets no longer exists/)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Edit Diwali' })).toBeInTheDocument();
+    });
   });
 
   it('turns a holiday off, and skips just the next one', async () => {
@@ -250,7 +369,7 @@ describe('the holiday calendar', () => {
     });
     renderApp(<SchedulesPage />);
     expect(await screen.findByRole('heading', { name: 'Switch ON' })).toBeInTheDocument();
-    const summary = await screen.findByText('Change holiday times (1 schedules)');
+    const summary = await screen.findByText('See each holiday step (1 schedules, with their history)');
     const details = summary.closest('details') as HTMLDetailsElement;
     expect(details.open).toBe(false);
     expect(details).toContainElement(screen.getByRole('heading', { name: 'Diwali: end', hidden: true }));

@@ -334,3 +334,9 @@ export function addMinutesToTime(time: string, minutes: number): string {
   const total = hour * 60 + minute + minutes;
   return `${pad(Math.floor(total / 60) % 24)}:${pad(total % 60)}`;
 }
+
+/** A local 24-hour time as people read it, such as "5:00 PM". */
+export function describeTime(time: string): string {
+  const [hour = 0, minute = 0] = time.split(':').map(Number);
+  return `${hour % 12 === 0 ? 12 : hour % 12}:${pad(minute)} ${hour < 12 ? 'AM' : 'PM'}`;
+}

@@ -550,12 +550,20 @@ export interface ConnectionReportDto {
 /* Holidays and notifications                                                 */
 /* -------------------------------------------------------------------------- */
 
+export interface HolidayStepDto {
+  time: string;
+  presetId: string;
+  presetName: string;
+}
+
 export interface HolidayDto {
   key: string;
   name: string;
   group: 'federal' | 'observance' | 'cultural' | 'show';
   description: string;
   enabled: boolean;
+  /** Changed from what the app first set up. */
+  customized: boolean;
   /** Local date, or null when the calendar has no later date, as with Diwali after 2037. */
   nextDate: string | null;
   startTime: string;
@@ -563,6 +571,9 @@ export interface HolidayDto {
   timeZone: string;
   skipped: boolean;
   colors: string[];
+  steps: HolidayStepDto[];
+  target: Target;
+  targetName: string;
   problem: string | null;
 }
 

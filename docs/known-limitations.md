@@ -52,7 +52,10 @@
 - **Diwali's date is one calendar's, for Los Angeles.** It is not a fact from Govee or a government, and it ends at 2037.
 - **Many holidays have no official colors.** Those are suggestions. Duplicate a preset and point the schedule at your copy to change one.
 - **Effects are not blended with patterns.** A string shows either fixed colors or an effect, so Diwali takes turns rather than combining them.
-- **New holidays need an app update.** The list is built in.
+- **New holidays need an app update.** The list is built in, though you can add your own schedule for any date.
+- **Holiday dates cannot be edited.** They are worked out for each year. To use another date, skip that year's show and add a one-time schedule.
+- **Steps stay on one date.** A show cannot cross midnight, so to end after midnight, turn off its end time and add a schedule of your own.
+- **Your changes apply every year,** not just to the next date.
 
 ## Limits of notifications
 
