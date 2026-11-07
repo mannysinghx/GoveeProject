@@ -535,6 +535,13 @@ describe('pattern editor', () => {
     });
   });
 
+  it('links to the light check from the send area', async () => {
+    mockApi(routes);
+    open();
+    await ready();
+    expect(screen.getByRole('link', { name: 'LEDs look wrong?' })).toHaveAttribute('href', '/patterns/check');
+  });
+
   it('keeps the LEDs in string order along rows that run right to left', async () => {
     mockApi(routes);
     const { container } = open();
@@ -677,7 +684,7 @@ describe('pattern editor', () => {
     await ready();
     setColor('Fill color', '#ff0000');
     await userEvent.click(screen.getByRole('button', { name: 'Alternate colors' }));
-    expect(screen.getByText(/This takes about 3 seconds: 9 commands across 3 strings/)).toBeInTheDocument();
+    expect(screen.getByText(/This takes about 5 seconds: 9 commands, plus a base color, across 3 strings/)).toBeInTheDocument();
     expect(screen.getByText(/not in perfect sync/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Send to 3 strings' }));

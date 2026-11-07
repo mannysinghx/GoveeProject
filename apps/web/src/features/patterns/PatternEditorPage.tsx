@@ -51,8 +51,8 @@ import {
   repeatFill,
   repeatPainted,
   resolveStrings,
+  estimatedSeconds,
   serpentineRows,
-  slowestStringCommands,
   toSettings,
   withLedCount,
   type PatternState,
@@ -472,7 +472,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
     () => patternToActions(pattern, strings, { turnOn, brightness: useBrightness ? brightness : null }),
     [pattern, strings, turnOn, useBrightness, brightness],
   );
-  const seconds = slowestStringCommands(actions);
+  const seconds = estimatedSeconds(actions);
   const shownCount = strings.filter((s) => s.included).length;
   const shownLeds = strings.filter((s) => s.included).reduce((sum, s) => sum + (s.ledCount ?? 0), 0);
   const valid = isHexColor(fill) && isHexColor(pattern.background) && cells.length > 0;
@@ -669,7 +669,14 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
       </div>
 
       <div className="space-y-5">
-        <SectionCard title="Try it on the lights">
+        <SectionCard
+          title="Try it on the lights"
+          action={
+            <Link to="/patterns/check" className="text-sm text-amber-soft underline underline-offset-2">
+              LEDs look wrong?
+            </Link>
+          }
+        >
           <div className="space-y-4">
             <label className="flex min-h-9 items-center gap-2 text-sm">
               <input type="checkbox" className="size-4" checked={turnOn} onChange={(e) => setTurnOn(e.target.checked)} />
@@ -688,7 +695,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
             ) : null}
             <p className="text-sm text-ink-300">
               This takes about {seconds} second{seconds === 1 ? '' : 's'}: {actions.length} command
-              {actions.length === 1 ? '' : 's'} across {shownCount} string{shownCount === 1 ? '' : 's'}. Each string changes a
+              {actions.length === 1 ? '' : 's'}, plus a base color, across {shownCount} string{shownCount === 1 ? '' : 's'}. Each string changes a
               section at a time, and they are not in perfect sync.
               {seconds > 10 ? ' Fewer colors means a quicker change.' : ''}
             </p>

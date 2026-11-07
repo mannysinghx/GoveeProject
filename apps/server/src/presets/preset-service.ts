@@ -303,6 +303,7 @@ export class PresetService {
     target: Target | undefined,
     actions: PresetActionInput[],
     correlationId?: string,
+    plainSegments = false,
   ): Promise<RunResultDto> {
     const draft: PresetDto = {
       id: 'draft',
@@ -322,7 +323,7 @@ export class PresetService {
       })),
     };
     const { plans, skipped } = this.buildPlan(draft, target);
-    return this.actions.runPlan({ type: 'preset', id: null, name, correlationId }, plans, skipped);
+    return this.actions.runPlan({ type: 'preset', id: null, name, correlationId, noBaseCoat: plainSegments }, plans, skipped);
   }
 
   async apply(

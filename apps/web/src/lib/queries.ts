@@ -267,7 +267,7 @@ export function useApplyPreset() {
 export function useApplyDraft() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (body: { name: string; target?: Target; actions: PresetActionInput[] }) =>
+    mutationFn: (body: { name: string; target?: Target; actions: PresetActionInput[]; plainSegments?: boolean }) =>
       api<RunResultDto>('/presets/apply-draft', { method: 'POST', body }),
     onSettled: () => {
       void client.invalidateQueries({ queryKey: keys.devices });

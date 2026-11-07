@@ -12,12 +12,13 @@ Current state of the project, so anyone can pick it up without the original conv
 
 | Piece | How it was checked |
 |---|---|
-| Backend, frontend, shared code | `npm test`: 456 tests (server 323, web 120, shared 13) |
+| Backend, frontend, shared code | `npm test`: 492 tests (server 336, web 143, shared 13) |
 | Connection monitor, offline detection, catch-up, one box per LED | Real browser against the mock, production build, with one mock light offline, on desktop and at phone width. `scripts/ci-local.sh --image` passed on `481cbdb`. Deployed: migration `002_connection.sql` applied, monitor started at 130-second intervals, status checks ran for all 3 strings and skipped the Govee group, new routes return 401 without a session. No command was sent to real lights. Diagnosis and catch-up have not yet run against a real outage. |
 | Pattern editor, all strings in series | Real browser against the mock, production build: drag painting across strings, repeat, flip surviving a reload, per-string sending, phone width. Not yet sent to real lights. |
 | Repeat in the pattern editor | Real browser against the mock, production build: a painted pattern with a blank filled all segments across strings, following right-to-left rows. `scripts/ci-local.sh --image` passed on `e05ed8a`, and it is deployed: the live build contains it, health is OK, and the monitor restarted. Not yet tried on real lights. |
 | 20 festival presets, New Year fireworks, yearly schedules, exact start times | Real browser against the mock, production build, with real scene names: presets listed in calendar order, yearly schedule shown and editable, phone width. A run due at 04:37:00.000 started at 04:37:00.000 on the real clock. `scripts/ci-local.sh --image` passed on `c00ee26`, and it is deployed: migration `003` applied, 21 presets installed, the Fireworks effect is set on all 3 strings from their real scene lists, and both schedules show their next run as January 1, 2027, Los Angeles time. **No effect has been run on real lights by this check.** |
 | One color for everything, in the pattern editor | Real browser against the mock, production build, on desktop and at phone width. **Committed locally, not deployed yet.** |
+| White-LED fixes and Check my lights | Unit tests, and a real browser against the mock, production build, at desktop and phone width. **Not deployed yet, and the physical cause isn't confirmed on real lights.** |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |
@@ -27,7 +28,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-The one-color selector in the pattern editor is committed locally and not pushed, waiting for the owner's approval. Only `apps/web` changed, so this is one `@glm/server` redeploy, with no database change.
+Branch `fix/white-leds` (worktree outside the repo) holds the white-LED changes and is not pushed, waiting for the owner's approval. It sits on the one-color selector, which is also undeployed. A separate session is building the holiday calendar and notifications on `main`, uncommitted when this was written, and rebases after this lands.
 
 ## Open findings and decisions
 
@@ -37,6 +38,8 @@ The one-color selector in the pattern editor is committed locally and not pushed
 | The H805C has 108 LEDs and 4 per segment: calculated from a manual, a third-party comparison and 27 reported segments, not stated by Govee | `docs/govee-integration.md`, `apps/web/src/features/patterns/pattern-model.ts` | Medium | Owner, by counting LEDs on real lights |
 | Offline detection matches the word "offline" in Govee's message | `apps/server/src/govee/cloud-transport.ts` | Low | Revisit if Govee changes the wording |
 | The owner's nightly Switch OFF at 23:00 means lights are off for the hour before the show, including on New Year's Eve | Production schedules | Low | Owner: change it for December 31 if wanted |
+| Some LEDs stay white on real strings. Cause not confirmed; fixes address a confirmed timing defect and the missing base color | `docs/govee-integration.md`, `apps/server/src/commands/action-service.ts` | High | Owner, by running Check my lights after deploying |
+| Reading LED colors would need Govee's private channel and account login, outside the official-API brief | `docs/govee-integration.md` | Decision | Owner |
 | License is MIT, copyright "mannysinghx" | `LICENSE` | Low | Owner can change it |
 | GitHub Actions: none exist, and CI runs locally by policy | `scripts/ci-local.sh` | None | Owner |
 | The global login limit could be used to block sign-in for 5 minutes at a time | `docs/security.md` | Low while off the public internet | Owner, if exposing it |

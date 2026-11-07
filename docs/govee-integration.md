@@ -4,7 +4,7 @@ Written from Govee's developer documentation as read on 6 November 2026, and cor
 
 ## What the real service has shown
 
-From a live account with three H805C strings and one group. Commands were only sent to the group, and only accepted responses were seen. **Whether anything changed physically has not been confirmed, and segment, colour and scene commands have not been sent to real lights.**
+From a live account with three H805C strings and one group. Power and segment color commands have been sent to the strings, and Govee accepted them. **The owner reports that some LEDs stay white, so accepted does not mean every LED changed.** Scene commands have not been sent to real lights from this app.
 
 | Question | Answer from the real API |
 |---|---|
@@ -60,12 +60,29 @@ Govee's supported-model list includes `H805C`. The list says nothing about which
 
 The scenes endpoint returned 113 scenes for a real H805C, including Fireworks, New Years, Thanksgiving, Christmas Eve, Winter Wonderland and Fall. Scene ids are read from Govee for each light, never hard-coded. **None of these has been activated on real lights from this app yet**, so how they look, and whether they carry on after the app stops sending commands, is unconfirmed.
 
+### When LEDs stay white
+
+The owner reported some LEDs staying white. What was found on November 7, 2026, from production records and read-only requests:
+
+- The pattern contained no white. It named all 27 segments on each string, and every command was accepted with code 200.
+- `device/state` returns an empty value for `segmentedColorRgb`, so what each segment shows can't be read. `colorRgb` reported the color of the first segment command sent.
+- **A defect in this app:** per-light commands could burst. The first segment command went 130 to 200 ms after power-on, and the next about 650 ms later, not the intended one a second.
+- The app had never sent a whole-string color, so an LED a segment command missed kept its earlier state.
+
+**The physical cause is not confirmed.** Reports for other Govee models describe similar symptoms, none with a confirmed cause: [segment colors accepted with no visible change](https://github.com/lasswellt/govee-homeassistant/issues/261), [higher segment numbers changing the whole string](https://github.com/lasswellt/govee-homeassistant/issues/208), and [a guess that the main color can overwrite segment colors](https://github.com/wez/govee2mqtt/issues/207).
+
+What changed: commands to one light are at least a second apart, a light gets an extra second after turning on, and a pattern covering a whole string sets its main color first. **Check my lights** on the pattern page separates the remaining causes by eye.
+
+### Reading each LED
+
+The official API can't report segment or LED colors. [One project](https://github.com/willadamskeane/govee-homeassistant/pull/1) reads per-segment colors through Govee's private AWS IoT channel, and in [another report](https://github.com/lasswellt/govee-homeassistant/issues/208) that channel needed the Govee account login. This app doesn't use it: it's undocumented, the brief limits the app to the official API, and it hasn't been tried on an H805C. It would report what the controller believes, so it still wouldn't detect an LED that has failed.
+
 ### LEDs per string
 
 Govee's API reports neither length nor LED count, so these come from outside it:
 
 - The H805C is the Permanent Outdoor Lights Elite. Its [manual listing](https://manuals.plus/govee/h805c-permanent-outdoor-light-elite-manual) gives 150 ft.
-- A [third-party comparison](https://www.glowtraxusa.com/blogs/articles/govee-permanent-lights-original-vs-2-vs-elite-vs-pro-what-is-actually-different) gives about 72 lights per 100 ft for the Elite, which works out to 108. A search summary of a retailer listing also said 108, but that page could not be read directly, and no Govee page was found stating it.
+- A [third-party comparison](https://www.glowtraxusa.com/blogs/articles/govee-permanent-lights-original-vs-2-vs-elite-vs-pro-what-is-actually-different) gives about 72 lights per 100 ft for the Elite, which works out to 108. A [report on the H805C](https://github.com/Galorhallen/govee-local-api/issues/219) also says 108: 9 sections of 12. A search summary of a retailer listing also said 108, but that page could not be read directly, and no Govee page was found stating it.
 - Real H805C lights report segments 0 to 26, with nothing finer. 108 / 27 is 4 LEDs per segment. **This is arithmetic, not something Govee documents.** Check it by painting one segment and counting the LEDs that change.
 
 The owner can enter a different count per string, such as after cutting or extending one. The editor then spreads the LEDs evenly across the segments.

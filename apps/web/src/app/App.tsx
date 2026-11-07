@@ -8,6 +8,7 @@ import { useSession } from '../features/auth/useSession';
 import { ActivityPage } from '../features/activity/ActivityPage';
 import { ConnectPage } from '../features/dashboard/ConnectPage';
 import { ConnectionPage } from '../features/connection/ConnectionPage';
+import { LightsCheckPage } from '../features/lights-check/LightsCheckPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { DeviceDetailPage } from '../features/devices/DeviceDetailPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
@@ -50,6 +51,7 @@ export function App() {
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         <Route path="/presets" element={<PresetsPage />} />
         <Route path="/patterns/new" element={<PatternEditorPage />} />
+        <Route path="/patterns/check" element={<LightsCheckPage />} />
         <Route path="/patterns/:presetId" element={<PatternEditorPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/schedules" element={<SchedulesPage />} />
