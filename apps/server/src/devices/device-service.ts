@@ -30,6 +30,12 @@ import { sceneToDto, type SceneStore } from './scene-store.js';
 /** The model this project targets first. Used for a highlight only. */
 const PRIMARY_MODEL = 'H805C';
 const STATE_HISTORY_PER_DEVICE = 200;
+/**
+ * After Govee refuses a status request outright, wait this long before polling again.
+ * Govee groups do this every time ("devices not exist"), and a retry cannot change the answer.
+ * Asking by hand always goes through, and a successful report clears this at once.
+ */
+const REFUSED_STATUS_RETRY_MS = 24 * 3600 * 1000;
 
 export type StateSource = 'manual' | 'poll' | 'post_command';
 
@@ -182,6 +188,7 @@ export class DeviceService {
       name: device.name,
       deviceType: device.deviceType,
       isPrimaryModel: device.sku.toUpperCase() === PRIMARY_MODEL,
+      isGoveeGroup: /group/i.test(device.sku),
       discoveryStatus: device.discoveryStatus,
       lastDiscoveredAt: device.lastDiscoveredAt,
       missingSince: device.missingSince,
@@ -329,7 +336,7 @@ export class DeviceService {
     const { statusPollSeconds } = this.getSettings();
     const now = this.clock.nowMs();
     for (const device of this.repository.list()) {
-      if (device.discoveryStatus !== 'present') continue;
+      if (device.discoveryStatus !== 'present' || this.statusRefused(device)) continue;
       const age = device.lastStatusRefreshAt ? now - Date.parse(device.lastStatusRefreshAt) : Infinity;
       if (age < statusPollSeconds * 1000) continue;
       try {
@@ -340,6 +347,12 @@ export class DeviceService {
       }
     }
     return this.list();
+  }
+
+  private statusRefused(device: DeviceRecord): boolean {
+    const error = device.lastStatusError;
+    if (!error || (error.category !== 'bad_request' && error.category !== 'not_found')) return false;
+    return this.clock.nowMs() - Date.parse(error.at) < REFUSED_STATUS_RETRY_MS;
   }
 
   private recordStatusError(id: string, failure: TransportError): void {
@@ -449,6 +462,8 @@ export class DeviceService {
       this.postCommandTimers.delete(deviceId);
       // Wait for queued work first, so the report reflects the newest command.
       if (this.queue.pendingForDevice(deviceId).length > 0) return;
+      const device = this.repository.get(deviceId);
+      if (!device || this.statusRefused(device)) return;
       void this.refreshState(deviceId, 'post_command')
         .then(({ device }) => {
           // Govee's report can lag behind a command. Check once more if something still differs.

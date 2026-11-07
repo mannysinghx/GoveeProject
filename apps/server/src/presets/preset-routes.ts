@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { idParamSchema, presetApplyRequestSchema, presetCreateSchema, presetUpdateSchema } from '@glm/shared';
+import {
+  idParamSchema,
+  presetApplyRequestSchema,
+  presetCreateSchema,
+  presetDraftApplySchema,
+  presetUpdateSchema,
+} from '@glm/shared';
 import type { AppContext } from '../app/context.js';
 import { parseInput } from '../shared/validation.js';
 
@@ -11,6 +17,11 @@ export function registerPresetRoutes(api: FastifyInstance, ctx: AppContext): voi
   api.post('/presets', async (request, reply) => {
     const body = parseInput(presetCreateSchema, request.body);
     return reply.status(201).send(presets.create(body));
+  });
+
+  api.post('/presets/apply-draft', async (request) => {
+    const body = parseInput(presetDraftApplySchema, request.body);
+    return presets.applyDraft(body.name, body.target, body.actions, request.id);
   });
 
   api.get('/presets/:id', async (request) => {

@@ -84,21 +84,22 @@ function DeviceCard({ device }: { device: DeviceDto }) {
           <p className="mt-0.5 text-xs text-ink-400">{device.sku}</p>
         </div>
         {device.isPrimaryModel ? <Badge tone="amber">Outdoor Elite</Badge> : null}
+        {device.isGoveeGroup ? <Badge tone="info">Govee group</Badge> : null}
       </div>
 
       <div className="flex flex-wrap gap-1.5">
-        <ConnectivityBadge device={device} />
-        {!missing ? <FreshnessBadge device={device} /> : null}
+        {device.isGoveeGroup ? null : <ConnectivityBadge device={device} />}
+        {!missing && !device.isGoveeGroup ? <FreshnessBadge device={device} /> : null}
       </div>
 
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <div>
           <dt className="text-xs text-ink-400">{historical ? 'Last reported power' : 'Reported power'}</dt>
-          <dd className="mt-0.5">{power ?? 'Unknown'}</dd>
+          <dd className="mt-0.5">{power ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
         </div>
         <div>
           <dt className="text-xs text-ink-400">{historical ? 'Last reported brightness' : 'Reported brightness'}</dt>
-          <dd className="mt-0.5">{brightness ?? 'Unknown'}</dd>
+          <dd className="mt-0.5">{brightness ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
         </div>
       </dl>
 

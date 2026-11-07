@@ -197,7 +197,9 @@ async function registerFrontend(app: FastifyInstance, ctx: AppContext): Promise<
       }
       return reply.status(404).send(errorBody(request, 'not_found', 'That endpoint does not exist.'));
     }
-    if (hasFrontend && request.method === 'GET') {
+    // Page addresses get the app. A missing file gets a real 404, not HTML posing as a script.
+    const isFile = /\.[a-z0-9]+$/i.test(request.url.split('?')[0] ?? '');
+    if (hasFrontend && request.method === 'GET' && !isFile) {
       return reply.header('cache-control', 'no-cache').sendFile('index.html');
     }
     return reply

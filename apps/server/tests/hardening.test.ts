@@ -1,5 +1,8 @@
+import fs from 'node:fs';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CommandDto, DeviceDto, DiscoveryResultDto, ScheduleDto } from '@glm/shared';
 import { GoveeCloudTransport } from '../src/govee/cloud-transport.js';
@@ -437,5 +440,190 @@ describe('failures inside background work', () => {
     const second = enqueue(20);
     await expect(first.done).resolves.toMatchObject({ id: first.command.id, status: 'failed', errorCategory: 'unknown' });
     await expect(second.done).resolves.toMatchObject({ status: 'accepted' });
+  });
+});
+
+describe('Govee groups, as the real API reports them', () => {
+  const group = () => ({
+    sku: 'SameModeGroup',
+    device: 'group-1',
+    deviceName: 'Christmas',
+    capabilities: mockFullDevice().capabilities.filter((c) => (c as { instance: string }).instance === 'powerSwitch'),
+  });
+  const refuseState = (h: Harness) => {
+    h.mock.intercept = (request, res) => {
+      if (!request.path.endsWith('/state')) return false;
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ code: 400, msg: 'devices not exist' }));
+      return true;
+    };
+  };
+  const stateCalls = (h: Harness) => h.mock.requests.filter((r) => r.path.endsWith('/state')).length;
+
+  async function setup() {
+    const h = await harness();
+    h.mock.devices = [group()];
+    const client = await authedClient(h.app);
+    const { devices } = (await client.post('/api/v1/devices/discover')).json() as DiscoveryResultDto;
+    refuseState(h);
+    return { h, client, device: devices[0] as DeviceDto };
+  }
+
+  it('recognises the group and reads it with no type', async () => {
+    const { device } = await setup();
+    expect(device).toMatchObject({ isGoveeGroup: true, isPrimaryModel: false, deviceType: null });
+    expect(device.capabilities.map((c) => c.kind)).toEqual(['power']);
+  });
+
+  it('stops polling after Govee refuses, instead of failing every minute', async () => {
+    const { h, client } = await setup();
+    await client.post('/api/v1/devices/refresh-due');
+    expect(stateCalls(h)).toBe(1);
+    for (let i = 0; i < 5; i++) {
+      h.clock.advance(61_000);
+      await client.post('/api/v1/devices/refresh-due');
+    }
+    expect(stateCalls(h)).toBe(1);
+    expect(h.ctx.activity.list({ eventType: 'state', outcome: 'failure', limit: 50 }).events).toHaveLength(1);
+  });
+
+  it('tries again the next day, and always when asked by hand', async () => {
+    const { h, client, device } = await setup();
+    await client.post('/api/v1/devices/refresh-due');
+    h.clock.advance(10_000);
+    expect((await client.post(`/api/v1/devices/${device.id}/refresh`)).statusCode).toBe(422);
+    expect(stateCalls(h)).toBe(2);
+
+    h.ctx.db.prepare('UPDATE sessions SET expires_at = ?').run('2030-01-01T00:00:00.000Z');
+    h.clock.advance(24 * 3600 * 1000 + 1000);
+    await client.post('/api/v1/devices/refresh-due');
+    expect(stateCalls(h)).toBe(3);
+  });
+
+  it('keeps polling through temporary failures', async () => {
+    const h = await harness();
+    h.mock.devices = [mockFullDevice()];
+    const client = await authedClient(h.app);
+    await client.post('/api/v1/devices/discover');
+    h.mock.intercept = (request, res) => {
+      if (!request.path.endsWith('/state')) return false;
+      res.writeHead(500);
+      res.end();
+      return true;
+    };
+    await client.post('/api/v1/devices/refresh-due');
+    const first = stateCalls(h);
+    h.clock.advance(61_000);
+    await client.post('/api/v1/devices/refresh-due');
+    expect(stateCalls(h)).toBeGreaterThan(first);
+  });
+
+  it('does not check status after a command when Govee has refused it', async () => {
+    const { h, client, device } = await setup();
+    await client.post('/api/v1/devices/refresh-due');
+    const before = stateCalls(h);
+    const command = (await client.post(`/api/v1/devices/${device.id}/power`, { on: true })).json() as { command: CommandDto };
+    expect(command.command).toMatchObject({ status: 'accepted', verification: 'unverified' });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(stateCalls(h)).toBe(before);
+  });
+});
+
+describe('sending an unsaved pattern', () => {
+  const pattern = {
+    name: 'Pattern preview',
+    actions: [
+      { type: 'power', on: true },
+      { type: 'segmentColor', segments: [0, 1], hex: '#ff0000' },
+      { type: 'segmentColor', segments: [2], hex: '#00ff00' },
+    ],
+  };
+
+  it('sends the steps in order, stores no preset, and records the run', async () => {
+    const h = await harness();
+    const { client, device } = await withDevice(h);
+    const response = await client.post('/api/v1/presets/apply-draft', {
+      ...pattern,
+      target: { type: 'device', deviceId: device.id },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('all_accepted');
+    expect(h.mock.controlRequests().map((c) => c.capability)).toEqual([
+      { type: 'devices.capabilities.on_off', instance: 'powerSwitch', value: 1 },
+      { type: 'devices.capabilities.segment_color_setting', instance: 'segmentedColorRgb', value: { segment: [0, 1], rgb: 16711680 } },
+      { type: 'devices.capabilities.segment_color_setting', instance: 'segmentedColorRgb', value: { segment: [2], rgb: 65280 } },
+    ]);
+    expect(h.ctx.presets.list()).toEqual([]);
+    expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM execution_runs').get()).toEqual({ n: 1 });
+  });
+
+  it('skips a group the pattern cannot apply to, and still runs its power step', async () => {
+    const h = await harness();
+    h.mock.devices = [
+      {
+        sku: 'SameModeGroup',
+        device: 'group-1',
+        capabilities: mockFullDevice().capabilities.filter((c) => (c as { instance: string }).instance === 'powerSwitch'),
+      },
+    ];
+    const client = await authedClient(h.app);
+    const { devices } = (await client.post('/api/v1/devices/discover')).json() as DiscoveryResultDto;
+    const run = (
+      await client.post('/api/v1/presets/apply-draft', { ...pattern, target: { type: 'device', deviceId: devices[0]!.id } })
+    ).json() as { status: string; outcomes: { status: string; reason: string | null }[] };
+    expect(run.status).toBe('partial');
+    expect(run.outcomes.map((o) => o.status)).toEqual(['accepted', 'skipped', 'skipped']);
+    expect(run.outcomes[1]?.reason).toContain('does not report segment colour');
+  });
+
+  it('rejects a segment the device does not report, per device, with nothing sent for it', async () => {
+    const h = await harness();
+    const { client, device } = await withDevice(h);
+    const run = (
+      await client.post('/api/v1/presets/apply-draft', {
+        name: 'Too long',
+        target: { type: 'device', deviceId: device.id },
+        actions: [{ type: 'segmentColor', segments: [99], hex: '#ff0000' }],
+      })
+    ).json() as { status: string; outcomes: { reason: string | null }[] };
+    expect(run.status).toBe('skipped');
+    expect(run.outcomes[0]?.reason).toContain('99');
+    expect(h.mock.controlRequests()).toHaveLength(0);
+  });
+
+  it('requires a target and valid steps', async () => {
+    const h = await harness();
+    const client = await authedClient(h.app);
+    expect((await client.post('/api/v1/presets/apply-draft', { actions: pattern.actions })).statusCode).toBe(400);
+    expect(
+      (await client.post('/api/v1/presets/apply-draft', { target: { type: 'device', deviceId: 'x' }, actions: [] })).statusCode,
+    ).toBe(400);
+  });
+});
+
+describe('serving the frontend', () => {
+  it('returns the app for page addresses, and a real 404 for missing files', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glm-web-'));
+    fs.mkdirSync(path.join(dir, 'assets'));
+    fs.writeFileSync(path.join(dir, 'index.html'), '<div id="root"></div>');
+    fs.writeFileSync(path.join(dir, 'assets', 'app.js'), 'console.log(1)');
+    const h = await harness({ env: { WEB_DIST_DIR: dir } });
+    try {
+      for (const url of ['/', '/schedules', '/patterns/new?device=x', '/devices/a.b/x']) {
+        const response = await h.app.inject({ method: 'GET', url });
+        expect(response.statusCode, url).toBe(200);
+        expect(response.body, url).toContain('id="root"');
+      }
+      const asset = await h.app.inject({ method: 'GET', url: '/assets/app.js' });
+      expect(asset.statusCode).toBe(200);
+      expect(String(asset.headers['content-type'])).toContain('javascript');
+      for (const url of ['/assets/old-hash.js', '/assets/old-hash.css', '/favicon.ico']) {
+        const missing = await h.app.inject({ method: 'GET', url });
+        expect(missing.statusCode, url).toBe(404);
+        expect(missing.body, url).not.toContain('id="root"');
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -2,7 +2,7 @@
 
 ## Not yet verified
 
-- **Nothing has been tested against the real Govee service or a real H805C.** The integration follows Govee's documentation. See the [acceptance checklist](acceptance-checklist.md) and the [list of documentation gaps](govee-integration.md#decisions-made-where-the-documentation-is-unclear).
+- **No one has confirmed yet that real lights respond correctly.** Discovery, status and power commands to a group have worked against the real Govee service, as far as Govee's responses show. Segment, colour and scene commands have not been sent to real lights. See the [acceptance checklist](acceptance-checklist.md) and [what the real service has shown](govee-integration.md#what-the-real-service-has-shown).
 - **DIY scene activation** is the least certain feature. The documentation shows no control example and gives three different capability types.
 
 ## Limits of the Govee cloud API
@@ -12,6 +12,14 @@
 - Smooth, fast animation is not possible, because of rate limits and cloud latency.
 - Scenes and features in the Govee app may not be exposed. Commands to several lights arrive one after another, not in sync.
 - The API can activate, but not create or edit, DIY scenes.
+
+## Limits of patterns
+
+- **Static only.** Clockwise, Twinkle, Breathe and similar effects run inside the lights, and the public API cannot send them.
+- **One cell is one segment.** An H805C reports 27. The Govee app paints individual bulbs, and the public API does not offer that.
+- **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across 27 segments takes about 27 seconds.
+- **No read-back.** Govee does not report segment colors, so the app cannot show what the lights are displaying.
+- **Lights change independently.** Sending to a group does not keep them in step.
 
 ## Limits of this version
 
@@ -34,7 +42,8 @@
 | LAN control | Optional for version 1. H805C support is unconfirmed, and the protocol needs physical testing first. The transport interface leaves room for it. See [Architecture](architecture.md#future-lan-control). |
 | Music mode and toggle capabilities | Outside this version's scope. They are listed read-only under Capabilities when reported. |
 | Device event subscriptions | Not needed for lighting control. Govee documents them on a separate page, which was not used. |
-| Editing or creating DIY scenes | The public API does not offer this. |
+| Creating or editing Govee DIY scenes | The public API does not offer this. The pattern editor saves app presets instead. |
+| Moving pattern effects | Would need a stream of cloud commands, which rate limits make slow and uneven. |
 | Entering the API key in the browser | The brief prefers an environment variable for version 1. If added later, the key must be encrypted at rest with a key held outside the database. |
 | Multi-replica operation | Needs shared queue and rate-limit state. Not needed for a single home. |
 | Automatic HTTPS | Left to a reverse proxy you control, so the app does not depend on any particular service. |

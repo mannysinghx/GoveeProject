@@ -58,6 +58,7 @@ export function device(overrides: Partial<DeviceDetailDto> = {}): DeviceDetailDt
     name: 'Front Eaves',
     deviceType: 'devices.types.light',
     isPrimaryModel: true,
+    isGoveeGroup: false,
     discoveryStatus: 'present',
     lastDiscoveredAt: '2026-11-01T10:00:00.000Z',
     missingSince: null,

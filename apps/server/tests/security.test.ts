@@ -270,6 +270,7 @@ describe('route protection', () => {
       ['DELETE', '/api/v1/presets/x'],
       ['POST', '/api/v1/presets/x/duplicate'],
       ['POST', '/api/v1/presets/x/apply'],
+      ['POST', '/api/v1/presets/apply-draft'],
       ['GET', '/api/v1/schedules'],
       ['POST', '/api/v1/schedules'],
       ['POST', '/api/v1/schedules/preview'],

@@ -1,6 +1,20 @@
 # Govee integration
 
-Written from Govee's developer documentation as read on 6 November 2026. Most reference pages carried update dates between July and October 2026. **None of this has been tested against the real Govee service or a real H805C.** Every request and response shape here comes from the documentation, and automated tests use a local stand-in that follows it.
+Written from Govee's developer documentation as read on 6 November 2026, and corrected by what one real account returned on 7 November 2026. Automated tests use a local stand-in that follows the same shapes.
+
+## What the real service has shown
+
+From a live account with three H805C strings and one group. Commands were only sent to the group, and only accepted responses were seen. **Whether anything changed physically has not been confirmed, and segment, colour and scene commands have not been sent to real lights.**
+
+| Question | Answer from the real API |
+|---|---|
+| What does an H805C report? | Power, gradient toggle, brightness, per-segment brightness, per-segment colour, RGB colour, colour temperature, scenes, music mode, DIY scenes, snapshots, DreamView toggle |
+| Segments | **27, addressed 0 to 26, in the `elementRange` and `size` form.** How many bulbs one covers is still unknown. |
+| Colour temperature and brightness | Reported with values while online |
+| What cannot be read back? | Segment colour, segment brightness, scenes, DIY scenes, snapshots, music mode and both toggles all return empty. A painted pattern can never show as confirmed. |
+| Scene options in the device list | None. Lists must come from the scene endpoints, using **Refresh scenes**. |
+| `diyScene` capability type | `devices.capabilities.dynamic_scene` on this model |
+| Govee groups | Listed with sku `SameModeGroup`, no type, and power only. Control is accepted. `device/state` answers HTTP 200 with code 400, "devices not exist". |
 
 ## Endpoints used
 
@@ -15,6 +29,16 @@ Base URL `https://openapi.api.govee.com`, authenticated with the header `Govee-A
 | DIY scenes | `POST /router/api/v1/device/diy-scenes` |
 
 No private or reverse-engineered APIs are used. The configured base URL must be the official host. The only exception is a loopback address, which exists for local testing and is flagged clearly in the UI. Anything else stops startup, so a mistake cannot send your key elsewhere.
+
+## Status requests Govee refuses
+
+When Govee refuses a status request outright, the app stops polling that device for 24 hours, rather than failing every minute forever. Asking by hand still goes through, and a successful report clears this. Temporary failures, such as timeouts and 5xx responses, keep polling as normal.
+
+## Patterns
+
+Govee's public API has no way to create or upload a DIY scene, or to send effects such as Clockwise, Twinkle or Breathe, which run inside the lights. The pattern editor instead sends `segmentedColorRgb` commands, one per colour, and saves the result as an app preset. Static patterns only. Sending motion over the cloud would be slow and uneven at these rate limits, so it is not offered.
+
+To use a moving effect, make it in the Govee Home app. If the API lists it, activate it from **Scenes**.
 
 ## H805C
 
@@ -33,7 +57,7 @@ Each of these is isolated in `govee/cloud-transport.ts` or `govee/capabilities.t
 | # | What the documentation shows | What the app does | Check on a real device |
 |---|---|---|---|
 | 1 | The success response of `device/control` is **not documented**. | Accepts any HTTP 2xx whose body has no failing `code`, and records whether `code: 200` was actually present. | Note the real response body. |
-| 2 | The failure table lists codes (400, 404, 429) without saying if they are HTTP statuses or body fields. | Checks both. An HTTP 200 with a body `code` other than 200 is a failure. | Send an invalid value. |
+| 2 | The failure table lists codes (400, 404, 429) without saying if they are HTTP statuses or body fields. | Checks both. An HTTP 200 with a body `code` other than 200 is a failure. **Confirmed:** Govee does send errors this way. | |
 | 3 | Envelopes differ: the device list uses `code/message/data`, while state and scenes use `requestId/msg/code/payload`. | Parses each endpoint its own way and reads either `message` or `msg`. | |
 | 4 | `diyScene` appears under three types: `dynamic_scene`, `dynamic_setting` and `diy_color_setting`. There is no DIY control example anywhere. | Sends the type this device's own device-list entry reports, with the option's integer value. Any type is recognised. | **Activate a DIY scene.** This is the most likely to need a change. |
 | 5 | The scene page says static scenes from the device list and dynamic scenes from the scenes endpoint are controlled the same way. Static samples show integer values, dynamic ones `{paramId, id}`. | Sends whichever value Govee returned, unchanged. Other shapes are ignored rather than forwarded. | Activate one of each. |

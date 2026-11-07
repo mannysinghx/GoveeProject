@@ -1,6 +1,6 @@
 # Real-device acceptance checklist
 
-**Automated tests use a stand-in for the Govee API. Everything below needs your real H805C and a real API key, and none of it has been done yet.** Please fill in the results. They are what will settle the open questions in [Govee integration](govee-integration.md).
+**Automated tests use a stand-in for the Govee API. Everything below needs your real H805C and a real API key.** Discovery works on a real account, but no step below has been signed off by checking the lights. Please fill in the results. They are what will settle the open questions in [Govee integration](govee-integration.md).
 
 Before you start, keep **Activity** open in a second tab. Have someone able to see the lights, or test after dark from where you can see them.
 
@@ -16,6 +16,8 @@ Record: date, app version, firmware version from the Govee app, and H805C segmen
 | 6 | **Colour temperature,** if listed. | Range matches the capability. Warm is warm and cool is cool. | | |
 | 7 | **Refresh state.** Use Refresh status. | Values match the lights. Note which settings say Not reported. | | |
 | 8 | **Segments, only if listed.** Set one segment to red. Then build a multi-step arrangement. | Note how many bulbs one segment covers. Do not assume one segment is one bulb. | | |
+| 8a | **Pattern.** In Paint a pattern, send a repeating red and white pattern to one string. | Red and white in the expected places, starting from segment 0. Note which physical end is segment 0, and whether colors reach the far end of the string. | | |
+| 8b | **Pattern across strings.** Save it, then apply it to a group of your strings. | Each string shows it. Note how long they take. | | |
 | 9 | **Scenes, only if listed.** Refresh scenes, then activate a dynamic scene, a device-list scene, a DIY scene and a snapshot, as available. | Each changes the lights. **Record any rejection and its message.** DIY control is undocumented, so it is the most likely to fail. | | |
 | 10 | **Scheduled action.** Create a one-time schedule for 2 minutes from now, then close the browser. | It runs on time. History shows the run. | | |
 | 11 | **Recurring schedule across a restart.** Create a daily schedule. Restart the app before it runs. | It still runs, once. | | |
@@ -33,7 +35,7 @@ Please note the answers, since the documentation does not settle them:
 1. What does a successful `device/control` response contain? The server does not log bodies by default, so a developer would need to capture this.
 2. Does `device/state` report a value for each capability on the H805C? Which ones are empty?
 3. How long after an accepted command does a report show the new value?
-4. Does the H805C report segments? How many, and how many bulbs does each cover?
+4. How many bulbs does each of the H805C's 27 segments cover? (It reports 27. The bulb count is unknown.)
 5. Does it accept `diyScene` commands, and with which capability type?
 6. What does Govee do with a command sent to an offline device?
 7. Does applying for a new API key invalidate the old one?

@@ -1,5 +1,6 @@
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { Brush, Plus, Save, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   formatSegmentList,
   isHexColor,
@@ -79,6 +80,15 @@ export function SegmentControl({
     <SectionCard
       title="Segments"
       description="Segments are the sections Govee reports for this device. One segment is not necessarily one bulb."
+      action={
+        <Link
+          to={`/patterns/new?device=${device.id}`}
+          className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 text-sm text-ink-100 hover:bg-ink-700"
+        >
+          <Brush className="size-4" aria-hidden />
+          Paint a pattern
+        </Link>
+      }
     >
       <div className="space-y-4">
         <fieldset>

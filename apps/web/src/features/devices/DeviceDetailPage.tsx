@@ -71,7 +71,15 @@ export function DeviceDetailPage() {
           </Notice>
         ) : null}
 
-        {d.lastStatusError ? (
+        {d.isGoveeGroup ? (
+          <Notice title="This is a group made in the Govee Home app">
+            Govee does not provide status for groups, so what the lights are doing is not reported here, and commands cannot
+            show as confirmed. To check on each light, open it from the dashboard. A group in this app can include the
+            individual lights instead.
+          </Notice>
+        ) : null}
+
+        {d.lastStatusError && !d.isGoveeGroup ? (
           <Notice tone="warn" title="The last status refresh failed">
             {d.lastStatusError.message} ({timeAgo(d.lastStatusError.at)}). Values below are from the last successful report.
           </Notice>

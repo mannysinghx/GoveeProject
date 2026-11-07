@@ -6,7 +6,7 @@ A self-hosted web app for managing Govee outdoor lights through the official Gov
 
 - Discovers the lights on your Govee account and shows what each one reports it can do
 - Turns lights on and off, and sets brightness, colour and colour temperature
-- Controls segments and activates Govee scenes, when your device exposes them through the API
+- Paints color patterns across a light string, and activates Govee scenes, when your device exposes them through the API
 - Saves presets of several steps, groups lights by area, and applies either to many lights
 - Runs schedules, including sunrise and sunset, whether or not a browser is open
 - Keeps a history of commands and schedule runs, and has a diagnostics screen for troubleshooting
@@ -14,7 +14,7 @@ A self-hosted web app for managing Govee outdoor lights through the official Gov
 **What to expect**
 
 - It needs an internet connection, because it controls lights through Govee's cloud.
-- It has not been tested against a real H805C. Automated tests use a stand-in for the Govee API, so check your own device with the [acceptance checklist](docs/acceptance-checklist.md).
+- It has reached the real Govee service, and an H805C reports 27 paintable segments, but no one has yet confirmed the lights respond correctly. Check your own with the [acceptance checklist](docs/acceptance-checklist.md).
 - "Accepted" in this app means Govee took the request, not that your lights changed. See [Why some features may be missing](#why-some-features-may-be-missing) and [Known limitations](docs/known-limitations.md).
 
 The software is free and open source, with no subscription. Your hardware, electricity, internet service and any domain or hosting you choose may still cost money.
@@ -85,6 +85,8 @@ After you create the account, the app takes you to **Connect to Govee**. Choose 
 
 **Create a preset.** Go to **Scenes & Presets**, choose **New preset**, and add steps in order, such as turn on, set brightness, set a colour. Leave **Device** on *Whichever device or group it is applied to* to reuse the preset anywhere, or choose a device to tie a step to it. Scenes and segments must be tied to a device.
 
+**Paint a pattern.** Go to **Scenes & Presets** and choose **Paint a pattern**. Pick a background and a fill color, then drag across the string, or use the gradient and repeat tools. **Send to lights** tries it, and **Save pattern** keeps it as a preset you can apply to a group or schedule. Each color takes one command, so fewer colors change faster. Moving effects such as Twinkle run inside the lights and cannot be sent through the public API; make those in the Govee Home app and activate them from Scenes if the API lists them.
+
 **Create a schedule.** Go to **Schedules** and choose **New schedule**. Pick a target, an action and when it should run. The panel at the bottom shows the actual next run times before you save.
 
 **Why schedules need the app running.** Schedules live in this app, not in the lights. The server has to be running, with internet access, for them to happen. If it was off, the run is recorded as missed. By default nothing else happens. You can choose per schedule to catch up with the most recent missed run. Older runs are never replayed.
@@ -97,7 +99,9 @@ Govee lists the H805C as supported, but that does not guarantee every feature is
 
 - Scenes in the Govee app may not all be exposed through the API.
 - DIY scenes can be activated if listed, but not created or edited here.
-- Segment control appears only if your device reports it. A segment is not necessarily one bulb.
+- Patterns need segment control, which only appears if your device reports it. A segment is not necessarily one bulb.
+- Govee does not report segment colors, so a pattern cannot show as confirmed. Check the lights themselves.
+- Groups made in the Govee Home app offer power only, with no status. To paint them, use a group in this app with the individual lights.
 - Commands reach lights through Govee's cloud, so smooth fast animation is not possible.
 
 ## Troubleshooting a missing or offline device

@@ -5,15 +5,16 @@ Current state of the project, so anyone can pick it up without the original conv
 ## Where it stopped
 
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
-- Version 1 is built and verified against a local stand-in for the Govee API. It has **not** been run against the real Govee service or a real H805C.
-- Deployed on Railway at <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). It is waiting for the owner to set `GOVEE_API_KEY` and create the owner account. See `docs/deploy-railway.md`.
+- Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
+- Deployed on Railway at <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). The owner has set the key and created the account. See `docs/deploy-railway.md`.
 
 ## Done and verified
 
 | Piece | How it was checked |
 |---|---|
-| Backend, frontend, shared code | `npm test`: 308 tests (server 252, web 52, shared 4) |
-| Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. **Not tested live:** signing in, because the owner account is the owner's to create. |
+| Backend, frontend, shared code | `npm test`: 337 tests (server 262, web 71, shared 4) |
+| Pattern editor | Real browser against the mock, production build: drag painting, repeat, send to a mixed group, phone width. Not yet sent to real lights. |
+| Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |
 | Every screen, under the real CSP | Production build in a real browser, against `apps/server/scripts/mock-govee.ts`, on desktop and at phone width |
@@ -35,8 +36,8 @@ Nothing.
 
 ## Next steps, in order
 
-1. Get a Govee API key. Set it as `GOVEE_API_KEY` in Railway's service variables, or in `.env` for a local install.
-2. Work through `docs/acceptance-checklist.md` with the real H805C.
+1. Send a pattern to one real H805C string and check it, starting with step 8a of `docs/acceptance-checklist.md`.
+2. Work through the rest of the checklist.
 3. Correct anything the checklist disproves. Adapters are isolated in `apps/server/src/govee/`, and each open question is listed in `docs/govee-integration.md`.
 
 ## How to resume

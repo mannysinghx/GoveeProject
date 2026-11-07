@@ -241,6 +241,8 @@ export interface DeviceDto {
   deviceType: string | null;
   /** The model this project targets first. A highlight only, never a restriction. */
   isPrimaryModel: boolean;
+  /** A group made in the Govee Home app. Govee does not provide status for these. */
+  isGoveeGroup: boolean;
   discoveryStatus: 'present' | 'missing';
   lastDiscoveredAt: string;
   missingSince: string | null;

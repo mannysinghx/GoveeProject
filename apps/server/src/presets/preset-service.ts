@@ -276,6 +276,28 @@ export class PresetService {
     return { plans: [...plans.values()], skipped };
   }
 
+  /** Runs unsaved steps on a target, in order, with the same checks and reporting as a preset. */
+  async applyDraft(name: string, target: Target, actions: DeviceAction[], correlationId?: string): Promise<RunResultDto> {
+    const draft: PresetDto = {
+      id: 'draft',
+      name,
+      description: '',
+      needsTarget: true,
+      createdAt: '',
+      updatedAt: '',
+      actions: actions.map((action, order) => ({
+        id: order,
+        deviceId: null,
+        deviceName: null,
+        action,
+        summary: describeAction(action),
+        order,
+      })),
+    };
+    const { plans, skipped } = this.buildPlan(draft, target);
+    return this.actions.runPlan({ type: 'preset', id: null, name, correlationId }, plans, skipped);
+  }
+
   async apply(
     id: string,
     target: Target | undefined,

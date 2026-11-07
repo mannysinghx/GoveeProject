@@ -216,6 +216,14 @@ export type PresetUpdate = z.infer<typeof presetUpdateSchema>;
 export const presetApplyRequestSchema = z.object({ target: targetSchema.optional() });
 export type PresetApplyRequest = z.infer<typeof presetApplyRequestSchema>;
 
+/** Tries out unsaved steps, such as a pattern in the editor. Nothing is stored as a preset. */
+export const presetDraftApplySchema = z.object({
+  name: nameSchema.default('Pattern preview'),
+  target: targetSchema,
+  actions: z.array(deviceActionSchema).min(1).max(100),
+});
+export type PresetDraftApply = z.infer<typeof presetDraftApplySchema>;
+
 /* -------------------------------------------------------------------------- */
 /* Schedules                                                                  */
 /* -------------------------------------------------------------------------- */

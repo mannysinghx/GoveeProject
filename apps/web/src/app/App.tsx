@@ -10,6 +10,7 @@ import { ConnectPage } from '../features/dashboard/ConnectPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
 import { DeviceDetailPage } from '../features/devices/DeviceDetailPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
+import { PatternEditorPage } from '../features/patterns/PatternEditorPage';
 import { PresetsPage } from '../features/presets/PresetsPage';
 import { SchedulesPage } from '../features/schedules/SchedulesPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
@@ -47,6 +48,8 @@ export function App() {
         <Route path="/connect" element={<ConnectPage />} />
         <Route path="/devices/:id" element={<DeviceDetailPage />} />
         <Route path="/presets" element={<PresetsPage />} />
+        <Route path="/patterns/new" element={<PatternEditorPage />} />
+        <Route path="/patterns/:presetId" element={<PatternEditorPage />} />
         <Route path="/groups" element={<GroupsPage />} />
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/activity" element={<ActivityPage />} />

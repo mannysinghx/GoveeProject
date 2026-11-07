@@ -1,10 +1,11 @@
-import { Copy, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Brush, Copy, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { DeviceDto, PresetDto } from '@glm/shared';
 import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader, SectionCard } from '../../components/ui';
 import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../../lib/queries';
 import { ScenesPanel } from '../devices/ScenesPanel';
+import { isPatternPreset } from '../patterns/pattern-model';
 import { ApplyPresetDialog } from './ApplyPresetDialog';
 import { PresetEditor } from './PresetEditor';
 
@@ -110,6 +111,7 @@ export function PresetsPage() {
   const devices = useDevices();
   const [editing, setEditing] = useState<PresetDto | 'new' | null>(null);
   const [applying, setApplying] = useState<PresetDto | null>(null);
+  const navigate = useNavigate();
 
   return (
     <>
@@ -117,9 +119,14 @@ export function PresetsPage() {
         title="Scenes & Presets"
         description="There are three different things here, and they behave differently."
         actions={
-          <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing('new')}>
-            New preset
-          </Button>
+          <>
+            <Button icon={<Brush className="size-4" aria-hidden />} onClick={() => navigate('/patterns/new')}>
+              Paint a pattern
+            </Button>
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setEditing('new')}>
+              New preset
+            </Button>
+          </>
         }
       />
 
@@ -171,7 +178,7 @@ export function PresetsPage() {
                 <PresetCard
                   key={preset.id}
                   preset={preset}
-                  onEdit={() => setEditing(preset)}
+                  onEdit={() => (isPatternPreset(preset) ? navigate(`/patterns/${preset.id}`) : setEditing(preset))}
                   onApply={() => setApplying(preset)}
                 />
               ))}
