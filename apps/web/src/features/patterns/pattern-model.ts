@@ -229,6 +229,38 @@ export function repeatFill(state: PatternState, cells: PatternCell[], colors: st
   return { ...state, cells: next };
 }
 
+/** How many cells the painted part covers, from the first painted cell to the last. */
+export function paintedSpan(state: PatternState, cells: PatternCell[]): number {
+  const painted = cells.flatMap((cell, i) => (state.cells[cell.key] !== undefined ? [i] : []));
+  const first = painted[0];
+  const last = painted.at(-1);
+  return first === undefined || last === undefined ? 0 : last - first + 1;
+}
+
+/**
+ * Copies what has been painted along the whole run, carrying on from one string to the
+ * next. The part from the first painted cell to the last is the pattern, including any
+ * unpainted cells inside it, and it stays where it was painted. `gap` leaves that many
+ * cells showing the background between copies.
+ */
+export function repeatPainted(state: PatternState, cells: PatternCell[], gap = 0): PatternState {
+  const span = paintedSpan(state, cells);
+  if (span === 0) return state;
+  const start = cells.findIndex((cell) => state.cells[cell.key] !== undefined);
+  const motif = cells.slice(start, start + span).map((cell) => state.cells[cell.key] ?? null);
+  const period = span + Math.max(0, Math.floor(gap));
+  const next = { ...state.cells };
+  let changed = false;
+  cells.forEach((cell, i) => {
+    const color = motif[(((i - start) % period) + period) % period] ?? null;
+    if ((next[cell.key] ?? null) === color) return;
+    changed = true;
+    if (color === null) delete next[cell.key];
+    else next[cell.key] = color;
+  });
+  return changed ? { ...state, cells: next } : state;
+}
+
 /** Rows of cell positions that zigzag, so every other row runs right to left. */
 export function serpentineRows(count: number, perRow: number): number[][] {
   const rows: number[][] = [];

@@ -4,6 +4,7 @@ import {
   ArrowUp,
   Blend,
   Brush,
+  Copy,
   Eraser,
   FlipHorizontal2,
   Redo2,
@@ -41,10 +42,12 @@ import {
   moveString,
   paintableDevices,
   paintCell,
+  paintedSpan,
   patternFromPreset,
   patternToActions,
   readableTextColor,
   repeatFill,
+  repeatPainted,
   resolveStrings,
   serpentineRows,
   slowestStringCommands,
@@ -390,6 +393,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   const [fill, setFill] = useState('#ff0000');
   const [tool, setTool] = useState<'paint' | 'erase'>('paint');
   const [runLength, setRunLength] = useState(3);
+  const [repeatGap, setRepeatGap] = useState(0);
   const [turnOn, setTurnOn] = useState(true);
   const [useBrightness, setUseBrightness] = useState(false);
   const [brightness, setBrightness] = useState(100);
@@ -433,6 +437,18 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
     setPattern(after);
     commit(before, after);
   };
+
+  // Repeating again straight away, such as with a different gap, starts from the original
+  // pattern. Otherwise the first repeat would count as the pattern, leaving nothing to fill.
+  const lastRepeat = useRef<{ before: PatternState; after: PatternState } | null>(null);
+  const repeat = () => {
+    const previous = lastRepeat.current;
+    const source = previous && previous.after === latest.current ? previous.before : latest.current;
+    const after = repeatPainted(source, cells, repeatGap);
+    change(() => after);
+    lastRepeat.current = after === source ? null : { before: source, after };
+  };
+  const span = paintedSpan(lastRepeat.current?.after === pattern ? lastRepeat.current.before : pattern, cells);
 
   const undo = () => {
     const previous = undoStack.at(-1);
@@ -553,6 +569,42 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
               />
             )}
 
+            <div className="space-y-2 border-t border-ink-700/70 pt-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={<Copy className="size-4" aria-hidden />}
+                  disabled={span === 0}
+                  onClick={repeat}
+                >
+                  Repeat
+                </Button>
+                <label className="flex items-center gap-2 text-sm text-ink-300">
+                  leaving a gap of
+                  <input
+                    type="number"
+                    aria-label="Segments left blank between repeats"
+                    className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                    min={0}
+                    max={Math.max(0, cells.length)}
+                    value={repeatGap}
+                    onChange={(e) => setRepeatGap(Math.max(0, Math.floor(Number(e.target.value)) || 0))}
+                  />
+                  segments
+                </label>
+              </div>
+              <p className="text-xs text-ink-400" role="status">
+                {span === 0
+                  ? 'Paint the start of your pattern above, then Repeat fills every other box with it.'
+                  : span >= cells.length
+                    ? 'Your pattern already covers every box.'
+                  : lastRepeat.current?.after === pattern
+                    ? `Your ${span}-segment pattern now repeats along all ${cells.length} segments. Undo goes back to it.`
+                    : `Repeat copies your ${span}-segment pattern across every other box, replacing what's there, on all the strings shown.`}
+              </p>
+            </div>
+
             <div className="flex flex-wrap items-end gap-2 border-t border-ink-700/70 pt-4">
               <Button
                 size="sm"
@@ -568,13 +620,13 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 disabled={cells.length === 0}
                 onClick={() => change((state) => repeatFill(state, cells, [fill, state.background], runLength))}
               >
-                Repeat pattern
+                Alternate colors
               </Button>
               <label className="flex items-center gap-2 text-sm text-ink-300">
                 every
                 <input
                   type="number"
-                  aria-label="Segments in each run of the repeat pattern"
+                  aria-label="Segments in each run of alternating colors"
                   className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
                   min={1}
                   max={Math.max(1, cells.length)}
@@ -586,7 +638,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
             </div>
             <p className="text-xs text-ink-400">
               Both tools run along all the strings shown, carrying on from one to the next. Gradient blends from the
-              background to the fill color. Repeat alternates them, such as red and green for Christmas.
+              background to the fill color. Alternate swaps between them, such as red and green for Christmas.
             </p>
           </div>
         </SectionCard>

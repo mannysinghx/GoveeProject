@@ -20,7 +20,9 @@ import {
   paintCell,
   patternFromPreset,
   patternToActions,
+  paintedSpan,
   repeatFill,
+  repeatPainted,
   resolveStrings,
   serpentineRows,
   slowestStringCommands,
@@ -229,6 +231,76 @@ describe('pattern model', () => {
   });
 });
 
+describe('repeating what was painted', () => {
+  const strings = resolveStrings([left, center, right], []);
+  const cells = canvasCells(strings);
+  const RED = '#ff0000';
+  const GREEN = '#00ff00';
+  const key = (i: number) => cells[i]?.key as string;
+  const colors = (state: ReturnType<typeof emptyPattern>) => cells.map((c) => state.cells[c.key] ?? null);
+  const start = (...painted: [number, string][]) =>
+    painted.reduce((state, [i, color]) => paintCell(state, key(i), color), emptyPattern());
+
+  it('fills every box from a starting pattern, carrying on across the strings', () => {
+    const result = colors(repeatPainted(start([0, RED], [1, RED], [2, GREEN]), cells));
+    expect(result).toHaveLength(81);
+    expect(result.every((color, i) => color === (i % 3 === 2 ? GREEN : RED))).toBe(true);
+    expect(result[26]).toBe(GREEN); // End of the first string.
+    expect(result[27]).toBe(RED); // Start of the next.
+  });
+
+  it('repeats blanks inside the pattern, so they keep showing the background', () => {
+    const state = repeatPainted(start([0, RED], [2, GREEN]), cells);
+    expect(colors(state).slice(0, 7)).toEqual([RED, null, GREEN, RED, null, GREEN, RED]);
+    expect(cellColor({ ...state, background: '#000000' }, key(4))).toBe('#000000');
+  });
+
+  it('leaves the requested gap between copies', () => {
+    expect(colors(repeatPainted(start([0, RED], [1, GREEN]), cells, 2)).slice(0, 8)).toEqual([RED, GREEN, null, null, RED, GREEN, null, null]);
+  });
+
+  it('keeps a pattern painted further along where it is, filling both directions', () => {
+    const result = colors(repeatPainted(start([4, RED], [5, GREEN]), cells));
+    expect(result.slice(0, 7)).toEqual([RED, GREEN, RED, GREEN, RED, GREEN, RED]);
+    expect(result[80]).toBe(RED);
+    const shifted = colors(repeatPainted(start([3, RED], [4, GREEN]), cells));
+    expect(shifted.slice(3, 5)).toEqual([RED, GREEN]);
+    expect(shifted[0]).toBe(GREEN);
+  });
+
+  it('follows the on-screen order of a flipped string', () => {
+    const flipped = resolveStrings([left], [{ deviceId: 'left', included: true, reversed: true }]);
+    const run = canvasCells(flipped);
+    const state = repeatPainted(paintCell(paintCell(emptyPattern(), cellKey('left', 26), RED), cellKey('left', 25), GREEN), run);
+    expect(state.cells[cellKey('left', 24)]).toBe(RED);
+    expect(state.cells[cellKey('left', 23)]).toBe(GREEN);
+    expect(state.cells[cellKey('left', 0)]).toBe(RED);
+  });
+
+  it('does not touch a string left out', () => {
+    const shown = canvasCells(strings.map((s) => (s.deviceId === 'right' ? { ...s, included: false } : s)));
+    const outside = paintCell(paintCell(emptyPattern(), cellKey('left', 0), RED), cellKey('right', 3), GREEN);
+    const state = repeatPainted(outside, shown);
+    expect(state.cells[cellKey('center', 26)]).toBe(RED);
+    expect(state.cells[cellKey('right', 3)]).toBe(GREEN);
+    expect(state.cells[cellKey('right', 4)]).toBeUndefined();
+  });
+
+  it('changes nothing when nothing is painted or nothing is left to fill', () => {
+    const empty = emptyPattern();
+    expect(repeatPainted(empty, cells)).toBe(empty);
+    expect(paintedSpan(empty, cells)).toBe(0);
+    const full = repeatPainted(start([0, RED]), cells);
+    expect(paintedSpan(full, cells)).toBe(81);
+    expect(repeatPainted(full, cells)).toBe(full);
+  });
+
+  it('still sends few commands, since each color is one command', () => {
+    const state = repeatPainted(start([0, RED], [1, GREEN]), cells);
+    expect(colorSteps(patternToActions(state, strings, options))).toHaveLength(6);
+  });
+});
+
 describe('LEDs on a string', () => {
   const strings = resolveStrings([left], []);
   const string = strings[0] as PatternString;
@@ -338,6 +410,71 @@ describe('pattern editor', () => {
     for (const box of boxes) expect(box.style.backgroundColor).toBe('rgb(255, 0, 0)');
     const next = container.querySelector('[data-cell="left:1"] [data-led]') as HTMLElement;
     expect(next.style.backgroundColor).toBe('rgb(255, 255, 255)');
+  });
+
+  describe('the Repeat button', () => {
+    const repeatButton = () => screen.getByRole('button', { name: 'Repeat' });
+    const paint = (name: string, segment: number) => {
+      fireEvent.pointerDown(cell(name, segment));
+      fireEvent.pointerUp(window);
+    };
+    const label = (name: string, segment: number) => cell(name, segment).getAttribute('aria-label') as string;
+
+    it('stays off until something is painted', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      expect(repeatButton()).toBeDisabled();
+      expect(screen.getByText(/Paint the start of your pattern/)).toBeInTheDocument();
+    });
+
+    it('fills the rest of the boxes in one click, and Undo brings back the original', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('Fill color', '#ff0000');
+      paint('Outdoor Left', 0);
+      setColor('Fill color', '#00ff00');
+      paint('Outdoor Left', 1);
+      expect(label('Outdoor Left', 2)).toContain('#ffffff');
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 2)).toContain('#ff0000');
+      expect(label('Outdoor Left', 3)).toContain('#00ff00');
+      expect(label('Outdoor Right', 26)).toContain('#ff0000');
+      expect(screen.getByText(/Your 2-segment pattern now repeats along all 81 segments/)).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      expect(label('Outdoor Left', 2)).toContain('#ffffff');
+      expect(label('Outdoor Left', 1)).toContain('#00ff00');
+    });
+
+    it('can be pressed again with a different gap, starting from the original pattern', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('Fill color', '#ff0000');
+      paint('Outdoor Left', 0);
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 1)).toContain('#ff0000');
+      fireEvent.change(screen.getByRole('spinbutton', { name: 'Segments left blank between repeats' }), { target: { value: '1' } });
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 1)).toContain('#ffffff');
+      expect(label('Outdoor Left', 2)).toContain('#ff0000');
+    });
+
+    it('treats the result as a new pattern once it has been repainted', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('Fill color', '#ff0000');
+      paint('Outdoor Left', 0);
+      await userEvent.click(repeatButton());
+      setColor('Fill color', '#0000ff');
+      paint('Outdoor Left', 5);
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 5)).toContain('#0000ff');
+      expect(label('Outdoor Left', 0)).toContain('#ff0000');
+    });
   });
 
   it('keeps the LEDs in string order along rows that run right to left', async () => {
@@ -481,7 +618,7 @@ describe('pattern editor', () => {
     open();
     await ready();
     setColor('Fill color', '#ff0000');
-    await userEvent.click(screen.getByRole('button', { name: 'Repeat pattern' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Alternate colors' }));
     expect(screen.getByText(/This takes about 3 seconds: 9 commands across 3 strings/)).toBeInTheDocument();
     expect(screen.getByText(/not in perfect sync/)).toBeInTheDocument();
 
