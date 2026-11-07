@@ -18,6 +18,7 @@ coverage/
 
 # Tooling and OS noise
 .DS_Store
+._*
 *.log
 .vite/
 .vitest/

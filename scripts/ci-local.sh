@@ -34,7 +34,7 @@ git archive "$SHA" | tar -x -C "$WORK"
 CONTAINER_IMAGE="node:26-bookworm-slim"
 echo "==> Running checks in $CONTAINER_IMAGE"
 # Streamed in rather than bind-mounted, so this works whichever paths Docker shares.
-tar -C "$WORK" -cf - . | docker run --rm -i \
+git archive "$SHA" | docker run --rm -i \
   --tmpfs /tmp:exec \
   -e CI=true \
   -e NPM_CONFIG_UPDATE_NOTIFIER=false \
