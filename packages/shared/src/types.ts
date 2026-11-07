@@ -4,6 +4,7 @@ import type {
   AppSettings,
   DeviceAction,
   MissedRunPolicy,
+  NotificationAction,
   Recurrence,
   ScheduleAction,
   Target,
@@ -404,6 +405,10 @@ export interface ScheduleDto {
   nextRun: NextRunDto | null;
   /** The target or preset this schedule points to no longer exists. */
   problem: string | null;
+  /** The holiday show this schedule belongs to, if any. */
+  builtinShow: string | null;
+  /** Only notifies when something goes wrong. */
+  quiet: boolean;
   lastExecution: ScheduleExecutionDto | null;
   createdAt: string;
   updatedAt: string;
@@ -539,6 +544,58 @@ export interface ConnectionReportDto {
   recentDeliveries: MissedDeliveryDto[];
   incidents: ConnectionIncidentDto[];
   automaticActions: ActivityEventDto[];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Holidays and notifications                                                 */
+/* -------------------------------------------------------------------------- */
+
+export interface HolidayDto {
+  key: string;
+  name: string;
+  group: 'federal' | 'observance' | 'cultural' | 'show';
+  description: string;
+  enabled: boolean;
+  /** Local date, or null when the calendar has no later date, as with Diwali after 2037. */
+  nextDate: string | null;
+  startTime: string;
+  endTime: string | null;
+  timeZone: string;
+  skipped: boolean;
+  colors: string[];
+  problem: string | null;
+}
+
+export interface NotificationDto {
+  id: number;
+  kind: 'run' | 'run_problem' | 'heads_up' | 'problem' | 'recovered' | 'test';
+  severity: 'info' | 'good' | 'warn' | 'bad';
+  title: string;
+  body: string;
+  link: string;
+  actions: { action: NotificationAction; label: string }[];
+  answer: NotificationAction | null;
+  answeredAt: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationListDto {
+  items: NotificationDto[];
+  unread: number;
+}
+
+export interface PushDeviceDto {
+  id: number;
+  label: string;
+  createdAt: string;
+  lastSuccessAt: string | null;
+  lastError: string | null;
+}
+
+export interface PushStatusDto {
+  publicKey: string;
+  devices: PushDeviceDto[];
 }
 
 export interface DashboardSummaryDto {

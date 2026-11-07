@@ -1,6 +1,7 @@
 import { CalendarClock, Info } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import {
+  HOLIDAYS,
   recurrenceSchema,
   type MissedRunPolicy,
   type Recurrence,
@@ -14,7 +15,7 @@ import { useDebounced } from '../../lib/hooks';
 import { usePresets, useSaveSchedule, useSchedulePreview, useSettings } from '../../lib/queries';
 import { parseTarget, TargetOptions } from '../presets/ApplyPresetDialog';
 
-type RepeatMode = 'once' | 'daily' | 'weekdays' | 'weekends' | 'custom' | 'solar' | 'yearly';
+type RepeatMode = 'once' | 'daily' | 'weekdays' | 'weekends' | 'custom' | 'solar' | 'yearly' | 'holiday';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -37,6 +38,7 @@ function modeFromRecurrence(recurrence: Recurrence | undefined): RepeatMode {
   if (recurrence.kind === 'daily') return 'daily';
   if (recurrence.kind === 'solar') return 'solar';
   if (recurrence.kind === 'yearly') return 'yearly';
+  if (recurrence.kind === 'holiday') return 'holiday';
   const key = [...recurrence.weekdays].sort((a, b) => a - b).join(',');
   if (key === WEEKDAY_SET.join(',')) return 'weekdays';
   if (key === WEEKEND_SET.join(',')) return 'weekends';
@@ -66,6 +68,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
   const [date, setDate] = useState(existing?.kind === 'once' ? existing.date : tomorrowLocal());
   const [month, setMonth] = useState(existing?.kind === 'yearly' ? existing.month : 1);
   const [day, setDay] = useState(existing?.kind === 'yearly' ? existing.day : 1);
+  const [holiday, setHoliday] = useState(existing?.kind === 'holiday' ? existing.holiday : 'thanksgiving');
   const [time, setTime] = useState(existing && 'time' in existing ? existing.time : '18:00');
   const [customDays, setCustomDays] = useState<number[]>(existing?.kind === 'weekly' ? existing.weekdays : [1, 2, 3, 4, 5]);
   const [startDate, setStartDate] = useState(existing && 'startDate' in existing ? (existing.startDate ?? '') : '');
@@ -94,6 +97,8 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
         return { kind: 'once', date, time };
       case 'yearly':
         return { kind: 'yearly', month, day, time, ...bounds };
+      case 'holiday':
+        return { kind: 'holiday', holiday, time, ...bounds };
       case 'daily':
         return { kind: 'daily', time, ...bounds };
       case 'weekdays':
@@ -112,7 +117,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           ...bounds,
         };
     }
-  }, [mode, date, month, day, time, customDays, startDate, endDate, solarEvent, offset, latitude, longitude]);
+  }, [mode, date, month, day, holiday, time, customDays, startDate, endDate, solarEvent, offset, latitude, longitude]);
 
   const parsed = recurrenceSchema.safeParse(recurrenceInput);
   const recurrenceError = parsed.success ? null : (parsed.error.issues[0]?.message ?? 'Check the schedule timing.');
@@ -205,6 +210,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
                 <option value="weekends">Weekends</option>
                 <option value="custom">Specific days</option>
                 <option value="yearly">Every year</option>
+                <option value="holiday">A holiday, every year</option>
                 <option value="solar">Sunrise or sunset</option>
               </select>
             )}
@@ -224,6 +230,19 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
             <Field label="Date">
               {(props) => (
                 <input {...props} type="date" className={inputClass} required value={date} onChange={(e) => setDate(e.target.value)} />
+              )}
+            </Field>
+          ) : null}
+          {mode === 'holiday' ? (
+            <Field label="Holiday">
+              {(props) => (
+                <select {...props} className={inputClass} value={holiday} onChange={(e) => setHoliday(e.target.value)}>
+                  {HOLIDAYS.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.name}
+                    </option>
+                  ))}
+                </select>
               )}
             </Field>
           ) : null}

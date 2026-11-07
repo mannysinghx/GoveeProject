@@ -213,6 +213,14 @@ export class Scheduler {
       }
     }
 
+    // The owner chose to skip this show on this date.
+    const skipped =
+      toRun !== null &&
+      row.builtin_show !== null &&
+      this.db
+        .prepare('SELECT 1 FROM show_skips WHERE show_key = ? AND local_date = ?')
+        .get(row.builtin_show, toRun.localDate) !== undefined;
+
     const insert = this.db.prepare(
       `INSERT OR IGNORE INTO schedule_executions
          (id, schedule_id, occurrence_key, scheduled_for, started_at, status, is_recovery, created_at, error_summary)
@@ -226,7 +234,9 @@ export class Scheduler {
       for (const occurrence of occurrences) {
         const id = crypto.randomUUID();
         const scheduledFor = occurrence.at.toUTC().toISO()!;
-        if (occurrence === toRun) {
+        if (occurrence === toRun && skipped) {
+          insert.run(id, row.id, occurrence.key, scheduledFor, null, 'skipped', 0, nowIso, 'You chose to skip this date.');
+        } else if (occurrence === toRun) {
           const changes = insert.run(
             id,
             row.id,
@@ -321,7 +331,14 @@ export class Scheduler {
   }
 
   private runAction(row: ScheduleRow, target: Target, action: ScheduleAction): Promise<RunResultDto> {
-    const source = { type: 'schedule' as const, id: row.id, name: row.name };
+    const source = {
+      type: 'schedule' as const,
+      id: row.id,
+      name: row.name,
+      quiet: row.quiet === 1,
+      // A holiday show belongs to that moment, so it is not replayed for a light that returns later.
+      noCatchUp: row.builtin_show !== null,
+    };
     if (action.type === 'preset') {
       return this.presets.apply(action.presetId, target, source);
     }

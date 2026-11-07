@@ -151,6 +151,23 @@ A preset with a `sceneName` uses that Govee scene on each light that lists it, a
 
 The New Year show is set up once, recorded in `builtin_installs`, so a schedule or group the owner deletes stays deleted: a yearly schedule at 00:00 on January 1 in the default time zone (missed runs are skipped), a second at 00:30 that turns the lights off (a missed run runs late, so lights are not left on), and a group of all strings. The fireworks are never kept for catch-up.
 
+## Holiday calendar
+
+`packages/shared/src/holidays.ts` works out each holiday's date from a rule, with no outside lookup: a fixed date, the nth weekday of a month, or the Easter calculation. US holidays use the actual date, not the observed workday. Diwali follows the lunar calendar, so it uses a table for Los Angeles through 2037; after that its schedules stop, and the calendar says so.
+
+A show is several schedules marked with the same `builtin_show`: one per step, then an end. They use the `holiday` recurrence and are set up once, each in a transaction, recorded in `builtin_installs`, so deleted stays deleted. Later steps and ends are `quiet`, so they only notify on failure. Missed starts are skipped; a missed end runs late, so lights are not left on. Skipping adds a row to `show_skips` for that show and local date, and each step records `skipped` rather than running. A show is never kept for catch-up.
+
+Yearly and holiday schedules jump directly to each year's date, not testing every day, because there are about 50 of these and the schedule list is read often.
+
+## Notifications
+
+`apps/server/src/notifications/` stores every notification and shows it in the app, and sends it to any device with push on. Sending never blocks or fails a run: `ActionService.runPlan` tells a listener when sending finishes, with the real outcome, and a push failure is only logged.
+
+- **Lights Check.** A run that Govee accepted shows the pattern sent as colored squares and asks whether the lights changed. The answer goes to Activity, and "Didn't change" starts a connection check. It never says the lights changed.
+- **Heads-up.** Every 30 seconds, a check finds holiday shows starting within 15 minutes and offers a Skip. A `dedupe_key` keeps it to one per show and date, even across restarts.
+- **Web Push.** The server makes its own signing keys once (`push_keys`). The browser gives it an address at its push service, which is checked against an allowlist of known services. A 404 or 410 removes the device. Payloads are encrypted for that browser.
+- **Buttons.** A button on a phone notification has no session or CSRF token, so each carries a random single-use token, stored only as a hash, that can only answer that one notification. It travels in the request body, so it stays out of request logs. The same buttons are in the app, because iPhones may not show them.
+
 ## Connection monitoring
 
 `apps/server/src/connection/` checks every monitorable light in the background, whether or not a browser is open. The interval is `CONNECTION_CHECK_SECONDS` (default 120), lengthened when needed so checks stay within a quarter of the daily budget: with 3 lights and the default budget, every 130 seconds, or about 2,000 requests a day. Govee groups are skipped because Govee gives no status for them.

@@ -29,6 +29,15 @@ Record: date, app version, firmware version from the Govee app, and H805C segmen
 | 16 | **Group,** if you have more than one device. | Results per device. Unsupported actions are skipped with a reason. | | |
 | 17 | **Rate limit behaviour.** Move sliders quickly for a minute. | No errors shown, or a clear rate-limit message. Check for rate-limit events in Activity. | | |
 
+## Notifications and holidays
+
+These need your real phone and lights:
+
+1. **Turn on alerts.** On iPhone, add the app to your Home Screen from Safari and open it from there. Go to **Notifications**, choose **Turn on for this device**, then **Send a test**. It should appear on your phone within a few seconds. This has not yet been tried on a real phone.
+2. **Try with the app closed.** Close it, and send a preset from another device. Check the notification arrives, and note whether **Looks right** and **Didn't change** appear on it.
+3. **Check Diwali.** Under **Schedules**, it should say Sunday, November 8, 5:00 PM to 8:00 PM. At 4:45 PM you should get a reminder with a Skip option. At 5:00 PM the lights should show Diwali colors, then Fireworks at 5:30, taking turns until they go off at 8:00.
+4. **Answer Lights Check.** Say whether the colors matched the squares. Answers are kept in **Activity**.
+
 ## Festival presets and fireworks
 
 These need your real lights:

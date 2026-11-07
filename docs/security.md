@@ -156,6 +156,14 @@ Logs are structured JSON on standard output. They include startup and shutdown, 
 
 They never include the API key, passwords, password hashes, session cookies, authorization headers or environment secrets. A setup code is printed once when setup is open on a non-loopback address, because whoever installs the app needs it. It works once at most, and is regenerated on restart.
 
+## Notifications
+
+Web Push is the one thing that sends data somewhere other than Govee: encrypted messages go through the push service of your browser's maker. It needs no account, and only the subscribed browser can read them. Its address is checked against a list of known push services, so a signed-in user cannot make the server call other hosts.
+
+The server's push signing key is stored in the database (`push_keys`), never logged or returned by the API, and so is included in backups; treat backups as secret. If it is lost, each device must turn alerts on again. Device addresses are not returned by the API either.
+
+Buttons on phone notifications use a public route, `POST /api/v1/notification-actions`. It needs a random single-use token, stored only as a hash, that expires after 7 days and can only answer one notification: confirming the lights, or skipping one show on one date. It cannot do anything else, and it never sends a command to a light.
+
 ## Known limitations
 
 - **Local encryption.** The key lives in plain text in `.env`, and the database is not encrypted. Anyone with read access to the server's files has both. Disk encryption and file permissions are your protection here.

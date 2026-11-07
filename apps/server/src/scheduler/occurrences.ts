@@ -1,4 +1,4 @@
-import type { NextRunDto, OccurrenceNote, Recurrence, SchedulePreviewDto } from '@glm/shared';
+import { holidayDate, type NextRunDto, type OccurrenceNote, type Recurrence, type SchedulePreviewDto } from '@glm/shared';
 import { DateTime } from 'luxon';
 import { getTimes } from 'suncalc';
 
@@ -92,6 +92,12 @@ export function occurrenceOnDate(recurrence: Recurrence, zone: string, date: str
       const { at, note } = resolveLocalTime(date, recurrence.time, zone);
       return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
     }
+    case 'holiday': {
+      if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
+      if (holidayDate(recurrence.holiday, Number(date.slice(0, 4))) !== date) return null;
+      const { at, note } = resolveLocalTime(date, recurrence.time, zone);
+      return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
+    }
     case 'solar': {
       if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
       if (recurrence.weekdays && !recurrence.weekdays.includes(weekdayOf(date, zone))) return null;
@@ -138,6 +144,10 @@ function firstPossibleDate(recurrence: Recurrence): string | null {
  * offset can put an occurrence on the far side of a date boundary.
  */
 function* walkOccurrences(recurrence: Recurrence, zone: string, afterMs: number): Generator<Occurrence> {
+  if (recurrence.kind === 'yearly' || recurrence.kind === 'holiday') {
+    yield* walkYears(recurrence, zone, afterMs);
+    return;
+  }
   let cursor = zoneOrThrow(DateTime.fromMillis(afterMs, { zone }), zone).startOf('day').minus({ days: 1 });
   const first = firstPossibleDate(recurrence);
   if (first && cursor.toISODate()! < first) {
@@ -151,6 +161,24 @@ function* walkOccurrences(recurrence: Recurrence, zone: string, afterMs: number)
     const occurrence = occurrenceOnDate(recurrence, zone, date);
     if (occurrence && occurrence.at.toMillis() > afterMs) yield occurrence;
     cursor = cursor.plus({ days: 1 });
+  }
+}
+
+/** These have one date a year, so there is no need to test every day in between. */
+function* walkYears(
+  recurrence: Extract<Recurrence, { kind: 'yearly' | 'holiday' }>,
+  zone: string,
+  afterMs: number,
+): Generator<Occurrence> {
+  const start = zoneOrThrow(DateTime.fromMillis(afterMs, { zone }), zone).year - 1;
+  for (let year = start; year < start + Math.ceil(SEARCH_LIMIT_DAYS / 365) + 2; year++) {
+    const date =
+      recurrence.kind === 'holiday'
+        ? holidayDate(recurrence.holiday, year)
+        : `${year}-${String(recurrence.month).padStart(2, '0')}-${String(recurrence.day).padStart(2, '0')}`;
+    if (!date) continue;
+    const occurrence = occurrenceOnDate(recurrence, zone, date);
+    if (occurrence && occurrence.at.toMillis() > afterMs) yield occurrence;
   }
 }
 

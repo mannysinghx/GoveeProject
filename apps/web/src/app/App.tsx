@@ -9,6 +9,7 @@ import { ActivityPage } from '../features/activity/ActivityPage';
 import { ConnectPage } from '../features/dashboard/ConnectPage';
 import { ConnectionPage } from '../features/connection/ConnectionPage';
 import { DashboardPage } from '../features/dashboard/DashboardPage';
+import { NotificationsPage } from '../features/notifications/NotificationsPage';
 import { DeviceDetailPage } from '../features/devices/DeviceDetailPage';
 import { GroupsPage } from '../features/groups/GroupsPage';
 import { PatternEditorPage } from '../features/patterns/PatternEditorPage';
@@ -55,6 +56,7 @@ export function App() {
         <Route path="/schedules" element={<SchedulesPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/connections" element={<ConnectionPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

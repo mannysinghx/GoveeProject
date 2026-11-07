@@ -7,7 +7,10 @@ import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
 import { CommandStore } from '../commands/command-store.js';
 import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
+import { NotificationService } from '../notifications/notification-service.js';
+import { webPushSender, type PushSender } from '../notifications/push-sender.js';
 import { BuiltinPresets } from '../presets/builtin-presets.js';
+import { HolidayCalendar } from '../presets/holiday-calendar.js';
 import { ConnectionMonitor } from '../connection/connection-monitor.js';
 import { MissedDeliveryStore } from '../connection/missed-delivery-store.js';
 import { openDatabase, runMigrations, type Db } from '../database/database.js';
@@ -57,6 +60,8 @@ export interface AppContext {
   missed: MissedDeliveryStore;
   connection: ConnectionMonitor;
   builtins: BuiltinPresets;
+  holidays: HolidayCalendar;
+  notifications: NotificationService;
 }
 
 export interface ContextOverrides {
@@ -64,6 +69,7 @@ export interface ContextOverrides {
   clock?: Clock;
   transport?: LightTransport;
   db?: Db;
+  pushSender?: PushSender;
 }
 
 export function readVersion(): string {
@@ -176,6 +182,27 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     { ...config.connection, dailyBudget: config.limits.dailyBudget },
   );
 
+  const holidays = new HolidayCalendar(db, schedules, activity, clock);
+  // Web Push needs a contact address for the app. Its own address is the natural one.
+  const pushSubject = config.allowedHosts?.[0]
+    ? `https://${config.allowedHosts[0]}`
+    : 'https://github.com/mannysinghx/GoveeProject';
+  const notifications = new NotificationService(
+    db,
+    activity,
+    () => settings.get(),
+    overrides.pushSender ?? webPushSender,
+    pushSubject,
+    logger,
+    clock,
+  );
+  actions.onRunFinished(
+    (run) => notifications.handleRun(run),
+    (error) => logger.warn({ err: error }, 'Could not notify about a run'),
+  );
+  connection.onIncident((event, kind, deviceName) => notifications.handleIncident(event, kind, deviceName));
+  notifications.onDidntChange(() => void connection.check());
+
   const builtins = new BuiltinPresets(
     db,
     devices,
@@ -218,5 +245,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     missed,
     connection,
     builtins,
+    holidays,
+    notifications,
   };
 }

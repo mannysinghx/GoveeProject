@@ -46,3 +46,30 @@ export function hexToInt(hex: string): number {
 export function intToHex(value: number): string {
   return rgbToHex(intToRgb(value));
 }
+
+const EMOJI_COLORS: readonly (readonly [string, number, number, number])[] = [
+  ['🟥', 255, 0, 0],
+  ['🟧', 255, 128, 0],
+  ['🟨', 255, 220, 0],
+  ['🟩', 0, 200, 0],
+  ['🟦', 30, 90, 255],
+  ['🟪', 150, 30, 220],
+  ['🟫', 130, 70, 20],
+  ['⬜', 255, 255, 255],
+  ['⬛', 0, 0, 0],
+];
+
+/** The closest colored square, so a color can be shown in plain notification text. */
+export function colorEmoji(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  let best = '⬜';
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const [emoji, er, eg, eb] of EMOJI_COLORS) {
+    const distance = (r - er) ** 2 + (g - eg) ** 2 + (b - eb) ** 2;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = emoji;
+    }
+  }
+  return best;
+}

@@ -11,6 +11,12 @@ import type {
   DeviceDto,
   DiagnosticsDto,
   DiscoveryResultDto,
+  HolidayDto,
+  NotificationAction,
+  NotificationDto,
+  NotificationListDto,
+  PushStatusDto,
+  PushSubscribe,
   GroupCreate,
   GroupDto,
   GroupUpdate,
@@ -398,6 +404,105 @@ export function useSendMissed() {
 
 export function useDismissMissed() {
   return useConnectionAction((id: number) => api<ConnectionReportDto>(`/connection/missed/${id}/dismiss`, { method: 'POST' }));
+}
+
+/* ------------------------------- holidays -------------------------------- */
+
+const HOLIDAYS_KEY = ['holidays'];
+
+export function useHolidays() {
+  return useQuery({
+    queryKey: HOLIDAYS_KEY,
+    queryFn: async () => (await api<{ holidays: HolidayDto[] }>('/holidays')).holidays,
+    refetchInterval: 60_000,
+  });
+}
+
+function useHolidayChange<Input>(call: (input: Input) => Promise<{ holidays: HolidayDto[] }>) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: call,
+    onSuccess: ({ holidays }) => client.setQueryData(HOLIDAYS_KEY, holidays),
+    onSettled: () => void client.invalidateQueries({ queryKey: keys.schedules }),
+  });
+}
+
+export function useSetHolidayEnabled() {
+  return useHolidayChange(({ key, enabled }: { key: string; enabled: boolean }) =>
+    api<{ holidays: HolidayDto[] }>(`/holidays/${key}/enabled`, { method: 'POST', body: { enabled } }),
+  );
+}
+
+export function useSetHolidaySkipped() {
+  return useHolidayChange(({ key, skip }: { key: string; skip: boolean }) =>
+    api<{ holidays: HolidayDto[] }>(`/holidays/${key}/skip`, { method: 'POST', body: { skip } }),
+  );
+}
+
+/* ----------------------------- notifications ----------------------------- */
+
+const NOTIFICATIONS_KEY = ['notifications'];
+const PUSH_KEY = ['notifications', 'push'];
+
+export function useNotifications() {
+  return useQuery({
+    queryKey: NOTIFICATIONS_KEY,
+    queryFn: () => api<NotificationListDto>('/notifications'),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useRespondToNotification() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, action }: { id: number; action: NotificationAction }) =>
+      api<NotificationDto>(`/notifications/${id}/respond`, { method: 'POST', body: { action } }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+      void client.invalidateQueries({ queryKey: HOLIDAYS_KEY });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<NotificationListDto>('/notifications/read-all', { method: 'POST' }),
+    onSuccess: (list) => client.setQueryData(NOTIFICATIONS_KEY, list),
+  });
+}
+
+export function useSendTestNotification() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<NotificationDto>('/notifications/test', { method: 'POST' }),
+    onSettled: () => void client.invalidateQueries({ queryKey: NOTIFICATIONS_KEY }),
+  });
+}
+
+export function usePushStatus() {
+  return useQuery({ queryKey: PUSH_KEY, queryFn: () => api<PushStatusDto>('/notifications/push') });
+}
+
+function usePushChange<Input>(call: (input: Input) => Promise<PushStatusDto>) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: call, onSuccess: (status) => client.setQueryData(PUSH_KEY, status) });
+}
+
+export function useSubscribePush() {
+  return usePushChange((subscription: PushSubscribe) =>
+    api<PushStatusDto>('/notifications/push/subscribe', { method: 'POST', body: subscription }),
+  );
+}
+
+export function useUnsubscribePush() {
+  return usePushChange((endpoint: string) =>
+    api<PushStatusDto>('/notifications/push/unsubscribe', { method: 'POST', body: { endpoint } }),
+  );
+}
+
+export function useRemovePushDevice() {
+  return usePushChange((id: number) => api<PushStatusDto>(`/notifications/push/${id}`, { method: 'DELETE' }));
 }
 
 export function useSummary() {

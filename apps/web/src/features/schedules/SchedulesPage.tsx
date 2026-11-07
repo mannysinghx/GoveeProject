@@ -1,3 +1,4 @@
+import { HolidayCalendar } from './HolidayCalendar';
 import { CalendarClock, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { describeRecurrence, type ScheduleDto } from '@glm/shared';
@@ -126,6 +127,13 @@ export function SchedulesPage() {
   const schedules = useSchedules();
   const [editing, setEditing] = useState<ScheduleDto | 'new' | null>(null);
   const [history, setHistory] = useState<ScheduleDto | null>(null);
+  const yours = schedules.data?.filter((schedule) => !schedule.builtinShow);
+  const holidaySteps = schedules.data?.filter((schedule) => schedule.builtinShow) ?? [];
+  const cardProps = (schedule: ScheduleDto) => ({
+    schedule,
+    onEdit: () => setEditing(schedule),
+    onHistory: () => setHistory(schedule),
+  });
 
   return (
     <>
@@ -138,9 +146,13 @@ export function SchedulesPage() {
           </Button>
         }
       />
+      <div className="mb-5">
+        <HolidayCalendar />
+      </div>
+      <h2 className="mb-3 text-lg font-semibold">Your schedules</h2>
       {schedules.isPending ? <Loading label="Loading schedules" /> : null}
       {schedules.isError ? <ErrorNotice error={schedules.error} /> : null}
-      {schedules.data?.length === 0 ? (
+      {yours?.length === 0 ? (
         <EmptyState
           icon={<CalendarClock className="size-8" aria-hidden />}
           title="No schedules yet"
@@ -153,17 +165,24 @@ export function SchedulesPage() {
           Turn lights on at sunset, off at midnight, or apply a preset on weekends.
         </EmptyState>
       ) : null}
-      {schedules.data && schedules.data.length > 0 ? (
+      {yours && yours.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {schedules.data.map((schedule) => (
-            <ScheduleCard
-              key={schedule.id}
-              schedule={schedule}
-              onEdit={() => setEditing(schedule)}
-              onHistory={() => setHistory(schedule)}
-            />
+          {yours.map((schedule) => (
+            <ScheduleCard key={schedule.id} {...cardProps(schedule)} />
           ))}
         </div>
+      ) : null}
+      {holidaySteps.length > 0 ? (
+        <details className="mt-6">
+          <summary className="min-h-9 cursor-pointer py-2 text-sm font-medium text-ink-200">
+            Change holiday times ({holidaySteps.length} schedules)
+          </summary>
+          <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {holidaySteps.map((schedule) => (
+              <ScheduleCard key={schedule.id} {...cardProps(schedule)} />
+            ))}
+          </div>
+        </details>
       ) : null}
       {editing ? <ScheduleEditor schedule={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
       {history ? <HistoryDialog schedule={history} onClose={() => setHistory(null)} /> : null}

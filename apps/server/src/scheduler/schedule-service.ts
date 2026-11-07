@@ -36,6 +36,8 @@ export interface ScheduleRow {
   last_evaluated_at: string;
   created_at: string;
   updated_at: string;
+  builtin_show: string | null;
+  quiet: number;
 }
 
 interface ExecutionRow {
@@ -124,6 +126,8 @@ export class ScheduleService {
       missedRunPolicy: row.missed_run_policy,
       nextRun: next ? toNextRunDto(next, row.time_zone) : null,
       problem: targetInfo.problem ?? actionInfo.problem,
+      builtinShow: row.builtin_show,
+      quiet: row.quiet === 1,
       lastExecution: last ? executionToDto(last) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -174,7 +178,7 @@ export class ScheduleService {
     return next;
   }
 
-  create(input: ScheduleCreate): ScheduleDto {
+  create(input: ScheduleCreate, show?: { key: string; quiet: boolean }): ScheduleDto {
     this.assertTargetAndAction(input.target, input.action);
     const next = this.assertWillRun(input.recurrence, input.timeZone);
     const id = crypto.randomUUID();
@@ -183,8 +187,8 @@ export class ScheduleService {
       .prepare(
         `INSERT INTO schedules
            (id, name, enabled, time_zone, recurrence_json, target_json, action_json, missed_run_policy,
-            next_run_at, last_evaluated_at, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            next_run_at, last_evaluated_at, created_at, updated_at, builtin_show, quiet)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
@@ -199,8 +203,11 @@ export class ScheduleService {
         now,
         now,
         now,
+        show?.key ?? null,
+        show?.quiet ? 1 : 0,
       );
-    this.activity.record({ eventType: 'schedule', outcome: 'info', message: `Created schedule "${input.name}".` });
+    // Setting up a holiday show adds one summary instead of a line per step.
+    if (!show) this.activity.record({ eventType: 'schedule', outcome: 'info', message: `Created schedule "${input.name}".` });
     return this.get(id);
   }
 
@@ -285,7 +292,7 @@ export class ScheduleService {
   upcoming(limit: number): DashboardSummaryDto['upcoming'] {
     const upcoming: DashboardSummaryDto['upcoming'] = [];
     for (const schedule of this.list()) {
-      if (!schedule.nextRun) continue;
+      if (!schedule.nextRun || schedule.quiet) continue;
       upcoming.push({
         scheduleId: schedule.id,
         scheduleName: schedule.name,

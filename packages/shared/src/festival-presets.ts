@@ -223,7 +223,154 @@ export const FIREWORKS_PRESET: BuiltinPresetDefinition = {
   brightness: 100,
 };
 
-export const BUILTIN_PRESETS: readonly BuiltinPresetDefinition[] = [...FESTIVAL_PRESETS, FIREWORKS_PRESET];
+const PINK = '#ff4d94';
+const LAVENDER = '#a678ff';
+const MINT = '#66e0a3';
+const BUTTER = '#ffe680';
+const ROYAL = '#1e3cc8';
+const TURQUOISE = '#00b4b4';
+const TERRACOTTA = '#c8552d';
+const MAGENTA = '#e6007e';
+const MARIGOLD = '#ffb300';
+const LIME = '#66cc00';
+
+const US_HOLIDAYS = 'US holidays';
+
+/** Holiday colors the calendar uses. Many holidays have no official colors, so these are suggestions. */
+export const HOLIDAY_PRESETS: readonly BuiltinPresetDefinition[] = [
+  {
+    key: 'holiday-new-year-day',
+    name: "New Year's Day: Gold & Silver",
+    occasion: US_HOLIDAYS,
+    when: 'January 1',
+    description: 'Gold, silver and white.',
+    colors: [...run(GOLD, 2), ...run(SILVER, 2), WHITE],
+  },
+  {
+    key: 'holiday-mlk',
+    name: 'Martin Luther King Jr. Day: Unity',
+    occasion: US_HOLIDAYS,
+    when: 'Third Monday of January',
+    description: 'Warm white, gold and deep blue.',
+    colors: [...run(WARM, 3), GOLD, ...run(ROYAL, 2)],
+  },
+  {
+    key: 'holiday-valentines',
+    name: "Valentine's Day: Hearts",
+    occasion: US_HOLIDAYS,
+    when: 'February 14',
+    description: 'Red, pink and white.',
+    colors: [...run(RED, 2), ...run(PINK, 2), WHITE],
+  },
+  {
+    key: 'holiday-presidents',
+    name: "Presidents' Day: Stars & Stripes",
+    occasion: US_HOLIDAYS,
+    when: 'Third Monday of February',
+    description: 'Red, white and blue.',
+    colors: [...run(BLUE, 2), RED, WHITE, RED, WHITE],
+  },
+  {
+    key: 'holiday-st-patricks',
+    name: "St. Patrick's Day: Shamrock",
+    occasion: US_HOLIDAYS,
+    when: 'March 17',
+    description: 'Greens, gold and white.',
+    colors: [...run(GREEN, 2), LIME, GOLD, ...run(EVERGREEN, 2), WHITE],
+  },
+  {
+    key: 'holiday-easter',
+    name: 'Easter: Pastels',
+    occasion: US_HOLIDAYS,
+    when: 'Easter Sunday',
+    description: 'Soft pink, lavender, mint and butter yellow.',
+    colors: [PINK, LAVENDER, MINT, BUTTER],
+  },
+  {
+    key: 'holiday-mothers',
+    name: "Mother's Day: Blush",
+    occasion: US_HOLIDAYS,
+    when: 'Second Sunday of May',
+    description: 'Pink, lavender and warm white.',
+    colors: [...run(PINK, 2), LAVENDER, ...run(WARM, 2)],
+  },
+  {
+    key: 'holiday-memorial',
+    name: 'Memorial Day: Remembrance',
+    occasion: US_HOLIDAYS,
+    when: 'Last Monday of May',
+    description: 'Poppy red, white and navy.',
+    colors: [...run(RED, 2), ...run(WHITE, 2), ...run(NAVY, 2)],
+  },
+  {
+    key: 'holiday-fathers',
+    name: "Father's Day: Blue & Amber",
+    occasion: US_HOLIDAYS,
+    when: 'Third Sunday of June',
+    description: 'Blue, navy and warm amber.',
+    colors: [...run(BLUE, 2), NAVY, ...run(AMBER, 2)],
+  },
+  {
+    key: 'holiday-juneteenth',
+    name: 'Juneteenth: Freedom',
+    occasion: US_HOLIDAYS,
+    when: 'June 19',
+    description: 'Red, gold and green.',
+    colors: [...run(RED, 2), ...run(GOLD, 2), ...run(GREEN, 2)],
+  },
+  {
+    key: 'holiday-independence',
+    name: 'Independence Day: Red, White & Blue',
+    occasion: US_HOLIDAYS,
+    when: 'July 4',
+    description: 'Bold red, white and blue.',
+    colors: [RED, RED, WHITE, WHITE, BLUE, BLUE],
+  },
+  {
+    key: 'holiday-labor',
+    name: 'Labor Day: Navy & Gold',
+    occasion: US_HOLIDAYS,
+    when: 'First Monday of September',
+    description: 'Navy, gold and white.',
+    colors: [...run(NAVY, 2), ...run(GOLD, 2), WHITE],
+  },
+  {
+    key: 'holiday-indigenous',
+    name: "Columbus / Indigenous Peoples' Day: Earth & Sky",
+    occasion: US_HOLIDAYS,
+    when: 'Second Monday of October',
+    description: 'Turquoise, terracotta and gold.',
+    colors: [...run(TURQUOISE, 2), ...run(TERRACOTTA, 2), GOLD],
+  },
+  {
+    key: 'holiday-halloween',
+    name: 'Halloween: Spooky',
+    occasion: US_HOLIDAYS,
+    when: 'October 31',
+    description: 'Orange, purple and green.',
+    colors: [...run(ORANGE, 3), ...run(PURPLE, 2), LIME],
+  },
+  {
+    key: 'diwali-colors',
+    name: 'Diwali: Festival Colors',
+    occasion: 'Diwali',
+    when: 'Diwali evening',
+    description: 'Gold, marigold, orange, magenta and red.',
+    colors: [GOLD, MARIGOLD, ORANGE, MAGENTA, RED],
+  },
+  {
+    key: 'diwali-fireworks',
+    name: 'Diwali: Fireworks',
+    occasion: 'Diwali',
+    when: 'Diwali evening',
+    description: "Turns the lights on at full brightness and runs Govee's moving Fireworks effect.",
+    colors: [GOLD, MAGENTA, ORANGE, WHITE, RED, MARIGOLD],
+    sceneName: 'Fireworks',
+    brightness: 100,
+  },
+];
+
+export const BUILTIN_PRESETS: readonly BuiltinPresetDefinition[] = [...FESTIVAL_PRESETS, FIREWORKS_PRESET, ...HOLIDAY_PRESETS];
 
 export function builtinPresetByKey(key: string): BuiltinPresetDefinition | undefined {
   return BUILTIN_PRESETS.find((preset) => preset.key === key);

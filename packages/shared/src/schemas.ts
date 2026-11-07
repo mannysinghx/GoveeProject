@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { holidayByKey } from './holidays.js';
 
 /* -------------------------------------------------------------------------- */
 /* Primitives                                                                 */
@@ -268,6 +269,13 @@ const yearlyRecurrenceSchema = z.object({
   ...dateBoundsShape,
 });
 
+const holidayRecurrenceSchema = z.object({
+  kind: z.literal('holiday'),
+  holiday: z.string().max(64).refine((key) => holidayByKey(key) !== undefined, 'Choose a holiday from the list'),
+  time: timeOfDaySchema,
+  ...dateBoundsShape,
+});
+
 const solarRecurrenceSchema = z.object({
   kind: z.literal('solar'),
   event: z.enum(['sunrise', 'sunset']),
@@ -284,6 +292,7 @@ export const recurrenceSchema = z
     dailyRecurrenceSchema,
     weeklyRecurrenceSchema,
     yearlyRecurrenceSchema,
+    holidayRecurrenceSchema,
     solarRecurrenceSchema,
   ])
   .superRefine((value, ctx) => {
@@ -365,6 +374,7 @@ export const activityEventTypes = [
   'auth',
   'rate_limit',
   'connection',
+  'notification',
   'settings',
   'system',
 ] as const;
@@ -409,6 +419,11 @@ export const settingsSchema = z.object({
   patternStrings: z.array(patternStringSettingSchema).max(200),
   /** Resend what a light missed when it comes back online. Off by default: lights may change at any hour. */
   catchUpEnabled: z.boolean(),
+  /** What to be notified about, in the app and on any phone that has turned on push. */
+  notifyScheduleStarts: z.boolean(),
+  notifyPatternStarts: z.boolean(),
+  notifyHeadsUp: z.boolean(),
+  notifyProblems: z.boolean(),
 });
 export type AppSettings = z.infer<typeof settingsSchema>;
 
@@ -427,4 +442,32 @@ export const DEFAULT_SETTINGS: AppSettings = {
   longitude: null,
   patternStrings: [],
   catchUpEnabled: false,
+  notifyScheduleStarts: true,
+  notifyPatternStarts: true,
+  notifyHeadsUp: true,
+  notifyProblems: true,
 };
+
+/* -------------------------------------------------------------------------- */
+/* Notifications                                                              */
+/* -------------------------------------------------------------------------- */
+
+export const notificationActions = ['looks_right', 'didnt_change', 'skip'] as const;
+export type NotificationAction = (typeof notificationActions)[number];
+
+export const notificationRespondSchema = z.object({ action: z.enum(notificationActions) });
+export const notificationActionTokenSchema = z.object({ token: z.string().min(20).max(128) });
+
+const base64UrlSchema = z.string().regex(/^[A-Za-z0-9_-]+=*$/, 'Expected base64url text');
+
+export const pushSubscribeSchema = z.object({
+  endpoint: z.url().max(2048),
+  keys: z.object({ p256dh: base64UrlSchema.max(256), auth: base64UrlSchema.max(64) }),
+  label: z.string().trim().min(1).max(80),
+});
+export type PushSubscribe = z.infer<typeof pushSubscribeSchema>;
+
+export const pushUnsubscribeSchema = z.object({ endpoint: z.url().max(2048) });
+
+export const holidayEnabledSchema = z.object({ enabled: z.boolean() });
+export const holidaySkipSchema = z.object({ skip: z.boolean() });
