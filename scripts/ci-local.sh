@@ -114,7 +114,18 @@ if [ "$BUILD_IMAGE" = true ]; then
       console.log('    health, frontend, auth and setup-code checks passed');
     })().catch((e) => { console.error(e); process.exit(1); });
   "
-  if ! docker logs "$NAME" 2>&1 | grep -q setupCodeForFirstRun; then
+  # Read the whole log first. Piping into "grep -q" under pipefail can report a failure
+  # even when the text is there, and the code itself must never be printed.
+  setup_code_logged=false
+  for _ in $(seq 1 5); do
+    container_logs="$(docker logs "$NAME" 2>&1 || true)"
+    case "$container_logs" in
+      *setupCodeForFirstRun*) setup_code_logged=true; break ;;
+    esac
+    sleep 1
+  done
+  unset container_logs
+  if [ "$setup_code_logged" != true ]; then
     echo "Setup code was not logged" >&2
     exit 1
   fi
