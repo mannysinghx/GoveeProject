@@ -1,0 +1,37 @@
+services:
+  app:
+    build: .
+    image: govee-light-manager:local
+    container_name: govee-light-manager
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # The container listens on all its interfaces. The port mapping below decides who can reach it.
+      HOST: 0.0.0.0
+      PORT: "8787"
+      DATABASE_PATH: /data/govee-light-manager.sqlite
+      # Schedules can set their own zone. This only affects the default for new ones.
+      TZ: ${TZ:-UTC}
+    ports:
+      # Published on this computer only. See docs/security.md before changing this.
+      - "127.0.0.1:${PORT:-8787}:8787"
+    volumes:
+      - govee-data:/data
+    # Hardening: the app needs nothing beyond its data volume and outbound HTTPS.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  govee-data:

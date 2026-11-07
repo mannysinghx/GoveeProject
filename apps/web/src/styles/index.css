@@ -1,0 +1,104 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * A warm, low-light palette for a screen often used at night, outdoors, near the
+ * lights themselves. Status colour is always paired with an icon or text.
+ */
+@theme {
+  --color-ink-950: #0f1113;
+  --color-ink-900: #15181b;
+  --color-ink-850: #1a1d20;
+  --color-ink-800: #212529;
+  --color-ink-700: #2d3238;
+  --color-ink-600: #434a52;
+  --color-ink-400: #8b939c;
+  --color-ink-300: #aab1b8;
+  --color-ink-200: #cdd2d6;
+  --color-ink-100: #eceae6;
+
+  --color-amber-glow: #f2b45a;
+  --color-amber-soft: #f7cd8c;
+  --color-amber-deep: #b97d2e;
+  --color-amber-wash: #2e2517;
+
+  --color-good: #7bc794;
+  --color-good-wash: #17291e;
+  --color-warn: #e9c46a;
+  --color-warn-wash: #2c2613;
+  --color-bad: #ee8a7b;
+  --color-bad-wash: #301b18;
+  --color-info: #8ab8e0;
+  --color-info-wash: #18242f;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background-color: var(--color-ink-950);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background-color: var(--color-ink-950);
+    color: var(--color-ink-100);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: 'tnum' 1;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-amber-glow);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  input[type='range'] {
+    accent-color: var(--color-amber-glow);
+    cursor: pointer;
+  }
+
+  /* Dialog backdrop */
+  dialog::backdrop {
+    background: rgb(0 0 0 / 0.65);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .color-picker-host .react-colorful {
+    width: 100%;
+    height: 180px;
+  }
+  .color-picker-host .react-colorful__saturation {
+    border-radius: 10px 10px 0 0;
+  }
+  .color-picker-host .react-colorful__last-control {
+    border-radius: 0 0 10px 10px;
+    height: 28px;
+  }
+  .color-picker-host .react-colorful__pointer {
+    width: 26px;
+    height: 26px;
+  }
+
+  .kelvin-track {
+    background: linear-gradient(to right, #ffb46b, #ffe4c4, #fff5ec, #e3ecff, #c9dcff);
+    border-radius: 999px;
+    height: 10px;
+  }
+}

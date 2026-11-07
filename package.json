@@ -1,0 +1,37 @@
+{
+  "name": "govee-light-manager",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Self-hosted web app for managing Govee outdoor lights through the official Govee API.",
+  "engines": {
+    "node": "^22.12.0 || ^24.0.0 || >=26.0.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @glm/shared && npm run build -w @glm/server && npm run build -w @glm/web",
+    "build:shared": "npm run build -w @glm/shared",
+    "dev": "npm run build:shared && concurrently -n server,web -c yellow,cyan \"npm run dev -w @glm/server\" \"npm run dev -w @glm/web\"",
+    "dev:mock": "npm run build:shared && concurrently -n mock,server,web -c magenta,yellow,cyan \"npm run mock-govee -w @glm/server\" \"npm run dev:mock -w @glm/server\" \"npm run dev -w @glm/web\"",
+    "start": "npm run start -w @glm/server",
+    "test": "npm run build:shared && npm run test --workspaces --if-present",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "ci": "bash scripts/ci-local.sh",
+    "reset-password": "npm run reset-password -w @glm/server --",
+    "db:backup": "npm run db:backup -w @glm/server --"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^10.0.6",
+    "eslint": "^10.14.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.0.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

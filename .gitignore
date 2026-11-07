@@ -1,0 +1,24 @@
+# Secrets. Never commit these.
+.env
+.env.*
+!.env.example
+
+# Runtime data (SQLite database, WAL files, backups)
+data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+backups/
+
+# Build output and dependencies
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Tooling and OS noise
+.DS_Store
+*.log
+.vite/
+.vitest/
+.claude/

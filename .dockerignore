@@ -1,0 +1,16 @@
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.git
+.claude
+.env
+.env.*
+!.env.example
+data
+backups
+docs
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore

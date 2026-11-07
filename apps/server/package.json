@@ -1,0 +1,37 @@
+{
+  "name": "@glm/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "dev:mock": "tsx watch --env-file-if-exists=dev-mock.env src/main.ts",
+    "mock-govee": "tsx scripts/mock-govee.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "reset-password": "node dist/cli/reset-password.js",
+    "db:backup": "node dist/cli/backup.js"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.1.5",
+    "@fastify/helmet": "^13.2.0",
+    "@fastify/static": "^10.1.10",
+    "@glm/shared": "1.0.0",
+    "@node-rs/argon2": "^2.2.2",
+    "better-sqlite3": "^13.0.3",
+    "fastify": "^5.12.8",
+    "luxon": "^3.7.2",
+    "pino": "^10.4.0",
+    "suncalc": "^2.1.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/luxon": "^3.7.6",
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "vitest": "^5.1.0"
+  }
+}

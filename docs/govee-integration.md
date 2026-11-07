@@ -1,0 +1,85 @@
+# Govee integration
+
+Written from Govee's developer documentation as read on 6 November 2026. Most reference pages carried update dates between July and October 2026. **None of this has been tested against the real Govee service or a real H805C.** Every request and response shape here comes from the documentation, and automated tests use a local stand-in that follows it.
+
+## Endpoints used
+
+Base URL `https://openapi.api.govee.com`, authenticated with the header `Govee-API-Key`.
+
+| Purpose | Request |
+|---|---|
+| List devices and capabilities | `GET /router/api/v1/user/devices` |
+| Control a device | `POST /router/api/v1/device/control` |
+| Device state | `POST /router/api/v1/device/state` |
+| Dynamic scenes | `POST /router/api/v1/device/scenes` |
+| DIY scenes | `POST /router/api/v1/device/diy-scenes` |
+
+No private or reverse-engineered APIs are used. The configured base URL must be the official host. The only exception is a loopback address, which exists for local testing and is flagged clearly in the UI. Anything else stops startup, so a mistake cannot send your key elsewhere.
+
+## H805C
+
+Govee's supported-model list includes `H805C`. The list says nothing about which capabilities a model has, so this project assumes none of them. Everything comes from the response for your own device. Specifically, this app does **not** assume:
+
+- that individual-bulb control exists, or that a segment is one bulb
+- any segment count or addressing
+- that every scene in the Govee app is available through the API
+- that DIY scenes can be created through the API
+- that an accepted command changed anything physically
+
+## Decisions made where the documentation is unclear
+
+Each of these is isolated in `govee/cloud-transport.ts` or `govee/capabilities.ts`, so correcting one after real-device testing should be a small change.
+
+| # | What the documentation shows | What the app does | Check on a real device |
+|---|---|---|---|
+| 1 | The success response of `device/control` is **not documented**. | Accepts any HTTP 2xx whose body has no failing `code`, and records whether `code: 200` was actually present. | Note the real response body. |
+| 2 | The failure table lists codes (400, 404, 429) without saying if they are HTTP statuses or body fields. | Checks both. An HTTP 200 with a body `code` other than 200 is a failure. | Send an invalid value. |
+| 3 | Envelopes differ: the device list uses `code/message/data`, while state and scenes use `requestId/msg/code/payload`. | Parses each endpoint its own way and reads either `message` or `msg`. | |
+| 4 | `diyScene` appears under three types: `dynamic_scene`, `dynamic_setting` and `diy_color_setting`. There is no DIY control example anywhere. | Sends the type this device's own device-list entry reports, with the option's integer value. Any type is recognised. | **Activate a DIY scene.** This is the most likely to need a change. |
+| 5 | The scene page says static scenes from the device list and dynamic scenes from the scenes endpoint are controlled the same way. Static samples show integer values, dynamic ones `{paramId, id}`. | Sends whichever value Govee returned, unchanged. Other shapes are ignored rather than forwarded. | Activate one of each. |
+| 6 | `snapshot` is listed under `dynamic_scene`, with no control example. | Treated like other ENUM scenes. The control page says values are as defined in the device list. | Activate a snapshot, if listed. |
+| 7 | The `segmentedColorRgb` example uses `0x0000ff`, which is not valid JSON. | Sends a decimal integer. | Set a segment colour. |
+| 8 | No formula is given for colour integers. The range is 0 to 16777215. | Uses `(r << 16) \| (g << 8) \| b`, as in the project brief. | Set red, and check it is red. |
+| 9 | Segment fields appear as an `options` list or as `elementRange` plus `size`. | Reads both. If neither is usable, no segment control is offered. | Inspect the capability JSON. |
+| 10 | Samples contain typos such as `reauired`, and the prefix `device.capabilities`. | Tolerates them, and sends the type exactly as Govee returned it. | |
+| 11 | Examples write `Host: https://openapi.api.govee.com`. A Host header carries no scheme. | Treats that as the base URL. | |
+| 12 | The page says an empty state value means "the instance does not support query". | Shows *Not reported*, and cannot confirm that setting. | Refresh state and compare with the capability list. |
+| 13 | `online: false` means the status is "historical data and has no reference significance". | Marks values historical, shows the device as offline, and does not confirm commands from such a report. | Test with the lights unpowered. |
+| 14 | No page says whether a new API key invalidates the old one. | Warns that it may. Not verified. | |
+| 15 | No rate-limit response headers are documented. | Reads `Retry-After` and common `*-ratelimit-*` spellings if present. Nothing depends on them. | Look at real response headers. |
+| 16 | The rate-limit table omits `device/diy-scenes`. | Applies the scenes limit to it. | |
+
+## Rate limits
+
+From Govee's table, read on 6 November 2026. These may change, so all are configurable.
+
+| Endpoint | Documented | App default | Variable |
+|---|---|---|---|
+| Device list | 30 per minute, per account | 20 per minute | `GOVEE_LIMIT_LIST_PER_MINUTE` |
+| Control | 12 per second per account (burst 80) | 8 per second | `GOVEE_LIMIT_CONTROL_ACCOUNT_PER_SECOND` |
+| Control | 2 per second per device (burst 6) | 1 per second | `GOVEE_LIMIT_CONTROL_DEVICE_PER_SECOND` |
+| State | 30 per minute per device | 20 per minute | `GOVEE_LIMIT_STATE_PER_MINUTE` |
+| Scenes | 30 per minute per device | 10 per minute | `GOVEE_LIMIT_SCENES_PER_MINUTE` |
+
+The app also keeps its own daily budget, `GOVEE_DAILY_REQUEST_BUDGET`, default 8000 requests. The current documentation states no daily limit, but other Govee documentation has described different limits over time, so this is a safety net. The count is held in memory and resets at 00:00 UTC or on restart.
+
+A 429 from Govee pauses all traffic for the time it asks, or for one second if it does not say. The event is recorded in Activity.
+
+## Capability handling
+
+| Govee instance | App control |
+|---|---|
+| `powerSwitch` | Power |
+| `brightness` | Brightness slider |
+| `colorRgb` | Colour picker |
+| `colorTemperatureK` | Temperature slider, using this device's own range |
+| `segmentedColorRgb` | Segment colour |
+| `segmentedBrightness` | Segment brightness |
+| `lightScene`, `diyScene`, `snapshot` | Scene list |
+| Anything else, such as `musicMode` and toggles | Listed read-only under Capabilities |
+
+A capability with unreadable metadata is listed read-only rather than offered with guessed limits.
+
+## Discovery behaviour
+
+The device list is requested only when you ask, and then at most once every `DISCOVERY_REFRESH_HOURS` (default 24) once you have run it for the first time. Ordinary page loads never call it.
