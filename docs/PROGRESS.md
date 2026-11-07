@@ -15,7 +15,7 @@ Current state of the project, so anyone can pick it up without the original conv
 | Backend, frontend, shared code | `npm test`: 416 tests (server 301, web 111, shared 4) |
 | Connection monitor, offline detection, catch-up, one box per LED | Real browser against the mock, production build, with one mock light offline, on desktop and at phone width. `scripts/ci-local.sh --image` passed on `481cbdb`. Deployed: migration `002_connection.sql` applied, monitor started at 130-second intervals, status checks ran for all 3 strings and skipped the Govee group, new routes return 401 without a session. No command was sent to real lights. Diagnosis and catch-up have not yet run against a real outage. |
 | Pattern editor, all strings in series | Real browser against the mock, production build: drag painting across strings, repeat, flip surviving a reload, per-string sending, phone width. Not yet sent to real lights. |
-| Repeat in the pattern editor | Real browser against the mock, production build: a painted pattern with a blank filled all segments across strings, following right-to-left rows. **Committed locally, not deployed yet.** |
+| Repeat in the pattern editor | Real browser against the mock, production build: a painted pattern with a blank filled all segments across strings, following right-to-left rows. `scripts/ci-local.sh --image` passed on `e05ed8a`, and it is deployed: the live build contains it, health is OK, and the monitor restarted. Not yet tried on real lights. |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |
@@ -25,7 +25,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-Repeat in the pattern editor and the record of the last deployment are committed locally and not pushed, waiting for the owner's approval. Only `apps/web` changed, so this is one `@glm/server` redeploy, with no database change and no change to what is sent to lights.
+Nothing.
 
 ## Open findings and decisions
 
