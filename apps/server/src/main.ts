@@ -6,7 +6,7 @@ async function main(): Promise<void> {
   loadDotEnv();
   const config = loadConfig();
   const ctx = createContext(config);
-  const { logger, queue, scheduler, maintenance, devices, db, connection } = ctx;
+  const { logger, queue, scheduler, maintenance, devices, db, connection, builtins } = ctx;
 
   logger.info(
     {
@@ -47,6 +47,7 @@ async function main(): Promise<void> {
   scheduler.start();
   maintenance.start();
   connection.start();
+  builtins.start();
 
   // Background work handles its own errors. Anything reaching here is a bug, so restart clean.
   process.on('unhandledRejection', (reason) => {
@@ -67,6 +68,7 @@ async function main(): Promise<void> {
     try {
       maintenance.stop();
       await connection.stop();
+      await builtins.stop();
       devices.stop();
       await app.close();
       await queue.stop();

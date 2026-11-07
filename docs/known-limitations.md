@@ -38,6 +38,14 @@
 - **A device re-added in the Govee app** may get a new identifier and appear as a new device. Presets tied to the old one will not follow it.
 - **Presets tied to a device** cannot be moved to another device in one step. Edit their steps instead.
 
+## Limits of festival presets and the fireworks
+
+- **Govee decides how a moving effect looks.** The app can only start one. It cannot change its colors, speed or length.
+- **The fireworks are not a timed show.** Each string gets its commands separately, about one a second, so they start about 2 seconds after midnight and are not synchronized with each other.
+- **The server's clock and the default time zone decide "midnight".** The show uses the default time zone set when it was installed. If you change that setting later, change the schedule too.
+- **Other schedules still run.** A nightly "turn off" still runs on New Year's Eve, and the show turns the lights back on at midnight.
+- **Festival dates are not automatic.** Only the fireworks run by themselves. Other festival presets run when you apply or schedule them.
+
 ## Limits of connection monitoring
 
 - **It diagnoses and retries. It does not repair.** Govee's public API has no restart, Wi-Fi or firmware commands, and a hosted server cannot reach your home network.

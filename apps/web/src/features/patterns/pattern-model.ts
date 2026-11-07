@@ -1,5 +1,6 @@
 import {
   hexToRgb,
+  orderLightStrings,
   rgbToHex,
   type DeviceDto,
   type PatternStringSetting,
@@ -74,26 +75,14 @@ export function paintableDevices(devices: DeviceDto[]): DeviceDto[] {
   return devices.filter((d) => d.discoveryStatus === 'present' && segmentCapability(d) !== undefined);
 }
 
-/** A sensible first guess at the physical order, until the owner arranges it themselves. */
-function nameRank(name: string): number {
-  if (/\bleft\b/i.test(name)) return 0;
-  if (/\b(center|centre|middle)\b/i.test(name)) return 1;
-  if (/\bright\b/i.test(name)) return 2;
-  return 3;
-}
-
 /**
  * Combines what Govee reports now with the saved arrangement. Saved order comes first.
  * A newly added light joins at the end, and a light that has gone is simply not listed.
  */
 export function resolveStrings(devices: DeviceDto[], saved: PatternStringSetting[]): PatternString[] {
   const paintable = paintableDevices(devices);
-  const savedIndex = new Map(saved.map((entry, index) => [entry.deviceId, { entry, index }]));
-  const ordered = [...paintable].sort((a, b) => {
-    const left = savedIndex.get(a.id)?.index ?? Number.MAX_SAFE_INTEGER;
-    const right = savedIndex.get(b.id)?.index ?? Number.MAX_SAFE_INTEGER;
-    return left - right || nameRank(a.name) - nameRank(b.name) || a.name.localeCompare(b.name);
-  });
+  const savedIndex = new Map(saved.map((entry) => [entry.deviceId, { entry }]));
+  const ordered = orderLightStrings(paintable, saved);
   return ordered.map((device) => {
     const capability = segmentCapability(device) as SegmentedColorCapability;
     const entry = savedIndex.get(device.id)?.entry;

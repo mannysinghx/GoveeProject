@@ -188,6 +188,7 @@ describe('pattern model', () => {
     name: 'x',
     description: '',
     needsTarget: false,
+    builtin: null,
     createdAt: '',
     updatedAt: '',
     actions: actions.map(({ deviceId, action }, order) => ({ id: order, deviceId, deviceName: deviceId, action, summary: '', order })),
@@ -689,6 +690,7 @@ describe('pattern editor', () => {
       name: 'Xmas',
       description: 'Red and white',
       needsTarget: false,
+      builtin: null,
       createdAt: '',
       updatedAt: '',
       actions: [

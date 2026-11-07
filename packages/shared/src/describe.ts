@@ -53,6 +53,8 @@ export function describeWeekdays(weekdays: number[]): string {
   return sorted.map((d) => WEEKDAY_NAMES[d - 1]).join(', ');
 }
 
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 export function describeRecurrence(recurrence: Recurrence): string {
   const bounds = (r: { startDate?: string | undefined; endDate?: string | undefined }) => {
     if (r.startDate && r.endDate) return ` from ${r.startDate} to ${r.endDate}`;
@@ -67,6 +69,8 @@ export function describeRecurrence(recurrence: Recurrence): string {
       return `Every day at ${recurrence.time}${bounds(recurrence)}`;
     case 'weekly':
       return `${describeWeekdays(recurrence.weekdays).replace(/^./, (c) => c.toUpperCase())} at ${recurrence.time}${bounds(recurrence)}`;
+    case 'yearly':
+      return `Every year on ${MONTHS[recurrence.month - 1]} ${recurrence.day} at ${recurrence.time}${bounds(recurrence)}`;
     case 'solar': {
       const offset = recurrence.offsetMinutes;
       const when =

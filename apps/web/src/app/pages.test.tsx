@@ -366,6 +366,7 @@ describe('presets', () => {
     name: 'Everyday Warm',
     description: 'Warm white',
     needsTarget: true,
+    builtin: null,
     createdAt: '2026-11-01T10:00:00.000Z',
     updatedAt: '2026-11-01T10:00:00.000Z',
     actions: [
@@ -583,6 +584,81 @@ describe('schedules', () => {
     expect(await within(dialog).findByText(/no future runs/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save schedule' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('would never run');
+  });
+});
+
+describe('festival presets', () => {
+  const festival = (name: string, occasion: string, overrides: object = {}) => ({
+    id: name,
+    name,
+    description: `About ${name}`,
+    needsTarget: false,
+    builtin: { key: name, occasion, when: 'December 24 and 25', colors: ['#ff0000', '#00c000'], isAutomaticShow: false },
+    createdAt: '2026-11-01T10:00:00.000Z',
+    updatedAt: '2026-11-01T10:00:00.000Z',
+    actions: [{ id: 1, deviceId: 'dev-1', deviceName: 'Left', action: { type: 'power', on: true }, summary: 'Turn on', order: 0 }],
+    ...overrides,
+  });
+  const fireworks = festival('New Year Fireworks', 'New Year', {
+    builtin: { key: 'fw', occasion: 'New Year', when: 'Midnight', colors: ['#ffaa00'], isAutomaticShow: true },
+    actions: [{ id: 2, deviceId: 'dev-1', deviceName: 'Left', action: { type: 'scene', sceneKey: 'k', sceneName: 'Fireworks' }, summary: 'Scene', order: 0 }],
+  });
+  const schedule = {
+    id: 's1',
+    name: 'New Year Fireworks',
+    enabled: true,
+    timeZone: 'America/Los_Angeles',
+    recurrence: { kind: 'yearly', month: 1, day: 1, time: '00:00' },
+    action: { type: 'preset', presetId: 'New Year Fireworks' },
+    nextRun: { at: '2027-01-01T08:00:00.000Z', local: '2027-01-01 00:00 PST', note: null },
+  };
+  const routes = (presets: object[], schedules: object[] = [schedule]) => ({
+    'GET /presets': { json: { presets } },
+    'GET /devices': { json: { devices: [] } },
+    'GET /schedules': { json: { schedules } },
+  });
+
+  it('groups them by occasion, and offers Apply and Duplicate but not Edit or Delete', async () => {
+    mockApi(routes([festival('Christmas: Candy Cane', 'Christmas'), festival('Veterans Day: Salute', 'Veterans Day'), fireworks]));
+    renderApp(<PresetsPage />);
+    expect(await screen.findByRole('heading', { name: 'Festival presets' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Christmas' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Veterans Day' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply Christmas: Candy Cane' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Duplicate Christmas: Candy Cane' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete Christmas: Candy Cane' })).not.toBeInTheDocument();
+    expect(screen.getByText('No presets yet')).toBeInTheDocument();
+  });
+
+  it('lists occasions in calendar order, not by name', async () => {
+    const entry = (key: string, name: string, occasion: string) => festival(name, occasion, { builtin: { key, occasion, when: '', colors: ['#ff0000'], isAutomaticShow: false } });
+    mockApi(routes([entry('new-year-after-calm', 'A', 'New Year'), entry('christmas-classic', 'B', 'Christmas'), entry('november-fall-effect', 'C', 'November')]));
+    renderApp(<PresetsPage />);
+    await screen.findByRole('heading', { name: 'Festival presets' });
+    expect(screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent).slice(0, 3)).toEqual(['November', 'Christmas', 'New Year']);
+  });
+
+  it('says when the fireworks run, how they end, and where to change it', async () => {
+    mockApi(routes([fireworks]));
+    renderApp(<PresetsPage />);
+    expect(await screen.findByText(/Runs automatically\. Every year on January 1 at 00:00/)).toBeInTheDocument();
+    expect(screen.getByText(/stop at 12:30 AM/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Change it under Schedules' })).toHaveAttribute('href', '/schedules');
+  });
+
+  it('says plainly when the fireworks have no moving effect, or no schedule', async () => {
+    mockApi(routes([festival('New Year Fireworks', 'New Year', { builtin: { ...fireworks.builtin } })], []));
+    renderApp(<PresetsPage />);
+    expect(await screen.findByText(/fixed firework colors, with no movement/)).toBeInTheDocument();
+    expect(screen.getByText(/No schedule runs this right now/)).toBeInTheDocument();
+  });
+
+  it('asks before applying, and sends only when confirmed', async () => {
+    const { calls } = mockApi(routes([festival('Christmas: Candy Cane', 'Christmas')]));
+    renderApp(<PresetsPage />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply Christmas: Candy Cane' }));
+    expect(await screen.findByRole('heading', { name: 'Apply "Christmas: Candy Cane"' })).toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
   });
 });
 

@@ -101,6 +101,10 @@ Each tick, every 15 seconds:
 
 **Crash policy.** A run still marked `running` at startup becomes `interrupted` and is not retried. It may have partly executed, and repeating lighting commands blindly is worse than reporting it.
 
+### Exact start times
+
+The scheduler checks for due runs every `SCHEDULER_TICK_SECONDS` (default 15). When a run is due before the next check, it also sets a timer for that moment, so runs start on time rather than up to a tick late. In a real-time test against the mock, a run due at 04:37:00.000 started at 04:37:00.000.
+
 ### Daylight-saving policy
 
 | Case | Policy | Example, New York |
@@ -138,6 +142,14 @@ Reads through `GET /devices` come from the app's own cache and never call Govee.
 - while the dashboard is open and visible, at a configurable interval (default 60 seconds, minimum 30).
 
 A device is shown as `stale` once its last report is older than a configurable age (default 5 minutes), and a report made while Govee says the device is offline is marked historical. Govee's own documentation says such values have no reference significance.
+
+## Built-in presets
+
+`packages/shared/src/festival-presets.ts` lists the festival presets. `apps/server/src/presets/builtin-presets.ts` writes them to the ordinary `presets` table, tied to the current strings in the owner's arrangement, marked with `builtin_key`. It runs at startup, after discovery, after a settings change and hourly, and writes nothing if nothing changed. Because they are rebuilt, they are read-only; a duplicate is an ordinary preset.
+
+A preset with a `sceneName` uses that Govee scene on each light that lists it, and its colors on any light that does not. Scenes are fetched once per light here.
+
+The New Year show is set up once, recorded in `builtin_installs`, so a schedule or group the owner deletes stays deleted: a yearly schedule at 00:00 on January 1 in the default time zone (missed runs are skipped), a second at 00:30 that turns the lights off (a missed run runs late, so lights are not left on), and a group of all strings. The fireworks are never kept for catch-up.
 
 ## Connection monitoring
 

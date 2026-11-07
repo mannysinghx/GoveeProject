@@ -96,6 +96,7 @@ export function httpErrorFromTransport(error: TransportError): AppError {
 }
 
 export class DeviceService {
+  private readonly discoveryListeners: (() => void)[] = [];
   readonly repository: DeviceRepository;
   private readonly postCommandTimers = new Map<string, NodeJS.Timeout>();
   private stopped = false;
@@ -115,6 +116,11 @@ export class DeviceService {
   ) {
     this.repository = new DeviceRepository(db);
     this.queue.onAccepted((deviceId) => this.schedulePostCommandRefresh(deviceId, 0));
+  }
+
+  /** Called after each successful discovery. */
+  onDiscovered(listener: () => void): void {
+    this.discoveryListeners.push(listener);
   }
 
   stop(): void {
@@ -291,6 +297,7 @@ export class DeviceService {
       details: { total: raw.length, added, updated, noLongerDiscovered },
     });
     this.logger.info({ total: raw.length, added, updated, noLongerDiscovered }, 'Device discovery succeeded');
+    for (const listener of this.discoveryListeners) listener();
 
     return { total: raw.length, added, updated, noLongerDiscovered, discoveredAt: now, devices: this.list() };
   }

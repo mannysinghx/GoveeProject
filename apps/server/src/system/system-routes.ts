@@ -67,5 +67,9 @@ export function registerSystemRoutes(api: FastifyInstance, ctx: AppContext): voi
 
   api.get('/settings', async () => settings.get());
 
-  api.patch('/settings', async (request) => settings.update(parseInput(settingsUpdateSchema, request.body)));
+  api.patch('/settings', async (request) => {
+    const updated = settings.update(parseInput(settingsUpdateSchema, request.body));
+    ctx.builtins.changed();
+    return updated;
+  });
 }

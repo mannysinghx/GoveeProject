@@ -330,8 +330,18 @@ export interface PresetDto {
   actions: PresetActionDto[];
   /** True when at least one action needs a device or group picked when applying. */
   needsTarget: boolean;
+  /** Set for presets that come with the app. These are read-only, and can be duplicated. */
+  builtin: BuiltinPresetInfoDto | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BuiltinPresetInfoDto {
+  key: string;
+  occasion: string;
+  when: string;
+  colors: string[];
+  isAutomaticShow: boolean;
 }
 
 /* -------------------------------------------------------------------------- */

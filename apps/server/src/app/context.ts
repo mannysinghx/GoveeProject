@@ -7,6 +7,7 @@ import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
 import { CommandStore } from '../commands/command-store.js';
 import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
+import { BuiltinPresets } from '../presets/builtin-presets.js';
 import { ConnectionMonitor } from '../connection/connection-monitor.js';
 import { MissedDeliveryStore } from '../connection/missed-delivery-store.js';
 import { openDatabase, runMigrations, type Db } from '../database/database.js';
@@ -55,6 +56,7 @@ export interface AppContext {
   maintenance: Maintenance;
   missed: MissedDeliveryStore;
   connection: ConnectionMonitor;
+  builtins: BuiltinPresets;
 }
 
 export interface ContextOverrides {
@@ -174,6 +176,19 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     { ...config.connection, dailyBudget: config.limits.dailyBudget },
   );
 
+  const builtins = new BuiltinPresets(
+    db,
+    devices,
+    scenes,
+    groups,
+    schedules,
+    activity,
+    () => settings.get(),
+    () => transport.isConfigured(),
+    logger,
+    clock,
+  );
+
   return {
     config,
     version: readVersion(),
@@ -202,5 +217,6 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     maintenance,
     missed,
     connection,
+    builtins,
   };
 }

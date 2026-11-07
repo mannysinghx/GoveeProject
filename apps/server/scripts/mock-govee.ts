@@ -32,6 +32,11 @@ if (process.env.MOCK_OFFLINE === '1') {
   };
 }
 
+// Names as real H805C lights list them. The ids are invented.
+mock.dynamicScenes = ['Fireworks', 'New Years', 'Thanksgiving', 'Christmas Eve', 'Winter Wonderland', 'Fall', 'Sunrise'].map(
+  (name, i) => ({ name, value: { paramId: 5000 + i, id: 6000 + i } }),
+);
+
 await mock.start(PORT);
 console.log(`Mock Govee API (test data only) listening on ${mock.url}`);
 

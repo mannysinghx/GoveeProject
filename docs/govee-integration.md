@@ -56,6 +56,10 @@ Govee's supported-model list includes `H805C`. The list says nothing about which
 - that DIY scenes can be created through the API
 - that an accepted command changed anything physically
 
+### Scenes on an H805C
+
+The scenes endpoint returned 113 scenes for a real H805C, including Fireworks, New Years, Thanksgiving, Christmas Eve, Winter Wonderland and Fall. Scene ids are read from Govee for each light, never hard-coded. **None of these has been activated on real lights from this app yet**, so how they look, and whether they carry on after the app stops sending commands, is unconfirmed.
+
 ### LEDs per string
 
 Govee's API reports neither length nor LED count, so these come from outside it:

@@ -30,6 +30,8 @@ export interface RunSource {
   id?: string | null;
   name: string;
   correlationId?: string | null;
+  /** Do not keep this for lights that were offline. */
+  noCatchUp?: boolean;
 }
 
 export type PlannedSkip = { deviceName: string; deviceId: string | null; action: DeviceAction; reason: string };
@@ -105,7 +107,9 @@ export class ActionService {
 
     const perDevice = await Promise.all(plans.map((plan) => this.runDevicePlan(plan, source, runId)));
     plans.forEach((plan, index) => {
-      if (perDevice[index]?.some((outcome) => outcome.errorCategory === 'device_offline')) {
+      // Only a pattern is worth resending. A late "turn off" or "turn on" could be wrong by then.
+      const isPattern = plan.actions.some((action) => action.type !== 'power');
+      if (!source.noCatchUp && isPattern && perDevice[index]?.some((outcome) => outcome.errorCategory === 'device_offline')) {
         this.missed.record(plan.device.id, source.name, plan.actions);
       }
     });

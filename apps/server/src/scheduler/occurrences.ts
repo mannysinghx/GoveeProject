@@ -85,6 +85,13 @@ export function occurrenceOnDate(recurrence: Recurrence, zone: string, date: str
       const { at, note } = resolveLocalTime(date, recurrence.time, zone);
       return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
     }
+    case 'yearly': {
+      if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
+      const monthDay = `${String(recurrence.month).padStart(2, '0')}-${String(recurrence.day).padStart(2, '0')}`;
+      if (date.slice(5) !== monthDay) return null;
+      const { at, note } = resolveLocalTime(date, recurrence.time, zone);
+      return { key: `${date}T${recurrence.time}@${zone}`, at, localDate: date, note };
+    }
     case 'solar': {
       if (!withinBounds(date, recurrence.startDate, recurrence.endDate)) return null;
       if (recurrence.weekdays && !recurrence.weekdays.includes(weekdayOf(date, zone))) return null;

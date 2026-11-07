@@ -38,6 +38,7 @@ export class Scheduler {
   private ticking = false;
   private lastTickAt: string | null = null;
   private readonly running = new Set<Promise<void>>();
+  private wakeTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly db: Db,
@@ -76,6 +77,8 @@ export class Scheduler {
   async stop(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    this.wakeTimer = null;
     await this.idle();
     this.logger.info('Scheduler stopped');
   }
@@ -115,6 +118,35 @@ export class Scheduler {
     return rows.length;
   }
 
+  /**
+   * How long until a run due before the next regular tick, or null if none is. Without
+   * this, a schedule could start up to a whole tick late, which matters at midnight on
+   * New Year's Eve.
+   */
+  nextWakeDelayMs(nowMs: number): number | null {
+    const row = this.db
+      .prepare('SELECT MIN(next_run_at) AS due FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL')
+      .get() as { due: string | null };
+    if (!row.due) return null;
+    const delay = Date.parse(row.due) - nowMs;
+    return delay > 0 && delay <= this.config.tickSeconds * 1000 ? delay : null;
+  }
+
+  private armExactWake(): void {
+    if (!this.timer) return;
+    if (this.wakeTimer) clearTimeout(this.wakeTimer);
+    this.wakeTimer = null;
+    try {
+      const delay = this.nextWakeDelayMs(this.clock.nowMs());
+      if (delay === null) return;
+      this.wakeTimer = setTimeout(() => void this.tick(), delay);
+      this.wakeTimer.unref?.();
+    } catch (error) {
+      // The regular tick still runs it, only slightly later.
+      this.logger.warn({ err: error }, 'Could not set an exact schedule wake-up');
+    }
+  }
+
   /** Public for tests and for the startup pass. Overlapping ticks do nothing. */
   async tick(): Promise<void> {
     if (this.ticking) return;
@@ -148,6 +180,7 @@ export class Scheduler {
       this.logger.error({ err: error }, 'Scheduler tick failed');
     } finally {
       this.ticking = false;
+      this.armExactWake();
     }
   }
 

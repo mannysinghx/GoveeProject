@@ -319,7 +319,7 @@ export function DashboardPage() {
           </SectionCard>
         </div>
 
-        {presets.data ? <QuickPresets presets={presets.data} /> : null}
+        {presets.data ? <QuickPresets presets={presets.data.filter((preset) => !preset.builtin)} /> : null}
       </div>
     </>
   );

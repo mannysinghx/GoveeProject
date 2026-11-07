@@ -260,6 +260,14 @@ const weeklyRecurrenceSchema = z.object({
   ...dateBoundsShape,
 });
 
+const yearlyRecurrenceSchema = z.object({
+  kind: z.literal('yearly'),
+  month: z.number().int().min(1).max(12),
+  day: z.number().int().min(1).max(31),
+  time: timeOfDaySchema,
+  ...dateBoundsShape,
+});
+
 const solarRecurrenceSchema = z.object({
   kind: z.literal('solar'),
   event: z.enum(['sunrise', 'sunset']),
@@ -275,9 +283,17 @@ export const recurrenceSchema = z
     onceRecurrenceSchema,
     dailyRecurrenceSchema,
     weeklyRecurrenceSchema,
+    yearlyRecurrenceSchema,
     solarRecurrenceSchema,
   ])
   .superRefine((value, ctx) => {
+    if (value.kind === 'yearly') {
+      // February 29 is left out because it would run only every four years.
+      const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][value.month - 1] as number;
+      if (value.day > days) {
+        ctx.addIssue({ code: 'custom', path: ['day'], message: `Pick a day from 1 to ${days} for that month` });
+      }
+    }
     if ('startDate' in value && value.startDate && value.endDate && value.endDate < value.startDate) {
       ctx.addIssue({
         code: 'custom',

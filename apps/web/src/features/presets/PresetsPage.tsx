@@ -7,6 +7,7 @@ import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../
 import { ScenesPanel } from '../devices/ScenesPanel';
 import { isPatternPreset } from '../patterns/pattern-model';
 import { ApplyPresetDialog } from './ApplyPresetDialog';
+import { FestivalPresets } from './FestivalPresets';
 import { PresetEditor } from './PresetEditor';
 
 function PresetCard({
@@ -112,6 +113,7 @@ export function PresetsPage() {
   const [editing, setEditing] = useState<PresetDto | 'new' | null>(null);
   const [applying, setApplying] = useState<PresetDto | null>(null);
   const navigate = useNavigate();
+  const yourPresets = presets.data?.filter((preset) => !preset.builtin);
 
   return (
     <>
@@ -153,13 +155,15 @@ export function PresetsPage() {
       </div>
 
       <div className="space-y-6">
+        {presets.data ? <FestivalPresets presets={presets.data} onApply={setApplying} /> : null}
+
         <section aria-labelledby="presets-heading">
           <h2 id="presets-heading" className="mb-3 text-lg font-semibold">
             App presets
           </h2>
           {presets.isPending ? <Loading label="Loading presets" /> : null}
           {presets.isError ? <ErrorNotice error={presets.error} /> : null}
-          {presets.data?.length === 0 ? (
+          {yourPresets?.length === 0 ? (
             <EmptyState
               icon={<Sparkles className="size-8" aria-hidden />}
               title="No presets yet"
@@ -172,9 +176,9 @@ export function PresetsPage() {
               A preset is a saved list of steps, such as turn on, set brightness, set a warm colour.
             </EmptyState>
           ) : null}
-          {presets.data && presets.data.length > 0 ? (
+          {yourPresets && yourPresets.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {presets.data.map((preset) => (
+              {yourPresets.map((preset) => (
                 <PresetCard
                   key={preset.id}
                   preset={preset}

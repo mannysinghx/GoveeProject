@@ -10,7 +10,7 @@ import type {
   RunResultDto,
   Target,
 } from '@glm/shared';
-import { describeAction } from '@glm/shared';
+import { builtinPresetByKey, describeAction, FIREWORKS_PRESET } from '@glm/shared';
 import type { ActivityService } from '../activity/activity-service.js';
 import type { ActionService, DevicePlan, PlannedSkip } from '../commands/action-service.js';
 import type { Db } from '../database/database.js';
@@ -27,6 +27,7 @@ interface PresetRow {
   description: string;
   created_at: string;
   updated_at: string;
+  builtin_key: string | null;
 }
 
 interface ActionRow {
@@ -73,12 +74,22 @@ export class PresetService {
 
   private toDto(row: PresetRow): PresetDto {
     const actions = this.actionsFor(row.id);
+    const definition = row.builtin_key ? builtinPresetByKey(row.builtin_key) : undefined;
     return {
       id: row.id,
       name: row.name,
       description: row.description,
       actions,
       needsTarget: actions.some((a) => a.deviceId === null),
+      builtin: definition
+        ? {
+            key: definition.key,
+            occasion: definition.occasion,
+            when: definition.when,
+            colors: definition.colors,
+            isAutomaticShow: definition.key === FIREWORKS_PRESET.key,
+          }
+        : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -158,8 +169,14 @@ export class PresetService {
     return this.get(id);
   }
 
+  private assertNotBuiltin(preset: PresetDto): void {
+    if (preset.builtin) {
+      throw conflict('preset_builtin', `"${preset.name}" comes with the app and cannot be changed. Duplicate it to make your own.`);
+    }
+  }
+
   update(id: string, input: PresetUpdate): PresetDto {
-    this.get(id);
+    this.assertNotBuiltin(this.get(id));
     if (input.name !== undefined) this.assertNameFree(input.name, id);
     if (input.actions !== undefined) this.validateActions(input.actions);
     this.db.transaction(() => {
@@ -193,6 +210,7 @@ export class PresetService {
 
   delete(id: string): void {
     const preset = this.get(id);
+    this.assertNotBuiltin(preset);
     const rows = this.db
       .prepare(
         `SELECT name FROM schedules
@@ -291,6 +309,7 @@ export class PresetService {
       name,
       description: '',
       needsTarget: actions.some((a) => a.deviceId === null),
+      builtin: null,
       createdAt: '',
       updatedAt: '',
       actions: actions.map(({ deviceId, action }, order) => ({
@@ -315,7 +334,11 @@ export class PresetService {
     const preset = this.get(id);
     const { plans, skipped } = this.buildPlan(preset, target);
     return this.actions.runPlan(
-      source ?? { type: 'preset', id, name: preset.name, correlationId },
+      {
+        ...(source ?? { type: 'preset', id, name: preset.name, correlationId }),
+        // A show tied to a moment should not run hours later when a light comes back.
+        noCatchUp: preset.builtin?.isAutomaticShow ?? false,
+      },
       plans,
       skipped,
     );

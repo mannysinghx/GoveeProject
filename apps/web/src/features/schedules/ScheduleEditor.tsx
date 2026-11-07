@@ -14,7 +14,9 @@ import { useDebounced } from '../../lib/hooks';
 import { usePresets, useSaveSchedule, useSchedulePreview, useSettings } from '../../lib/queries';
 import { parseTarget, TargetOptions } from '../presets/ApplyPresetDialog';
 
-type RepeatMode = 'once' | 'daily' | 'weekdays' | 'weekends' | 'custom' | 'solar';
+type RepeatMode = 'once' | 'daily' | 'weekdays' | 'weekends' | 'custom' | 'solar' | 'yearly';
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const WEEKDAYS = [
   { value: 1, label: 'Mon' },
@@ -34,6 +36,7 @@ function modeFromRecurrence(recurrence: Recurrence | undefined): RepeatMode {
   if (recurrence.kind === 'once') return 'once';
   if (recurrence.kind === 'daily') return 'daily';
   if (recurrence.kind === 'solar') return 'solar';
+  if (recurrence.kind === 'yearly') return 'yearly';
   const key = [...recurrence.weekdays].sort((a, b) => a - b).join(',');
   if (key === WEEKDAY_SET.join(',')) return 'weekdays';
   if (key === WEEKEND_SET.join(',')) return 'weekends';
@@ -61,6 +64,8 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
   const [timeZone, setTimeZone] = useState(schedule?.timeZone ?? settings.data?.defaultTimeZone ?? 'UTC');
   const [mode, setMode] = useState<RepeatMode>(modeFromRecurrence(existing));
   const [date, setDate] = useState(existing?.kind === 'once' ? existing.date : tomorrowLocal());
+  const [month, setMonth] = useState(existing?.kind === 'yearly' ? existing.month : 1);
+  const [day, setDay] = useState(existing?.kind === 'yearly' ? existing.day : 1);
   const [time, setTime] = useState(existing && 'time' in existing ? existing.time : '18:00');
   const [customDays, setCustomDays] = useState<number[]>(existing?.kind === 'weekly' ? existing.weekdays : [1, 2, 3, 4, 5]);
   const [startDate, setStartDate] = useState(existing && 'startDate' in existing ? (existing.startDate ?? '') : '');
@@ -87,6 +92,8 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
     switch (mode) {
       case 'once':
         return { kind: 'once', date, time };
+      case 'yearly':
+        return { kind: 'yearly', month, day, time, ...bounds };
       case 'daily':
         return { kind: 'daily', time, ...bounds };
       case 'weekdays':
@@ -105,7 +112,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           ...bounds,
         };
     }
-  }, [mode, date, time, customDays, startDate, endDate, solarEvent, offset, latitude, longitude]);
+  }, [mode, date, month, day, time, customDays, startDate, endDate, solarEvent, offset, latitude, longitude]);
 
   const parsed = recurrenceSchema.safeParse(recurrenceInput);
   const recurrenceError = parsed.success ? null : (parsed.error.issues[0]?.message ?? 'Check the schedule timing.');
@@ -197,6 +204,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
                 <option value="weekdays">Weekdays</option>
                 <option value="weekends">Weekends</option>
                 <option value="custom">Specific days</option>
+                <option value="yearly">Every year</option>
                 <option value="solar">Sunrise or sunset</option>
               </select>
             )}
@@ -218,6 +226,35 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
                 <input {...props} type="date" className={inputClass} required value={date} onChange={(e) => setDate(e.target.value)} />
               )}
             </Field>
+          ) : null}
+          {mode === 'yearly' ? (
+            <>
+              <Field label="Month">
+                {(props) => (
+                  <select {...props} className={inputClass} value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+                    {MONTHS.map((label, index) => (
+                      <option key={label} value={index + 1}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </Field>
+              <Field label="Day">
+                {(props) => (
+                  <input
+                    {...props}
+                    type="number"
+                    className={inputClass}
+                    required
+                    min={1}
+                    max={31}
+                    value={day}
+                    onChange={(e) => setDay(Math.floor(Number(e.target.value)) || 1)}
+                  />
+                )}
+              </Field>
+            </>
           ) : null}
           {showTime ? (
             <Field label="Time">

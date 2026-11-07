@@ -29,6 +29,15 @@ Record: date, app version, firmware version from the Govee app, and H805C segmen
 | 16 | **Group,** if you have more than one device. | Results per device. Unsupported actions are skipped with a reason. | | |
 | 17 | **Rate limit behaviour.** Move sliders quickly for a minute. | No errors shown, or a clear rate-limit message. Check for rate-limit events in Activity. | | |
 
+## Festival presets and fireworks
+
+These need your real lights:
+
+1. **Try the fireworks.** On **Scenes & Presets**, choose **Try it** under New Year fireworks. Check that all strings show the effect, and how far out of step they are.
+2. **Note how long it runs.** It should carry on by itself, with no more commands. If it stops, the 12:30 AM end time needs rethinking.
+3. **Try a moving effect and a pattern,** such as Thanksgiving: Govee Effect and Veterans Day: Red, White & Blue. Check the colors look right.
+4. **Check Schedules.** New Year Fireworks should show its next run as 12:00 AM on January 1 in your time zone.
+
 ## LED boxes and connection monitoring
 
 These need your real lights:
