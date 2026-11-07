@@ -72,9 +72,9 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
 
   const app = Fastify({
     loggerInstance: logger as unknown as FastifyBaseLogger,
-    // One hop, not "true": with "true" the client-supplied left end of X-Forwarded-For
-    // would become the client address, and forging it would defeat login throttling.
-    trustProxy: config.trustProxy ? (_address: string, hop: number) => hop < 1 : false,
+    // A hop count, not Fastify's "true": with "true" the client-supplied left end of
+    // X-Forwarded-For would become the client address, and forging it would defeat login throttling.
+    trustProxy: config.trustProxy ? (_address: string, hop: number) => hop < config.trustProxyHops : false,
     bodyLimit: 256 * 1024,
     genReqId: (req) => {
       const inbound = req.headers['x-request-id'];

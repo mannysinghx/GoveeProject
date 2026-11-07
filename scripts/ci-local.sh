@@ -67,6 +67,11 @@ git archive "$SHA" | docker run --rm -i \
       echo "Source maps found in the frontend bundle" >&2
       exit 1
     fi
+    echo "--- Dockerfile stays deployable on Railway"
+    if grep -qE "^[[:space:]]*VOLUME" Dockerfile; then
+      echo "Railway rejects Dockerfiles with a VOLUME instruction" >&2
+      exit 1
+    fi
     echo "--- all checks passed"
   '
 

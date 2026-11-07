@@ -38,8 +38,9 @@ COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
 COPY migrations ./migrations
 
+# The data directory is mounted at run time: a named volume in Compose, a Railway Volume
+# on Railway. No VOLUME instruction here, because Railway rejects images that declare one.
 RUN mkdir -p /data && chown node:node /data
-VOLUME /data
 USER node
 
 EXPOSE 8787

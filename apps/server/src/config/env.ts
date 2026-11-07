@@ -43,7 +43,15 @@ const envSchema = z.object({
   PORT: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(65535).default(8787)),
   ALLOWED_HOSTS: optionalString,
   COOKIE_SECURE: z.preprocess(emptyToUndefined, z.enum(['auto', 'true', 'false']).default('auto')),
-  TRUST_PROXY: booleanString(false),
+  // true means one proxy. A number says how many sit in front of the app.
+  TRUST_PROXY: z.preprocess(
+    emptyToUndefined,
+    z
+      .string()
+      .regex(/^(true|false|\d{1,2})$/, 'Use true, false, or the number of proxies')
+      .default('false')
+      .transform((v) => (v === 'true' ? 1 : v === 'false' ? 0 : Number(v))),
+  ),
   SETUP_TOKEN: optionalString,
 
   DATABASE_PATH: z.preprocess(emptyToUndefined, z.string().default('./data/govee-light-manager.sqlite')),
@@ -91,6 +99,8 @@ export interface AppConfig {
   allowedHosts: string[] | null;
   cookieSecure: 'auto' | boolean;
   trustProxy: boolean;
+  /** How many proxies are in front of the app. The client address is taken from that far along. */
+  trustProxyHops: number;
   setupToken: string | null;
   databasePath: string;
   migrationsDir: string;
@@ -179,7 +189,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
           .filter(Boolean)
       : null,
     cookieSecure: e.COOKIE_SECURE === 'auto' ? 'auto' : e.COOKIE_SECURE === 'true',
-    trustProxy: e.TRUST_PROXY,
+    trustProxy: e.TRUST_PROXY > 0,
+    trustProxyHops: e.TRUST_PROXY,
     setupToken: e.SETUP_TOKEN ?? null,
     databasePath: e.DATABASE_PATH === ':memory:' ? ':memory:' : resolveFromRoot(e.DATABASE_PATH),
     migrationsDir: resolveFromRoot(e.MIGRATIONS_DIR ?? './migrations'),

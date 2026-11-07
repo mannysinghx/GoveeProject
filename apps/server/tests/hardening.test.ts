@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CommandDto, DeviceDto, DiscoveryResultDto, ScheduleDto } from '@glm/shared';
 import { GoveeCloudTransport } from '../src/govee/cloud-transport.js';
 import { TransportError } from '../src/govee/transport.js';
-import { authedClient, createHarness, type Harness } from './support/harness.js';
+import { authedClient, createHarness, testConfig, type Harness } from './support/harness.js';
 import { mockFullDevice, TEST_API_KEY } from './support/mock-govee.js';
 
 const PASSWORD = 'correct-horse-battery';
@@ -228,6 +228,30 @@ describe('client address behind a proxy', () => {
       });
     for (let i = 0; i < 5; i++) expect((await attempt(i)).statusCode).toBe(401);
     expect((await attempt(99)).statusCode).toBe(429);
+  });
+});
+
+describe('proxy hop count', () => {
+  const ipFor = async (env: NodeJS.ProcessEnv) => {
+    const h = await harness({ env });
+    await h.app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      headers: { 'x-forwarded-for': '203.0.113.9, 198.51.100.7, 10.0.0.2' },
+      payload: { username: 'owner', password: 'wrong-password' },
+    });
+    return h.ctx.activity.list({ eventType: 'auth', limit: 1 }).events[0]?.details as { ip: string };
+  };
+
+  it('takes the address that many proxies back, and never the forgeable left end', async () => {
+    expect((await ipFor({ TRUST_PROXY: 'false' })).ip).toBe('127.0.0.1');
+    expect((await ipFor({ TRUST_PROXY: 'true' })).ip).toBe('10.0.0.2');
+    expect((await ipFor({ TRUST_PROXY: '1' })).ip).toBe('10.0.0.2');
+    expect((await ipFor({ TRUST_PROXY: '2' })).ip).toBe('198.51.100.7');
+  });
+
+  it('rejects anything else', () => {
+    expect(() => testConfig({ TRUST_PROXY: 'yes' })).toThrow(/TRUST_PROXY/);
   });
 });
 

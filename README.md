@@ -189,6 +189,7 @@ npm run dev:mock
 ## Documentation
 
 - [First-run setup and installation](docs/setup.md)
+- [Deploying to Railway](docs/deploy-railway.md)
 - [Architecture](docs/architecture.md)
 - [Govee integration, and decisions made where Govee's documentation is unclear](docs/govee-integration.md)
 - [Troubleshooting](docs/troubleshooting.md)

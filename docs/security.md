@@ -50,6 +50,10 @@ This sends passwords and cookies over plain HTTP, so anyone able to watch your n
 
 Bound beyond loopback, setup requires a code. Complete setup yourself before others can reach the app.
 
+### On a hosting service
+
+See [Deploying to Railway](deploy-railway.md). There, the app is on the public internet, protected only by its own sign-in.
+
 ### From outside your home
 
 Do not forward a port directly to the app. Use one of these:
@@ -65,7 +69,7 @@ Do not forward a port directly to the app. Use one of these:
 
    With `COOKIE_SECURE=true`, HSTS and related headers are also enabled. Setup then needs a code, because the bind address no longer says who can connect.
 
-   `TRUST_PROXY=true` means exactly one proxy: the app takes the client address from the last `X-Forwarded-For` entry. The proxy must append to that header, and must pass on the original `Host`. Keep the app bound to loopback or a private interface, so traffic cannot bypass the proxy. Only set this when a proxy really is in front, or clients can forge their address and get around login throttling.
+   `TRUST_PROXY=true` means one proxy: the app takes the client address from the last `X-Forwarded-For` entry. If more proxies sit in front, set the number instead, such as `TRUST_PROXY=2`. Each proxy must append to that header, and the original `Host` must reach the app. Keep the app bound to loopback or a private interface, so traffic cannot bypass the proxy. Only set this when a proxy really is in front, or clients can forge their address and get around login throttling.
 
 No particular tunnel or hosted service is needed.
 
@@ -157,5 +161,5 @@ They never include the API key, passwords, password hashes, session cookies, aut
 - **Local encryption.** The key lives in plain text in `.env`, and the database is not encrypted. Anyone with read access to the server's files has both. Disk encryption and file permissions are your protection here.
 - **Single account.** There are no roles. Anyone signed in has full control.
 - **Sign-in over HTTP.** Without HTTPS, credentials are unencrypted in transit. This is why the default is loopback.
-- **Login throttling** counts by address. Behind a proxy without `TRUST_PROXY=true`, all clients share one address. More than one proxy in a row is not supported, for the same reason.
+- **Login throttling** counts by address. Behind a proxy without the right `TRUST_PROXY` value, all clients can end up sharing one address.
 - **Lockout as nuisance.** The limit across all addresses means someone able to reach the sign-in page from many addresses could block sign-in for 5 minutes at a time. Sessions already signed in keep working, and schedules are unaffected. This is another reason to keep the app off the public internet.

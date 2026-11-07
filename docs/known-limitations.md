@@ -18,6 +18,7 @@
 - **Schedules run in the app, not on the lights.** They do not run while the app is stopped, or when the internet or Govee is unavailable.
 - **One owner account.** No additional users or roles.
 - **One app instance per database.** Queues and rate limits are held in memory.
+- **Serverless hosts do not fit.** The app needs an always-on process and a persistent disk, so platforms such as Vercel cannot run it as built. [Railway](deploy-railway.md) can.
 - **The rate-limit counters reset on restart,** including the daily budget. Govee's own limits do not.
 - **Commands waiting in the queue are lost on shutdown.** They are recorded as interrupted and are not resent.
 - **The API key is changed in `.env`,** with a restart. There is no screen for it.
