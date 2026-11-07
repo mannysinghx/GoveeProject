@@ -1,0 +1,63 @@
+v26.13.0
+rebuild test, device-pinned preset=false: before {"devices":1,"device_states":1,"capability_states":1,"group_devices":1,"command_history":1,"preset_actions":0} foreign_keys= 1
+  migration: applied. after {"devices":1,"device_states":0,"capability_states":0,"group_devices":0,"command_history":0,"preset_actions":0}
+  activity rows [{"message":"m","device_id":null}]
+rebuild test, device-pinned preset=true: before {"devices":1,"device_states":1,"capability_states":1,"group_devices":1,"command_history":1,"preset_actions":1} foreign_keys= 1
+  migration: FAILED: FOREIGN KEY constraint failed  after {"devices":1,"device_states":1,"capability_states":1,"group_devices":1,"command_history":1,"preset_actions":1}
+--- N=10
+{"N":10,"step":"create+migrate all","ms":37,"rssMB":94,"heapMB":21,"extMB":5,"fds":49,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":1557}
+{"step":"all timers started","ms":1670}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":12.8,"loopMaxMs":138.1,"rssMB":147,"heapMB":17,"extMB":4,"fds":49,"calls":70}
+{"step":"disk","totalMB":17,"perUserKB":1739}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":12.7,"loopMaxMs":25.2,"rssMB":147,"heapMB":17,"extMB":4,"fds":49,"calls":70}
+{"step":"same-moment run on every account, 3 lights each","ms":191,"commands":30,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":10.9,"loopP99ms":12.1,"loopMaxMs":12.1,"rssMB":147,"heapMB":19,"extMB":4,"fds":49,"calls":100}
+{"step":"one monitor pass, serial across all","ms":2798}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":15.1,"loopMaxMs":15.4,"rssMB":147,"heapMB":23,"extMB":4,"fds":49,"calls":148}
+{"step":"backup + integrity_check all","ms":56,"ok":10,"N":10}
+{"step":"during backups","loopP50ms":10.1,"loopP99ms":16,"loopMaxMs":16,"rssMB":147,"heapMB":23,"extMB":4,"fds":49,"calls":148}
+--- N=100
+{"N":100,"step":"create+migrate all","ms":362,"rssMB":153,"heapMB":22,"extMB":5,"fds":319,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":15529}
+{"step":"all timers started","ms":15971}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":13,"loopMaxMs":1313.9,"rssMB":552,"heapMB":79,"extMB":4,"fds":319,"calls":700}
+{"step":"disk","totalMB":170.2,"perUserKB":1743}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":12.9,"loopMaxMs":21.8,"rssMB":553,"heapMB":81,"extMB":4,"fds":319,"calls":700}
+{"step":"same-moment run on every account, 3 lights each","ms":309,"commands":300,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":10.9,"loopP99ms":40.1,"loopMaxMs":40.1,"rssMB":556,"heapMB":27,"extMB":4,"fds":319,"calls":1000}
+{"step":"one monitor pass, serial across all","ms":2836}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":18.4,"loopMaxMs":44.8,"rssMB":556,"heapMB":34,"extMB":4,"fds":319,"calls":1318}
+{"step":"backup + integrity_check all","ms":387,"ok":100,"N":100}
+{"step":"during backups","loopP50ms":11.5,"loopP99ms":12.6,"loopMaxMs":12.6,"rssMB":556,"heapMB":35,"extMB":4,"fds":319,"calls":1318}
+--- N=500
+{"N":500,"step":"create+migrate all","ms":1664,"rssMB":383,"heapMB":35,"extMB":5,"fds":1519,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":78488}
+{"step":"all timers started","ms":80232}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":13.2,"loopMaxMs":6799,"rssMB":2434,"heapMB":73,"extMB":4,"fds":1519,"calls":3500}
+{"step":"disk","totalMB":850.4,"perUserKB":1742}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":16.4,"loopMaxMs":70.8,"rssMB":2435,"heapMB":81,"extMB":4,"fds":1519,"calls":3500}
+{"step":"same-moment run on every account, 3 lights each","ms":743,"commands":1500,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":11,"loopP99ms":94.7,"loopMaxMs":94.7,"rssMB":2350,"heapMB":88,"extMB":4,"fds":1519,"calls":5000}
+{"step":"one monitor pass, serial across all","ms":3305}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":186.4,"loopMaxMs":289.1,"rssMB":2350,"heapMB":120,"extMB":4,"fds":1519,"calls":6518}
+{"step":"backup + integrity_check all","ms":2103,"ok":500,"N":500}
+{"step":"during backups","loopP50ms":11.7,"loopP99ms":14.4,"loopMaxMs":14.5,"rssMB":2350,"heapMB":126,"extMB":4,"fds":1519,"calls":6518}
+--- N=1000
+{"N":1000,"step":"create+migrate all","ms":3426,"rssMB":693,"heapMB":45,"extMB":5,"fds":3019,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":155685}
+{"step":"all timers started","ms":159208}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":11.9,"loopMaxMs":10519.3,"rssMB":3926,"heapMB":112,"extMB":4,"fds":3019,"calls":7000}
+{"step":"disk","totalMB":1701.1,"perUserKB":1742}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":12,"loopMaxMs":195.4,"rssMB":3653,"heapMB":45,"extMB":4,"fds":3019,"calls":7000}
+{"step":"same-moment run on every account, 3 lights each","ms":2883,"commands":3000,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":1050.1,"loopP99ms":1050.1,"loopMaxMs":1050.1,"rssMB":3688,"heapMB":91,"extMB":4,"fds":3019,"calls":10000}
+{"step":"one monitor pass, serial across all","ms":3611}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":391.9,"loopMaxMs":490.5,"rssMB":3747,"heapMB":162,"extMB":4,"fds":3019,"calls":13013}
+{"step":"backup + integrity_check all","ms":6011,"ok":1000,"N":1000}
+{"step":"during backups","loopP50ms":11.3,"loopP99ms":15.4,"loopMaxMs":96,"rssMB":3751,"heapMB":147,"extMB":4,"fds":3019,"calls":13013}
+DONE

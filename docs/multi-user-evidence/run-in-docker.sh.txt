@@ -1,0 +1,10 @@
+set -euo pipefail
+mkdir /tmp/app; tar -xf - -C /tmp/app; apt-get update -qq >/dev/null; apt-get install -y -qq --no-install-recommends python3 make g++ >/dev/null
+cd /tmp/app; npm ci --no-audit --no-fund >/dev/null 2>&1; npm run build -w @glm/shared >/dev/null; npm run build -w @glm/server >/dev/null; cd apps/server; cp /tmp/app/exp/*.mjs .; node -v; git --version >/dev/null 2>&1 || true
+node scale-test.mjs 100
+node scale-test.mjs 500
+echo '--- restart: 500 existing files'
+node scale-test.mjs 500 reuse
+echo '--- restart: 500 existing files, 256 KB cache each'
+node scale-test.mjs 500 reuse small
+echo DONE

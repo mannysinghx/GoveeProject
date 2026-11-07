@@ -1,0 +1,38 @@
+// One app context per user, each with its own SQLite file. Stub transport: nothing leaves the container.
+import fs from 'node:fs'; import path from 'node:path'; import { monitorEventLoopDelay, performance } from 'node:perf_hooks';
+import { pino } from 'pino'; import Database from 'better-sqlite3';
+import { openDatabase as openDb } from './dist/database/database.js'; import { loadConfig } from './dist/config/env.js'; import { createContext } from './dist/app/context.js';
+const N = Number(process.argv[2]); const LAT = 150; const reuse=process.argv[3]==='reuse'; const small=process.argv[4]==='small'; const root = `/var/tmp/scale-${N}`; if(!reuse){fs.rmSync(root,{recursive:true,force:true});} fs.rmSync(path.join(root,'bk'),{recursive:true,force:true}); fs.mkdirSync(root,{recursive:true});
+const seg = { type:'devices.capabilities.segment_color_setting', instance:'segmentedColorRgb', parameters:{dataType:'STRUCT',fields:[{fieldName:'segment',dataType:'Array',size:{min:1,max:27},elementRange:{min:0,max:26},elementType:'INTEGER',required:true},{fieldName:'rgb',dataType:'INTEGER',range:{min:0,max:16777215,precision:1},required:true}]}};
+const pw = { type:'devices.capabilities.on_off', instance:'powerSwitch', parameters:{dataType:'ENUM',options:[{name:'on',value:1},{name:'off',value:0}]}};
+const scene = { type:'devices.capabilities.dynamic_scene', instance:'lightScene', parameters:{dataType:'ENUM',options:[]}};
+const scenesList = Array.from({length:113},(_, i)=>({name:i===0?'Fireworks':`Scene ${i}`,value:{paramId:i,id:i}}));
+let calls = 0; const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+const stub = (u) => ({ name:'stub', isConfigured:()=>true,
+  discoverDevices: async()=>{calls++;await sleep(LAT);return ['Left','Center','Right'].map(n=>({sku:'H805C',device:`AA:${u}:${n}`,deviceName:`Outdoor ${n}`,type:'devices.types.light',capabilities:[pw,seg,scene]}));},
+  getDeviceState: async()=>{calls++;await sleep(LAT);return {capabilities:[{type:'devices.capabilities.online',instance:'online',state:{value:true}},{...pw,state:{value:1}}]};},
+  sendCommand: async()=>{calls++;await sleep(LAT);return {hadExplicitCode:true,rateLimit:null};},
+  getDynamicScenes: async()=>{calls++;await sleep(LAT);return [{...scene,parameters:{dataType:'ENUM',options:scenesList}}];},
+  getDiyScenes: async()=>{calls++;await sleep(LAT);return [];},
+});
+const logger = pino({level:'silent'}); const mem=()=>{const m=process.memoryUsage();return {rssMB:+(m.rss/1048576).toFixed(0),heapMB:+(m.heapUsed/1048576).toFixed(0),extMB:+(m.external/1048576).toFixed(0)}};
+const fds=()=>fs.readdirSync('/proc/self/fd').length; const base=mem();
+const t0=performance.now(); const ctxs=[];
+for (let u=0;u<N;u++){ const config=loadConfig({NODE_ENV:'production',HOST:'127.0.0.1',DATABASE_PATH:path.join(root,`${u}.sqlite`),MIGRATIONS_DIR:'/tmp/app/migrations',WEB_DIST_DIR:'/nonexistent',GOVEE_API_KEY:'stub-key-not-real',LOG_LEVEL:'silent'}); const o={logger,transport:stub(u)}; if(small){o.db=openDb(config.databasePath); o.db.pragma('cache_size = -256');} ctxs.push(createContext(config,o)); }
+console.log(JSON.stringify({N,reuse,small,step:'create+migrate all',ms:Math.round(performance.now()-t0),...mem(),fds:fds(),base}));
+const t1=performance.now(); for (const c of ctxs) await Promise.all([c.devices.discover()]); console.log(JSON.stringify({step:'first discovery, serial',ms:Math.round(performance.now()-t1)}));
+const h=monitorEventLoopDelay({resolution:10});h.enable();
+const t2=performance.now(); for (const c of ctxs){ c.scheduler.start(); c.maintenance.start(); c.connection.start(); c.builtins.start(); c.notifications?.start?.(); }
+const lag=(label)=>{const o={step:label,loopP50ms:+(h.percentile(50)/1e6).toFixed(1),loopP99ms:+(h.percentile(99)/1e6).toFixed(1),loopMaxMs:+(h.max/1e6).toFixed(1),...mem(),fds:fds(),calls};h.reset();return JSON.stringify(o)};
+await sleep(45000); console.log(JSON.stringify({step:'all timers started',ms:Math.round(t2)}));console.log(lag('settle 45s: builtins install, first monitor pass'));
+let size=0; for (const f of fs.readdirSync(root)) size+=fs.statSync(path.join(root,f)).size; console.log(JSON.stringify({step:'disk',totalMB:+(size/1048576).toFixed(1),perUserKB:Math.round(size/N/1024)}));
+const c0=ctxs[0]; console.log(JSON.stringify({step:'tenant 0 contents',presets:c0.db.prepare('SELECT COUNT(*) n FROM presets').get().n,schedules:c0.db.prepare('SELECT COUNT(*) n FROM schedules').get().n,enabled:c0.db.prepare('SELECT COUNT(*) n FROM schedules WHERE enabled=1').get().n,zone:c0.db.prepare('SELECT DISTINCT time_zone z FROM schedules').all().map(r=>r.z),devices:c0.db.prepare('SELECT COUNT(*) n FROM devices').get().n}));
+await sleep(30000); console.log(lag('idle 30s: scheduler ticks, heads-up checks'));
+const t3=performance.now(); const before=calls; const runs=ctxs.map(c=>{const devs=c.devices.repository.list();return c.actions.runPlan({type:'manual',id:null,name:'herd'},devs.map(device=>({device,actions:[{type:'power',on:true}]})));});
+const res=await Promise.all(runs); console.log(JSON.stringify({step:'same-moment run on every account, 3 lights each',ms:Math.round(performance.now()-t3),commands:calls-before,statuses:[...new Set(res.map(r=>r.status))]}));console.log(lag('during herd'));
+await sleep(8000); h.reset(); const t4=performance.now(); const c4=calls; await Promise.all(ctxs.map(c=>c.connection.check())); console.log(JSON.stringify({step:'every account monitor check at the same moment',ms:Math.round(performance.now()-t4),goveeCalls:calls-c4}));console.log(lag('during simultaneous monitor pass'));
+await sleep(8000); h.reset(); const t6=performance.now(); const c6=calls; for (const c of ctxs){ await c.devices.refreshDue?.(); await c.connection.check(); } console.log(JSON.stringify({step:'every account monitor check one after another',ms:Math.round(performance.now()-t6),goveeCalls:calls-c6}));console.log(lag('during serial monitor pass'));
+const t5=performance.now(); const bdir=path.join(root,'bk'); fs.mkdirSync(bdir); let ok=0; for (let u=0;u<N;u++){ await ctxs[u].db.backup(path.join(bdir,`${u}.sqlite`)); const b=new Database(path.join(bdir,`${u}.sqlite`),{readonly:true}); if(b.pragma('integrity_check',{simple:true})==='ok')ok++; b.close(); } console.log(JSON.stringify({step:'backup + integrity_check all',ms:Math.round(performance.now()-t5),ok,N}));
+console.log(lag('during backups'));
+const t7=performance.now(); for (const c of ctxs) c.db.close(); const again=[]; const {openDatabase,runMigrations}=await import('./dist/database/database.js'); for (let u=0;u<N;u++){ const d=openDatabase(path.join(root,`${u}.sqlite`)); runMigrations(d,'/tmp/app/migrations'); again.push(d);} console.log(JSON.stringify({step:'reopen all files, migrations already applied (a restart)',ms:Math.round(performance.now()-t7)}));
+process.exit(0);

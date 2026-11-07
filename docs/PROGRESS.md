@@ -74,3 +74,7 @@ Before any push, run the CI on the exact commit. It never uses GitHub:
 ```bash
 scripts/ci-local.sh --image
 ```
+
+## Proposals not started
+
+Letting other people sign up and use their own lights: see [the plan](multi-user-plan.md). It is waiting on the owner's decisions, and nothing is built.

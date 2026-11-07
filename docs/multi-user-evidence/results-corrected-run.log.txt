@@ -1,0 +1,68 @@
+v26.13.0
+{"N":100,"reuse":false,"small":false,"step":"create+migrate all","ms":440,"rssMB":153,"heapMB":22,"extMB":5,"fds":319,"base":{"rssMB":85,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":15200}
+{"step":"all timers started","ms":15821}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":11.9,"loopMaxMs":834.7,"rssMB":529,"heapMB":22,"extMB":4,"fds":319,"calls":700}
+{"step":"disk","totalMB":170.1,"perUserKB":1742}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":12.2,"loopMaxMs":13.6,"rssMB":530,"heapMB":24,"extMB":4,"fds":319,"calls":700}
+{"step":"same-moment run on every account, 3 lights each","ms":255,"commands":300,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":11,"loopP99ms":21.7,"loopMaxMs":21.7,"rssMB":530,"heapMB":39,"extMB":4,"fds":319,"calls":1000}
+{"step":"every account monitor check at the same moment","ms":506,"goveeCalls":300}
+{"step":"during simultaneous monitor pass","loopP50ms":11,"loopP99ms":30.4,"loopMaxMs":30.4,"rssMB":506,"heapMB":38,"extMB":4,"fds":319,"calls":1600}
+{"step":"every account monitor check one after another","ms":40519,"goveeCalls":531}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":12.5,"loopMaxMs":26,"rssMB":423,"heapMB":23,"extMB":4,"fds":319,"calls":2131}
+{"step":"backup + integrity_check all","ms":374,"ok":100,"N":100}
+{"step":"during backups","loopP50ms":11.1,"loopP99ms":12.2,"loopMaxMs":12.2,"rssMB":423,"heapMB":24,"extMB":4,"fds":319,"calls":2131}
+{"step":"reopen all files, migrations already applied (a restart)","ms":342}
+{"N":500,"reuse":false,"small":false,"step":"create+migrate all","ms":2075,"rssMB":383,"heapMB":36,"extMB":5,"fds":1519,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":76028}
+{"step":"all timers started","ms":78205}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":13.5,"loopMaxMs":4777.3,"rssMB":1816,"heapMB":42,"extMB":4,"fds":1519,"calls":3500}
+{"step":"disk","totalMB":850.5,"perUserKB":1742}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":12.9,"loopMaxMs":31.5,"rssMB":1816,"heapMB":50,"extMB":4,"fds":1519,"calls":3500}
+{"step":"same-moment run on every account, 3 lights each","ms":1107,"commands":1500,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":100.5,"loopP99ms":100.5,"loopMaxMs":100.5,"rssMB":1736,"heapMB":65,"extMB":4,"fds":1519,"calls":5000}
+{"step":"every account monitor check at the same moment","ms":825,"goveeCalls":1500}
+{"step":"during simultaneous monitor pass","loopP50ms":11.4,"loopP99ms":158.6,"loopMaxMs":158.6,"rssMB":1736,"heapMB":58,"extMB":4,"fds":1519,"calls":8000}
+{"step":"every account monitor check one after another","ms":46532,"goveeCalls":1764}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":16.3,"loopMaxMs":114.3,"rssMB":1663,"heapMB":71,"extMB":4,"fds":1519,"calls":9764}
+{"step":"backup + integrity_check all","ms":2083,"ok":500,"N":500}
+{"step":"during backups","loopP50ms":12,"loopP99ms":13.3,"loopMaxMs":13.7,"rssMB":1669,"heapMB":77,"extMB":4,"fds":1519,"calls":9764}
+{"step":"reopen all files, migrations already applied (a restart)","ms":2247}
+--- restart: 500 existing files
+{"N":500,"reuse":true,"small":false,"step":"create+migrate all","ms":254,"rssMB":239,"heapMB":30,"extMB":5,"fds":1519,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":79253}
+{"step":"all timers started","ms":79637}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":12.7,"loopMaxMs":87.6,"rssMB":715,"heapMB":96,"extMB":4,"fds":1519,"calls":2000}
+{"step":"disk","totalMB":343.7,"perUserKB":704}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":11.9,"loopMaxMs":13.2,"rssMB":716,"heapMB":104,"extMB":4,"fds":1519,"calls":2000}
+{"step":"same-moment run on every account, 3 lights each","ms":975,"commands":1500,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":105.4,"loopP99ms":105.4,"loopMaxMs":105.4,"rssMB":734,"heapMB":70,"extMB":4,"fds":1519,"calls":3500}
+{"step":"every account monitor check at the same moment","ms":725,"goveeCalls":1500}
+{"step":"during simultaneous monitor pass","loopP50ms":11.4,"loopP99ms":72.1,"loopMaxMs":72.1,"rssMB":737,"heapMB":51,"extMB":4,"fds":1519,"calls":6500}
+{"step":"every account monitor check one after another","ms":39759,"goveeCalls":1725}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":12.3,"loopMaxMs":71.8,"rssMB":684,"heapMB":56,"extMB":4,"fds":1519,"calls":8225}
+{"step":"backup + integrity_check all","ms":2324,"ok":500,"N":500}
+{"step":"during backups","loopP50ms":11.9,"loopP99ms":14.1,"loopMaxMs":16.3,"rssMB":685,"heapMB":63,"extMB":4,"fds":1519,"calls":8225}
+{"step":"reopen all files, migrations already applied (a restart)","ms":1263}
+--- restart: 500 existing files, 256 KB cache each
+{"N":500,"reuse":true,"small":true,"step":"create+migrate all","ms":275,"rssMB":240,"heapMB":35,"extMB":5,"fds":1519,"base":{"rssMB":84,"heapMB":19,"extMB":5}}
+{"step":"first discovery, serial","ms":76695}
+{"step":"all timers started","ms":77099}
+{"step":"settle 45s: builtins install, first monitor pass","loopP50ms":11,"loopP99ms":12,"loopMaxMs":80.2,"rssMB":619,"heapMB":29,"extMB":4,"fds":1519,"calls":2000}
+{"step":"disk","totalMB":345.6,"perUserKB":708}
+{"step":"tenant 0 contents","presets":37,"schedules":46,"enabled":46,"zone":["UTC"],"devices":3}
+{"step":"idle 30s: scheduler ticks, heads-up checks","loopP50ms":11,"loopP99ms":11.9,"loopMaxMs":36.4,"rssMB":565,"heapMB":30,"extMB":4,"fds":1519,"calls":2000}
+{"step":"same-moment run on every account, 3 lights each","ms":724,"commands":1500,"statuses":["all_accepted"]}
+{"step":"during herd","loopP50ms":11.9,"loopP99ms":105.8,"loopMaxMs":105.8,"rssMB":582,"heapMB":48,"extMB":4,"fds":1519,"calls":3500}
+{"step":"every account monitor check at the same moment","ms":760,"goveeCalls":1500}
+{"step":"during simultaneous monitor pass","loopP50ms":11.7,"loopP99ms":154.7,"loopMaxMs":154.7,"rssMB":633,"heapMB":82,"extMB":4,"fds":1519,"calls":6500}
+{"step":"every account monitor check one after another","ms":39791,"goveeCalls":1725}
+{"step":"during serial monitor pass","loopP50ms":11,"loopP99ms":12.2,"loopMaxMs":75.1,"rssMB":604,"heapMB":79,"extMB":4,"fds":1519,"calls":8225}
+{"step":"backup + integrity_check all","ms":2240,"ok":500,"N":500}
+{"step":"during backups","loopP50ms":12.5,"loopP99ms":14,"loopMaxMs":16.7,"rssMB":606,"heapMB":58,"extMB":4,"fds":1519,"calls":8225}
+{"step":"reopen all files, migrations already applied (a restart)","ms":1134}
+DONE
