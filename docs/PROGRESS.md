@@ -26,6 +26,10 @@ Current state of the project, so anyone can pick it up without the original conv
 | Scheduler in real time: live run, graceful stop, missed runs, catch-up, restart inside grace, no duplicates, backup and reset CLIs, no secrets in logs or database | A throwaway script against the production build |
 | Security and correctness review | Independent review found 12 defects, including a login bypass through percent-encoded paths. All were reproduced and fixed, with regression tests in `apps/server/tests/hardening.test.ts`. |
 
+## Marketing
+
+The deck is an artifact: <https://claude.ai/artifact/Bf4UZRaCtK94riR9jSjx54>. The video, screenshots and how they were made are in `marketing/` in the main checkout, not committed. They show the version at `10bb5c8`, with sample lights.
+
 ## In flight
 
 Branch `fix/white-leds` (worktree outside the repo) holds the white-LED changes and is not pushed, waiting for the owner's approval. It sits on the one-color selector, which is also undeployed. A separate session is building the holiday calendar and notifications on `main`, uncommitted when this was written, and rebases after this lands.
