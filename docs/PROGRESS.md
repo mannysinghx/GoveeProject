@@ -18,7 +18,7 @@ Current state of the project, so anyone can pick it up without the original conv
 | Repeat in the pattern editor | Real browser against the mock, production build: a painted pattern with a blank filled all segments across strings, following right-to-left rows. `scripts/ci-local.sh --image` passed on `e05ed8a`, and it is deployed: the live build contains it, health is OK, and the monitor restarted. Not yet tried on real lights. |
 | 20 festival presets, New Year fireworks, yearly schedules, exact start times | Real browser against the mock, production build, with real scene names: presets listed in calendar order, yearly schedule shown and editable, phone width. A run due at 04:37:00.000 started at 04:37:00.000 on the real clock. `scripts/ci-local.sh --image` passed on `c00ee26`, and it is deployed: migration `003` applied, 21 presets installed, the Fireworks effect is set on all 3 strings from their real scene lists, and both schedules show their next run as January 1, 2027, Los Angeles time. **No effect has been run on real lights by this check.** |
 | One color for everything, in the pattern editor | Real browser against the mock, production build, on desktop and at phone width. **Committed locally, not deployed yet.** |
-| Holiday calendar, Diwali show, notifications, Web Push | Real browser against the mock, production build, on desktop and at phone width: 21 shows listed soonest first with Diwali on 2026-11-08, Lights Check answers saved to Activity, offline string reported, service worker registered with no-cache headers. The real `web-push` library signed and encrypted a message in a test. The service worker's code was run against a stand-in for the browser. **Committed locally, not deployed. Not tried on a real phone, or on real lights.** |
+| Holiday calendar, Diwali show, notifications, Web Push | Real browser against the mock, production build, on desktop and at phone width: 21 shows listed soonest first with Diwali on 2026-11-08, Lights Check answers saved to Activity, offline string reported, service worker registered with no-cache headers. The real `web-push` library signed and encrypted a message in a test. The service worker's code was run against a stand-in for the browser. `scripts/ci-local.sh --image` passed on `10bb5c8`, and it is deployed: migration `004` applied, 16 more presets, 44 more schedules (49 in all), Diwali's next run is 2026-11-09T01:00Z with its 7 steps, the Fireworks effect is set on all 3 strings, the fireworks schedules are tagged, and push keys exist. `/sw.js` and the manifest are served on both addresses. **Not tried on a real phone, or on real lights: no device has turned on alerts yet.** |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |
@@ -28,7 +28,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-Three things are committed locally and not pushed, waiting for the owner's approval of one push: the one-color selector, the holiday calendar and Diwali show, and notifications. **Diwali is Sunday 2026-11-08 at 5 PM Los Angeles time, so it only runs if this is deployed before then.** Deploying adds migration `004_holidays_notifications.sql`, and on first start creates about 44 enabled holiday schedules and makes the push keys.
+Nothing in this checkout. The white-LED fix is on the branch `fix/white-leds`, not deployed, and needs a rebase onto `origin/main` (conflicts in `action-service.ts`, `README.md`, `docs/PROGRESS.md` and `docs/govee-integration.md`).
 
 ## Open findings and decisions
 
@@ -48,8 +48,8 @@ Three things are committed locally and not pushed, waiting for the owner's appro
 
 ## Next steps, in order
 
-1. Get approval, push once, and verify live: migration applied, shows installed, Diwali's next run is 2026-11-09T01:00Z.
-2. Have the owner turn on alerts on a phone and press Send a test.
+1. Have the owner turn on alerts on a phone, using the final web address, and press Send a test.
+2. Check the first real Diwali run on 2026-11-08 at 5 PM Los Angeles time.
 3. Send a pattern to one real H805C string and check it, including the LED count, with `docs/acceptance-checklist.md`.
 4. Work through the rest of the checklist.
 5. Correct anything the checklist disproves. Adapters are isolated in `apps/server/src/govee/`, and each open question is listed in `docs/govee-integration.md`.
