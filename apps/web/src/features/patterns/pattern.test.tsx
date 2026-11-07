@@ -478,6 +478,63 @@ describe('pattern editor', () => {
     });
   });
 
+  describe('one color for everything', () => {
+    const allBoxes = () => screen.getAllByRole('button', { name: /segment \d+,/ }).map((b) => (b.getAttribute('aria-label') as string).slice(-7));
+    const colorAll = () => userEvent.click(screen.getByRole('button', { name: 'Color all 3 strings' }));
+
+    it('colors every box on every string, replacing what was painted', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('Fill color', '#ff0000');
+      fireEvent.pointerDown(cell('Outdoor Left', 0));
+      fireEvent.pointerUp(window);
+      setColor('One color for everything', '#00ff00');
+      await colorAll();
+      expect(allBoxes()).toHaveLength(81);
+      expect(new Set(allBoxes())).toEqual(new Set(['#00ff00']));
+      await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      expect(cell('Outdoor Left', 0).getAttribute('aria-label')).toContain('#ff0000');
+      expect(cell('Outdoor Left', 1).getAttribute('aria-label')).toContain('#ffffff');
+    });
+
+    it('sends each string one color command, and only when Send is pressed', async () => {
+      const { calls } = mockApi(routes);
+      open();
+      await ready();
+      setColor('One color for everything', '#0000ff');
+      await colorAll();
+      expect(calls.some((c) => c.path === '/presets/apply-draft')).toBe(false);
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Turn the lights on first' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Send to 3 strings' }));
+      await waitFor(() => expect(calls.some((c) => c.path === '/presets/apply-draft')).toBe(true));
+      const body = calls.find((c) => c.path === '/presets/apply-draft')?.body as { actions: PresetActionInput[] };
+      expect(body.actions).toHaveLength(3);
+      for (const step of body.actions) expect(step.action).toMatchObject({ type: 'segmentColor', hex: '#0000ff' });
+    });
+
+    it('leaves later painting as the pattern that Repeat copies', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('One color for everything', '#0000ff');
+      await colorAll();
+      expect(screen.getByRole('button', { name: 'Repeat' })).toBeDisabled();
+      setColor('Fill color', '#ff0000');
+      fireEvent.pointerDown(cell('Outdoor Left', 0));
+      fireEvent.pointerUp(window);
+      expect(cell('Outdoor Left', 1).getAttribute('aria-label')).toContain('#0000ff');
+      expect(screen.getByRole('button', { name: 'Repeat' })).toBeEnabled();
+    });
+
+    it('names just the one string when only one is shown', async () => {
+      mockApi({ ...routes, 'GET /devices': { json: { devices: [left] } } });
+      open();
+      await screen.findByText('1 light string found');
+      expect(screen.getByRole('button', { name: 'Color all of this string' })).toBeInTheDocument();
+    });
+  });
+
   it('keeps the LEDs in string order along rows that run right to left', async () => {
     mockApi(routes);
     const { container } = open();

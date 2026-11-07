@@ -186,6 +186,16 @@ export function paintCell(state: PatternState, key: string, color: string | null
   return { ...state, cells };
 }
 
+/**
+ * Makes everything one color. It becomes the background, not paint on every cell, so
+ * anything painted afterwards still counts as the pattern for Repeat. The background is
+ * shared, so this also covers strings left out of the canvas if they are included later.
+ */
+export function oneColor(state: PatternState, hex: string): PatternState {
+  if (state.background === hex && Object.keys(state.cells).length === 0) return state;
+  return { background: hex, cells: {} };
+}
+
 export function clearPattern(state: PatternState): PatternState {
   return { ...state, cells: {} };
 }

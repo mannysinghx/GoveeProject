@@ -5,6 +5,7 @@ import {
   Blend,
   Brush,
   Copy,
+  Palette,
   Eraser,
   FlipHorizontal2,
   Redo2,
@@ -40,6 +41,7 @@ import {
   ledsInSegment,
   modelSize,
   moveString,
+  oneColor,
   paintableDevices,
   paintCell,
   paintedSpan,
@@ -391,6 +393,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   const [undoStack, setUndoStack] = useState<PatternState[]>([]);
   const [redoStack, setRedoStack] = useState<PatternState[]>([]);
   const [fill, setFill] = useState('#ff0000');
+  const [allColor, setAllColor] = useState('#ffffff');
   const [tool, setTool] = useState<'paint' | 'erase'>('paint');
   const [runLength, setRunLength] = useState(3);
   const [repeatGap, setRepeatGap] = useState(0);
@@ -509,6 +512,21 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 against your lights.
               </Notice>
             ) : null}
+            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-ink-850 p-3">
+              <ColorChoice label="One color for everything" value={allColor} onChange={setAllColor} />
+              <Button
+                size="sm"
+                icon={<Palette className="size-4" aria-hidden />}
+                disabled={cells.length === 0 || !isHexColor(allColor)}
+                onClick={() => change((state) => oneColor(state, allColor))}
+              >
+                Color all {shownCount === 1 ? 'of this string' : `${shownCount} strings`}
+              </Button>
+              <p className="w-full text-xs text-ink-400">
+                Replaces what's painted, as one undoable step. The lights change when you press Send.
+              </p>
+            </div>
+
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <ColorChoice
                 label="Background"
