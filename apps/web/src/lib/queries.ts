@@ -1,6 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import type {
   ActivityListDto,
+  AiAnswerDto,
+  AiQuestionListDto,
+  AiStatusDto,
   ActivityQuery,
   AppSettings,
   CommandDto,
@@ -536,5 +539,27 @@ export function useUpdateSettings() {
       client.setQueryData(keys.settings, data);
       void client.invalidateQueries({ queryKey: ['connection'] });
     },
+  });
+}
+
+/* ----------------------------------- AI ----------------------------------- */
+
+export function useAiStatus() {
+  return useQuery({ queryKey: ['ai', 'status'], queryFn: () => api<AiStatusDto>('/ai/status') });
+}
+
+export function useAiQuestions(limit = 5) {
+  return useQuery({
+    queryKey: ['ai', 'questions', limit],
+    queryFn: () => api<AiQuestionListDto>(`/ai/questions?limit=${limit}`),
+  });
+}
+
+export function useAskAi() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (question: string) => api<AiAnswerDto>('/ai/ask', { method: 'POST', body: { question } }),
+    // Spend and provider health change with every question, answered or not.
+    onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
   });
 }

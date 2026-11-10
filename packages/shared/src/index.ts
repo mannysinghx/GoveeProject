@@ -1,3 +1,4 @@
+export * from './ai.js';
 export * from './color.js';
 export * from './describe.js';
 export * from './festival-presets.js';

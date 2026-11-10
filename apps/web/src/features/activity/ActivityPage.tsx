@@ -10,6 +10,7 @@ import {
 import { Badge, Button, Detail, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, SectionCard, type Tone } from '../../components/ui';
 import { dateTime, ERROR_CATEGORY_LABEL, timeAgo } from '../../lib/format';
 import { useActivity, useDevices, useDiagnostics } from '../../lib/queries';
+import { AskCard } from '../ai/AskCard';
 
 const OUTCOME_TONE: Record<ActivityOutcome, Tone> = {
   success: 'good',
@@ -144,6 +145,7 @@ export function ActivityPage() {
     <>
       <PageHeader title="Activity & Troubleshooting" description="What the app has done, and how its connection to Govee is doing." />
       <div className="space-y-5">
+        <AskCard />
         <Diagnostics />
 
         <SectionCard title="Activity">

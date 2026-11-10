@@ -13,6 +13,7 @@ import Fastify, {
 } from 'fastify';
 import type { ApiErrorBody } from '@glm/shared';
 import { registerActivityRoutes } from '../activity/activity-routes.js';
+import { registerAiRoutes } from '../ai/ai-routes.js';
 import { registerAuthRoutes } from '../auth/auth-routes.js';
 import { constantTimeEqual, type SessionInfo } from '../auth/auth-service.js';
 import { SESSION_COOKIE } from '../auth/cookies.js';
@@ -167,6 +168,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
       registerScheduleRoutes(api, ctx);
       registerActivityRoutes(api, ctx);
       registerConnectionRoutes(api, ctx);
+      registerAiRoutes(api, ctx);
       registerNotificationRoutes(api, ctx);
     },
     { prefix: '/api/v1' },

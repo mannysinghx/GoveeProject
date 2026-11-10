@@ -181,6 +181,15 @@ Yearly and holiday schedules jump directly to each year's date, not testing ever
 
 Background status failures are recorded as incidents, not as a line in the activity log per check.
 
+## AI
+
+`apps/server/src/ai/` holds Ask. Only `providers.ts` talks to AI providers, through one small client for the OpenAI-style chat completions request that DeepSeek, Gemini and GLM all accept. Hosts are fixed in code.
+
+- **Round-robin.** `AiService` keeps a cursor, and each question starts with the next provider. A question stays on one provider for all its tool rounds; if that provider fails, the whole question moves to the next. A provider that fails rests for a minute, or an hour if it refused the key.
+- **Tools.** `ask-tools.ts` defines six read-only tools over the existing services. Their results leave out Govee device ids, sign-in history and location, and are cut to 12,000 characters.
+- **References.** Tool results carry refs such as `run:<id>`. The answer may cite them as `[[run:<id>]]`, and `AiService` removes any the tools did not return.
+- **Spending.** `ledger.ts` records every request in `ai_usage`, and the cap is checked before each request, so one question cannot run far past it. At most 8 requests per question, and the last one is sent without tools, so the model has to answer.
+
 ## Database
 
 SQLite in WAL mode, with foreign keys on, through better-sqlite3. Hand-written SQL migrations in `migrations/` run at startup, each in a transaction, and are checksummed so a changed migration stops startup. Related writes use transactions. Old activity and command history is pruned after `HISTORY_RETENTION_DAYS` (default 90).

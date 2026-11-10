@@ -1,4 +1,5 @@
 import { RefreshCw, Send, X } from 'lucide-react';
+import { AskCard } from '../ai/AskCard';
 import type {
   ConnectionAdviceDto,
   ConnectionIncidentDto,
@@ -234,6 +235,8 @@ export function ConnectionPage() {
           {data.advice.map((advice) => (
             <AdviceCard key={advice.id} advice={advice} />
           ))}
+
+          <AskCard />
 
           <SectionCard title="Your lights" description="Online means Govee reports the light as connected, as of the last check.">
             <ul className="space-y-2">

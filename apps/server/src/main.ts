@@ -14,6 +14,7 @@ async function main(): Promise<void> {
       node: process.version,
       env: config.env,
       goveeKeyConfigured: ctx.transport.isConfigured(),
+      aiProviders: config.ai.enabled ? config.ai.providers.map((p) => `${p.id}:${p.model}`) : 'disabled',
       database: config.databasePath,
     },
     'Starting Govee Light Manager',

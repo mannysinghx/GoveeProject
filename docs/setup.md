@@ -114,3 +114,13 @@ Connection monitor settings, all optional:
 | `CONNECTION_MONITOR_ENABLED` | `true` | Check lights in the background |
 | `CONNECTION_CHECK_SECONDS` | `120` | Shortest time between checks. More lights are checked less often, to stay within a quarter of the daily budget. |
 | `MISSED_DELIVERY_MAX_HOURS` | `24` | Oldest missed pattern that will still be resent |
+
+AI settings, all optional. Ask stays off until at least one key is set. Read [AI](security.md#ai) first.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `GLM_API_KEY` | none | Keys for the providers to use. Each one turns that provider on. |
+| `AI_PROVIDERS` | `deepseek,gemini,glm` | The order they take turns in. Leave a name out to stop using it. |
+| `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `GLM_MODEL` | `deepseek-flash`, `gemini-3.1-flash-lite`, `glm-4.7-flash` | The model for each |
+| `AI_MONTHLY_LIMIT_USD` | `5` | No more AI requests that month once this is reached |
+| `AI_ENABLED` | `true` | Turns AI off entirely |

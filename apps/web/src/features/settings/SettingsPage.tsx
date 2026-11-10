@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import type { AppSettings } from '@glm/shared';
 import { Button, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
+import { AiSettings } from '../ai/AiSettings';
 import { timeZoneOptions } from '../../lib/format';
 import { useDiagnostics, useSettings, useUpdateSettings } from '../../lib/queries';
 import { PASSWORD_MIN_LENGTH, useChangePassword } from '../auth/useSession';
@@ -222,6 +223,7 @@ export function SettingsPage() {
       <div className="max-w-3xl space-y-5">
         {settings.data ? <GeneralSettings settings={settings.data} /> : null}
         <ServerConfiguration />
+        <AiSettings />
         <ChangePassword />
       </div>
     </>

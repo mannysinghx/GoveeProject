@@ -2,7 +2,7 @@ import { Writable } from 'node:stream';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app/build-app.js';
-import { createContext, type AppContext, type ContextOverrides } from '../../src/app/context.js';
+import { configSecrets, createContext, type AppContext, type ContextOverrides } from '../../src/app/context.js';
 import { loadConfig, PROJECT_ROOT, type AppConfig } from '../../src/config/env.js';
 import type { Clock } from '../../src/shared/clock.js';
 import { createLogger } from '../../src/shared/logger.js';
@@ -85,7 +85,7 @@ export async function createHarness(
   const clock = new FakeClock();
   const logger = createLogger({
     level: config.logLevel,
-    secrets: [config.govee.apiKey, config.setupToken],
+    secrets: configSecrets(config),
     destination,
   });
   const ctx = createContext(config, { clock, logger, ...options.overrides });

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+import { aiProviderIds, type AiProviderId } from '@glm/shared';
 
 /**
  * Works from both src/config and dist/config because they share a depth:
@@ -94,7 +95,25 @@ const envSchema = z.object({
   CONNECTION_MONITOR_ENABLED: booleanString(true),
   CONNECTION_CHECK_SECONDS: positiveInt(120),
   MISSED_DELIVERY_MAX_HOURS: positiveInt(24),
+
+  // AI features. Each provider is used only when its key is set. See docs/ai-features-plan.md.
+  AI_ENABLED: booleanString(true),
+  AI_PROVIDERS: z.preprocess(emptyToUndefined, z.string().default(aiProviderIds.join(','))),
+  AI_MONTHLY_LIMIT_USD: positiveNumber(5),
+  AI_TIMEOUT_MS: positiveInt(45_000),
+  DEEPSEEK_API_KEY: optionalString,
+  DEEPSEEK_MODEL: z.preprocess(emptyToUndefined, z.string().default('deepseek-flash')),
+  GEMINI_API_KEY: optionalString,
+  GEMINI_MODEL: z.preprocess(emptyToUndefined, z.string().default('gemini-3.1-flash-lite')),
+  GLM_API_KEY: optionalString,
+  GLM_MODEL: z.preprocess(emptyToUndefined, z.string().default('glm-4.7-flash')),
 });
+
+export interface AiProviderConfig {
+  id: AiProviderId;
+  apiKey: string;
+  model: string;
+}
 
 export interface AppConfig {
   env: 'development' | 'test' | 'production';
@@ -147,6 +166,31 @@ export interface AppConfig {
     checkSeconds: number;
     missedMaxHours: number;
   };
+  ai: {
+    enabled: boolean;
+    /** Providers with a key, in round-robin order. Empty means AI features are off. */
+    providers: AiProviderConfig[];
+    monthlyLimitUsd: number;
+    timeoutMs: number;
+  };
+}
+
+/** Keeps the order given in AI_PROVIDERS, drops unknown names and providers with no key. */
+function resolveAiProviders(e: z.infer<typeof envSchema>): AiProviderConfig[] {
+  const keys: Record<AiProviderId, { apiKey: string | undefined; model: string }> = {
+    deepseek: { apiKey: e.DEEPSEEK_API_KEY, model: e.DEEPSEEK_MODEL },
+    gemini: { apiKey: e.GEMINI_API_KEY, model: e.GEMINI_MODEL },
+    glm: { apiKey: e.GLM_API_KEY, model: e.GLM_MODEL },
+  };
+  const wanted = e.AI_PROVIDERS.split(',')
+    .map((name) => name.trim().toLowerCase())
+    .filter((name): name is AiProviderId => (aiProviderIds as readonly string[]).includes(name));
+  const providers: AiProviderConfig[] = [];
+  for (const id of new Set(wanted)) {
+    const entry = keys[id];
+    if (entry.apiKey) providers.push({ id, apiKey: entry.apiKey, model: entry.model });
+  }
+  return providers;
 }
 
 export class ConfigError extends Error {}
@@ -241,6 +285,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       enabled: e.CONNECTION_MONITOR_ENABLED,
       checkSeconds: e.CONNECTION_CHECK_SECONDS,
       missedMaxHours: e.MISSED_DELIVERY_MAX_HOURS,
+    },
+    ai: {
+      enabled: e.AI_ENABLED,
+      providers: resolveAiProviders(e),
+      monthlyLimitUsd: e.AI_MONTHLY_LIMIT_USD,
+      timeoutMs: e.AI_TIMEOUT_MS,
     },
   };
 }

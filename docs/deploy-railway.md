@@ -33,6 +33,10 @@ Current deployment: project `goveeproject`, service `@glm/server`, <https://glms
 
 `HOST`, `NODE_ENV` and `DATABASE_PATH` are already set in the `Dockerfile`.
 
+Optional, for Ask: any of `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` and `GLM_API_KEY`, plus `AI_MONTHLY_LIMIT_USD` if the default of $5 does not suit. Set keys yourself in the dashboard. Each change restarts the app.
+
+Claude sessions working on this project must not read variables with Railway's `list-variables`, because it returns their values, which would put keys in a transcript.
+
 ## First sign-in
 
 Set `GOVEE_API_KEY` first, because changing a variable restarts the app. Then find `setupCodeForFirstRun` in the service's **Deploy Logs**. Setup requires this one-time code because the site is public. The code changes on every restart until the owner account exists.

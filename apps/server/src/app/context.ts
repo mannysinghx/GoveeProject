@@ -2,6 +2,9 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { ActivityService } from '../activity/activity-service.js';
+import { AiService } from '../ai/ai-service.js';
+import { AskTools } from '../ai/ask-tools.js';
+import { AiLedger } from '../ai/ledger.js';
 import { AuthService } from '../auth/auth-service.js';
 import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
@@ -62,6 +65,7 @@ export interface AppContext {
   builtins: BuiltinPresets;
   holidays: HolidayCalendar;
   notifications: NotificationService;
+  ai: AiService;
 }
 
 export interface ContextOverrides {
@@ -70,6 +74,8 @@ export interface ContextOverrides {
   transport?: LightTransport;
   db?: Db;
   pushSender?: PushSender;
+  /** Stands in for the AI providers in tests. */
+  aiFetch?: typeof fetch;
 }
 
 export function readVersion(): string {
@@ -96,9 +102,14 @@ function resolveSetupCode(config: AppConfig): { code: string | null; generated: 
   return { code: crypto.randomBytes(9).toString('base64url'), generated: true };
 }
 
+/** Every secret the app holds, so none can reach a log line or activity record. */
+export function configSecrets(config: AppConfig): (string | null)[] {
+  return [config.govee.apiKey, config.setupToken, ...config.ai.providers.map((p) => p.apiKey)];
+}
+
 /** Wires every service together. Tests pass overrides for the clock and transport. */
 export function createContext(config: AppConfig, overrides: ContextOverrides = {}): AppContext {
-  const secrets = [config.govee.apiKey, config.setupToken];
+  const secrets = configSecrets(config);
   const logger = overrides.logger ?? createLogger({ level: config.logLevel, secrets });
   const clock = overrides.clock ?? systemClock;
   const scrub = createSecretScrubber(secrets);
@@ -216,6 +227,16 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     clock,
   );
 
+  const ai = new AiService(
+    new AiLedger(db, clock),
+    new AskTools({ devices, schedules, commands, connection, activity }),
+    () => settings.get(),
+    scrub,
+    logger,
+    clock,
+    { config: config.ai, ...(overrides.aiFetch ? { fetchImpl: overrides.aiFetch } : {}) },
+  );
+
   return {
     config,
     version: readVersion(),
@@ -247,5 +268,6 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     builtins,
     holidays,
     notifications,
+    ai,
   };
 }

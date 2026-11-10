@@ -66,6 +66,11 @@ export class Maintenance {
     this.db.prepare('DELETE FROM notifications WHERE created_at < ?').run(cutoff);
     this.db.prepare('DELETE FROM notification_tokens WHERE expires_at < ?').run(this.clock.nowIso());
     this.db.prepare('DELETE FROM show_skips WHERE created_at < ?').run(cutoff);
+    // AI questions follow normal history. Usage rows stay about 400 days, for the monthly spending cap.
+    this.db.prepare('DELETE FROM ai_questions WHERE created_at < ?').run(cutoff);
+    this.db
+      .prepare('DELETE FROM ai_usage WHERE created_at < ?')
+      .run(new Date(this.clock.nowMs() - 400 * 24 * HOUR_MS).toISOString());
     if (events + commands > 0) {
       this.logger.info({ events, commands, cutoff }, 'Pruned old history');
     }

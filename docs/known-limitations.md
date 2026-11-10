@@ -65,6 +65,14 @@
 - **A notification appears when sending finishes,** a few seconds after a run starts, so it can report what really happened.
 - **Skip must arrive before the show starts.** Answering after that records the answer but cannot undo what has run.
 
+## Limits of Ask
+
+- **Answers can be wrong.** They come from small, low-cost models. Each answer links to the records it used, so check those before acting on it.
+- **Not tested against the real providers yet.** The request format follows each provider's documentation, and the tests use a stand-in. The first real questions will confirm the model names and settings, especially GLM's.
+- **Data leaves the server.** See [AI](security.md#ai) for what is sent and where.
+- **It only reads.** Ask cannot change lights, schedules or settings, and cannot see anything the app has not recorded, such as changes made in the Govee Home app.
+- **Costs are estimates.** They use each provider's listed paid price, and DeepSeek's peak rate, so the real bill should be the same or lower.
+
 ## Limits of connection monitoring
 
 - **It diagnoses and retries. It does not repair.** Govee's public API has no restart, Wi-Fi or firmware commands, and a hosted server cannot reach your home network.
