@@ -59,15 +59,10 @@ Still open, for the owner (details in the plan):
 
 ## 4. In flight
 
-**Phase 2 (Describe a pattern, Describe a schedule) is built on this branch,** without the "colours from a photo" option.
-- **Tests:** 651 pass (shared 55, server 436, web 160).
-- **Browser:** seen at desktop and phone width against the Govee mock, with placeholder keys and no AI request sent.
-- **Next:** full local CI, then the owner's approval to deploy.
-- **What a deploy changes:** it redeploys `@glm/server`, with no database change.
-- **Code:**
-  - `apps/server/src/ai/drafts.ts` (prompts and checks)
-  - `AiService.draftPattern` and `draftSchedule`, the routes `POST /api/v1/ai/draft-pattern` and `/draft-schedule`
-  - `apps/web/src/features/ai/DescribeBox.tsx`, and `applyPatternDraft` in `pattern-model.ts`
+**Phase 2 (Describe a pattern, Describe a schedule) is deployed** as `69ae69d`, on 10 November 2026 at 14:03 UTC, without the "colours from a photo" option.
+- **Tests:** 651 pass, and local CI passed in full.
+- **Production:** Railway deployment `d766197f` succeeded.
+- **Not yet tried for real:** no AI request has reached a provider in production yet, Ask included.
 
 Not started yet:
 
@@ -106,11 +101,11 @@ Still open:
 
 ## 6. Next steps, in order
 
-1. The owner asks a few questions in Ask on www.lightup.ink. Round-robin means three questions reach all three providers. Then check Settings, then AI, for any provider marked as resting, and its note.
+1. The owner tries Ask (three questions reach all three providers), Describe a pattern and Describe a schedule on www.lightup.ink. Then check Settings, then AI, for any provider marked as resting, and its note.
 2. Fix any model or parameter a provider rejects. Record the real token counts in the plan's Cost section, and correct any model or parameter the providers reject, open findings 1 and 2 especially.
 3. Check Ask against five real past events from production data, which needs the owner: a missed run, an offline light, a rate limit, a schedule skipped by policy, and a catch-up.
 4. The owner decides D3 (the cap; the default is $5) and D7 (which providers' data terms are acceptable). Drop a provider by removing its key in Railway.
-5. Then Phase 2 of the plan.
+5. Then the photo option for Describe a pattern, or Phase 3 (digest and holiday suggestions).
 
 ## 7. Facts the code depends on
 
