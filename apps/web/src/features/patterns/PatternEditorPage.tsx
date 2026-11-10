@@ -24,6 +24,7 @@ import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loadin
 import {
   useApplyDraft,
   useDevices,
+  useDraftPattern,
   useDiscover,
   usePresets,
   useRefreshDue,
@@ -31,11 +32,14 @@ import {
   useSettings,
   useUpdateSettings,
 } from '../../lib/queries';
+import { DescribeBox } from '../ai/DescribeBox';
 import {
+  applyPatternDraft,
   canvasCells,
   cellColor,
   cellKey,
   clearPattern,
+  describeStrings,
   emptyPattern,
   gradientFill,
   ledsInSegment,
@@ -378,6 +382,8 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   const updateSettings = useUpdateSettings();
   const save = useSavePreset();
   const apply = useApplyDraft();
+  const draft = useDraftPattern();
+  const [drafted, setDrafted] = useState<{ message: string; note: string | null } | null>(null);
   const navigate = useNavigate();
 
   const [arrangement, setArrangement] = useState<PatternStringSetting[] | null>(null);
@@ -511,6 +517,32 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 control isn't available through the API, and the LED count is worked out from published specs, so check it
                 against your lights.
               </Notice>
+            ) : null}
+            {cells.length > 0 ? (
+              <DescribeBox
+                label="Describe a pattern"
+                placeholder="Warm white with gold every fourth segment"
+                busy={draft.isPending}
+                error={draft.error}
+                result={drafted}
+                onDescribe={(text) => {
+                  setDrafted(null);
+                  draft.mutate(
+                    { description: text, strings: describeStrings(strings) },
+                    {
+                      onSuccess: (result) => {
+                        // Replaces what is painted as one undoable step. Nothing is sent until Send.
+                        change(() => applyPatternDraft(result.draft, cells));
+                        if (name.trim() === '') setName(result.draft.name);
+                        setDrafted({
+                          message: 'Drafted into the editor. Undo puts back what was there. The lights change only when you press Send.',
+                          note: result.draft.note ?? null,
+                        });
+                      },
+                    },
+                  );
+                }}
+              />
             ) : null}
             <div className="flex flex-wrap items-center gap-3 rounded-lg bg-ink-850 p-3">
               <ColorChoice label="One color for everything" value={allColor} onChange={setAllColor} />

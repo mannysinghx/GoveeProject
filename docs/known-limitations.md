@@ -65,11 +65,15 @@
 - **A notification appears when sending finishes,** a few seconds after a run starts, so it can report what really happened.
 - **Skip must arrive before the show starts.** Answering after that records the answer but cannot undo what has run.
 
-## Limits of Ask
+## Limits of Ask and Describe
 
 - **Answers can be wrong.** They come from small, low-cost models. Each answer links to the records it used, so check those before acting on it.
 - **Not tested against the real providers yet.** The request format follows each provider's documentation, and the tests use a stand-in. The first real questions will confirm the model names and settings, especially GLM's.
 - **Data leaves the server.** See [AI](security.md#ai) for what is sent and where.
+- **Drafts are suggestions.** Describe fills the pattern or schedule editor, and you check it there. A model can misread a description, so look at the pattern and the "next runs" list before you Send or Save.
+- **Patterns are still, and made of whole segments.** Describe cannot make movement, and several LEDs share each segment, so "every fourth LED" becomes the nearest whole-segment version.
+- **A schedule draft is one schedule.** "On at sunset, off at 11" needs two schedules. The draft makes the first and says so in its note.
+- **No photo option yet.** "Use colours from a photo" is not built.
 - **It only reads.** Ask cannot change lights, schedules or settings, and cannot see anything the app has not recorded, such as changes made in the Govee Home app.
 - **Costs are estimates.** They use each provider's listed paid price, and DeepSeek's peak rate, so the real bill should be the same or lower.
 

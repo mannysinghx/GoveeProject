@@ -175,6 +175,11 @@ Ask, on the Connections and Activity pages, answers questions using up to three 
 - **References are checked.** An answer can only cite records the tools returned during that question. Anything else is removed.
 - **Keys.** They are read from the environment, sent only to their own provider's fixed host with redirects refused, and scrubbed from every log line, activity record and stored answer, like the Govee key. They are never returned by the API.
 - **Spending.** Every request is recorded in `ai_usage` with its token count and an estimated cost at the provider's listed paid price, even on a free tier. Requests stop for the month at `AI_MONTHLY_LIMIT_USD` (default $5). One question runs at a time, and at most 6 a minute.
+- **Drafts.** "Describe a pattern" and "Describe a schedule" go through the same providers, cap and limits as Ask. A draft is only ever shown in an editor. Nothing is sent to the lights until you press Send, and nothing is saved until you press Save.
+  - **A pattern draft sends** your description, plus each string's name, segment count and LEDs per segment.
+  - **A schedule draft sends** your description, your time zone, and the names and app ids of your lights, groups and presets.
+  - **A sunrise or sunset schedule never sends the home's location.** The schedule editor adds the location from Settings in your browser, and the server ignores any location in a draft.
+  - **Drafts are not stored.** Only their cost is recorded, in `ai_usage`.
 - **Stored.** Questions and answers are kept for `HISTORY_RETENTION_DAYS`, without the records sent. Usage rows are kept about 400 days, for the monthly limit.
 
 ## Known limitations

@@ -1,7 +1,8 @@
 # AI features plan
 
 **Status:**
-- **Phase 1, Ask, is built** on branch `claude/stoic-antonelli-c7ec73`. It is not deployed, and has not yet been tried against the real providers.
+- **Ask (Phase 1)** is built and deployed (10 November 2026).
+- **Describe a pattern and Describe a schedule (Phase 2)** are built on branch `claude/stoic-antonelli-c7ec73`, without the photo option. They wait for the owner's approval to deploy.
 - **The rest is a plan.**
 
 Written 9 November 2026 against `main` at `81e115b`, and updated the same day when the owner chose the providers. Line references are to that commit.
@@ -172,7 +173,7 @@ The protection does not depend on the model obeying. Ask has no write tools, and
   - Check five real past events: a missed run, an offline light, a rate limit, a schedule skipped by policy, and a catch-up.
   - Record the real token counts here.
 
-### 2. Describe a pattern
+### 2. Describe a pattern (built, except the photo option)
 
 - **Where:** a "Describe" box in the pattern editor, plus "Use colours from a photo", which reads a palette from an image on DeepSeek or Gemini.
 - **How:**
@@ -183,7 +184,7 @@ The protection does not depend on the model obeying. Ask has no write tools, and
   - You agree that at least eight look right.
   - Nothing is sent without pressing Send.
 
-### 3. Describe a schedule
+### 3. Describe a schedule (built)
 
 - **Where:** a "Describe" box in the schedule editor.
 - **How:**
@@ -259,7 +260,7 @@ Each phase is built and tested in full, then proposed as **one** deploy, with `s
 |---|---|---|---|
 | **0. Decisions** | Providers chosen. Still open: D3, D5, D7, and the keys in Railway. | Your time | Partly done |
 | **1. Foundation and Ask** | The `ai/` module, ledger, cap, switch, scrubbing, tests, Ask, AI settings | Medium | **Built, tested locally, not deployed.** Real-provider check still to do. |
-| **2. Pattern and schedule drafts** | Describe in both editors, plus colours from a photo | Medium, about 3 days | Not started |
+| **2. Pattern and schedule drafts** | Describe in both editors, plus colours from a photo | Medium, about 3 days | **Built, tested locally, not yet deployed.** "Colours from a photo" is still to do: it needs an image upload route, and only DeepSeek and Gemini accept images. |
 | **3. Digest and holiday suggestions** | Weekly notification, holiday prompts | Small, about 1 day | Not started |
 | **4. Photo check trial** | Your photos tested by hand against DeepSeek and Gemini | Under $0.10, an evening | Not started |
 | **5. Photo check** | Only if the trial passes | Medium | Not started |

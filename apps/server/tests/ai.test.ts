@@ -617,3 +617,142 @@ describe('Ask, after review', () => {
     expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM ai_usage').get()).toEqual({ n: 0 });
   });
 });
+
+describe('Drafts', () => {
+  const env = (extra: NodeJS.ProcessEnv = {}) => ({ ...KEYS, ...extra });
+  const json = (value: unknown, usage = { prompt_tokens: 600, completion_tokens: 200 }) => answer(JSON.stringify(value), usage);
+  const STRINGS = [
+    { name: 'Outdoor Left', cells: 27, ledsPerCell: 4 },
+    { name: 'Outdoor Right', cells: 27, ledsPerCell: 4 },
+  ];
+  const draftPattern = (client: Awaited<ReturnType<typeof authedClient>>, description = 'Warm white with gold every fourth segment') =>
+    client.post('/api/v1/ai/draft-pattern', { description, strings: STRINGS });
+  const GOOD_PATTERN = {
+    name: 'Warm and gold',
+    background: '#ffd7a8',
+    steps: [{ op: 'repeat', from: 0, to: 53, colors: ['#ffd7a8', '#ffd7a8', '#ffd7a8', '#d4a017'], run: 1 }],
+    note: null,
+  };
+
+  describe('pattern', () => {
+    it('returns a checked draft, asking for JSON with no tools, and records what it cost', async () => {
+      const { h, fake, client } = await setup();
+      fake.queues.deepseek.push(json(GOOD_PATTERN));
+      const response = await draftPattern(client);
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ draft: GOOD_PATTERN, provider: 'deepseek', model: 'deepseek-flash' });
+      const sent = fake.seen[0]!.body;
+      expect(sent.tools).toBeUndefined();
+      expect(sent).toMatchObject({ response_format: { type: 'json_object' }, thinking: { type: 'disabled' } });
+      const prompt = sent.messages[0]!.content ?? '';
+      expect(prompt).toContain('"Outdoor Left": 27 segments, cells 0 to 26, 4 LEDs per segment');
+      expect(prompt).toContain('"Outdoor Right": 27 segments, cells 27 to 53');
+      expect(sent.messages[1]!.content).toBe('Warm white with gold every fourth segment');
+      expect(h.ctx.db.prepare('SELECT feature, outcome FROM ai_usage').all()).toEqual([{ feature: 'draft_pattern', outcome: 'ok' }]);
+      // Drafts are not kept as questions.
+      expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM ai_questions').get()).toEqual({ n: 0 });
+    });
+
+    it('asks Gemini for JSON in words, and reads JSON wrapped in a code fence', async () => {
+      const { fake, client } = await setup(env({ AI_PROVIDERS: 'gemini' }));
+      fake.queues.gemini.push(answer('```json\n' + JSON.stringify(GOOD_PATTERN) + '\n```'));
+      const response = await draftPattern(client);
+      expect(response.statusCode).toBe(200);
+      expect(fake.seen[0]!.body.response_format).toBeUndefined();
+    });
+
+    it('gives the model one chance to correct a draft, telling it what was wrong', async () => {
+      const { fake, client } = await setup();
+      fake.queues.deepseek.push(
+        json({ ...GOOD_PATTERN, steps: [{ op: 'paint', from: 50, to: 80, color: '#ff0000' }] }),
+        json(GOOD_PATTERN),
+      );
+      expect((await draftPattern(client)).statusCode).toBe(200);
+      expect(fake.seen).toHaveLength(2);
+      const correction = fake.seen[1]!.body.messages.at(-1)!.content ?? '';
+      expect(correction).toContain('cell 80 is past the last cell, 53');
+    });
+
+    it('moves to the next provider after two bad drafts, without resting the first', async () => {
+      const { fake, client } = await setup();
+      fake.queues.deepseek.push(answer('not json at all'), json({ name: 'x' }));
+      fake.queues.gemini.push(json(GOOD_PATTERN));
+      const response = await draftPattern(client);
+      expect(response.json()).toMatchObject({ provider: 'gemini' });
+      const status = (await client.get('/api/v1/ai/status')).json() as AiStatusDto;
+      expect(status.providers.find((p) => p.id === 'deepseek')).toMatchObject({ available: true });
+    });
+
+    it('rejects a request with nothing to paint', async () => {
+      const { client } = await setup();
+      const response = await client.post('/api/v1/ai/draft-pattern', { description: 'red', strings: [] });
+      expect(response.statusCode).toBe(400);
+    });
+  });
+
+  describe('schedule', () => {
+    async function withChoices() {
+      const s = await setup();
+      const group = (await s.client.post('/api/v1/groups', { name: 'Front', deviceIds: [s.light.id] })).json() as { id: string };
+      const preset = (
+        await s.client.post('/api/v1/presets', { name: 'Christmas', actions: [{ deviceId: null, action: { type: 'power', on: true } }] })
+      ).json() as { id: string };
+      await s.client.patch('/api/v1/settings', { defaultTimeZone: 'America/Los_Angeles', latitude: 34.0522, longitude: -118.2437 });
+      return { ...s, group, preset };
+    }
+    const draftSchedule = (client: Awaited<ReturnType<typeof authedClient>>, description = 'Fridays in December at sunset, Christmas on the front') =>
+      client.post('/api/v1/ai/draft-schedule', { description });
+
+    it('drafts a sunset schedule without ever sending the home location', async () => {
+      const { fake, client, group, preset, light } = await withChoices();
+      fake.queues.deepseek.push(
+        json({
+          name: 'Christmas Fridays',
+          recurrence: { kind: 'solar', event: 'sunset', offsetMinutes: 0, weekdays: [5], startDate: '2026-12-01', endDate: '2026-12-31', latitude: 1, longitude: 2 },
+          target: { type: 'group', id: group.id },
+          action: { type: 'preset', presetId: preset.id },
+          note: null,
+        }),
+      );
+      const response = await draftSchedule(client);
+      expect(response.statusCode).toBe(200);
+      const { draft } = response.json() as { draft: Record<string, unknown> };
+      expect(draft).toMatchObject({
+        name: 'Christmas Fridays',
+        timeZone: 'America/Los_Angeles',
+        target: { type: 'group', groupId: group.id },
+        action: { type: 'preset', presetId: preset.id },
+        missedRunPolicy: 'skip',
+      });
+      expect(draft.recurrence).toEqual({ kind: 'solar', event: 'sunset', offsetMinutes: 0, weekdays: [5], startDate: '2026-12-01', endDate: '2026-12-31' });
+      const prompt = fake.seen[0]!.body.messages[0]!.content ?? '';
+      expect(prompt).toContain(light.id);
+      expect(prompt).toContain('"name":"Christmas"');
+      expect(prompt).toContain('diwali (Diwali)');
+      const sent = JSON.stringify(fake.seen);
+      expect(sent).not.toContain('34.0522');
+      expect(sent).not.toContain('118.2437');
+    });
+
+    it('corrects an id that does not exist', async () => {
+      const { fake, client, group } = await withChoices();
+      const base = { name: 'Lights on', recurrence: { kind: 'daily', time: '18:00' }, target: { type: 'group', id: group.id } };
+      fake.queues.deepseek.push(json({ ...base, action: { type: 'preset', presetId: 'made-up' } }), json({ ...base, action: { type: 'power', on: true } }));
+      const response = await draftSchedule(client, 'Lights on at 6 every day');
+      expect(response.json()).toMatchObject({ draft: { action: { type: 'power', on: true } } });
+      expect(fake.seen[1]!.body.messages.at(-1)!.content).toContain('there is no preset with id made-up');
+    });
+
+    it('corrects a holiday the app does not know', async () => {
+      const { fake, client, group } = await withChoices();
+      const base = { name: 'Holiday', target: { type: 'group', id: group.id }, action: { type: 'power', on: true } };
+      fake.queues.deepseek.push(
+        json({ ...base, recurrence: { kind: 'holiday', holiday: 'festivus', time: '18:00' } }),
+        json({ ...base, recurrence: { kind: 'holiday', holiday: 'diwali', time: '18:00' } }),
+      );
+      const response = await draftSchedule(client, 'On Diwali at 6');
+      expect(response.json()).toMatchObject({ draft: { recurrence: { kind: 'holiday', holiday: 'diwali' } } });
+      expect(fake.seen[1]!.body.messages.at(-1)!.content).toContain('Choose a holiday from the list');
+    });
+  });
+});

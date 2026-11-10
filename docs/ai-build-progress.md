@@ -59,7 +59,17 @@ Still open, for the owner (details in the plan):
 
 ## 4. In flight
 
-Nothing is half-done. Not started yet:
+**Phase 2 (Describe a pattern, Describe a schedule) is built on this branch,** without the "colours from a photo" option.
+- **Tests:** 651 pass (shared 55, server 436, web 160).
+- **Browser:** seen at desktop and phone width against the Govee mock, with placeholder keys and no AI request sent.
+- **Next:** full local CI, then the owner's approval to deploy.
+- **What a deploy changes:** it redeploys `@glm/server`, with no database change.
+- **Code:**
+  - `apps/server/src/ai/drafts.ts` (prompts and checks)
+  - `AiService.draftPattern` and `draftSchedule`, the routes `POST /api/v1/ai/draft-pattern` and `/draft-schedule`
+  - `apps/web/src/features/ai/DescribeBox.tsx`, and `applyPatternDraft` in `pattern-model.ts`
+
+Not started yet:
 
 - **The first real questions to each provider.** This needs the owner's keys in `.env` locally, or in Railway. Each question costs a fraction of a cent.
 

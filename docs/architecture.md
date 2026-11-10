@@ -197,7 +197,12 @@ Background status failures are recorded as incidents, not as a line in the activ
   - 60,000 characters of tool output, after which the model must answer.
 - **Cut-short replies.** A reply whose `finish_reason` is anything but `stop` or `tool_calls` counts as a failure and moves to the next provider, though its cost still counts.
 - **Gemini 3.** Its tool calls carry `extra_content`, holding a thought signature. It is sent back unchanged, because Gemini refuses the next round without it.
-- **Spending.** `ledger.ts` records every request in `ai_usage`, including failed ones that may have been billed. The cap is checked before each request. An answer's cost includes what any failed provider cost for the same question.
+- **Drafts.** `drafts.ts` builds the prompts and checks the replies for Describe.
+  - Replies are JSON. DeepSeek and GLM are sent `response_format: json_object`; Gemini is asked in words. Either way, every reply is checked against the shared Zod schemas: `patternDraftSchema` with cell bounds, and `scheduleDraftSchema` with `parseRecurrenceDraft` and checks that each id exists.
+  - A bad draft gets one correction on the same provider, told exactly what was wrong. It then moves to the next provider, which is not rested, since the provider itself worked.
+  - Pattern drafts are editor steps (paint, gradient, repeat over cell ranges), applied in the browser by `applyPatternDraft` with the editor's own functions, so they are undoable.
+- **One runner.** `AiService.withProviders` does round-robin, failover and resting for Ask and both drafts. `guarded` allows one AI request at a time, at most 6 a minute.
+- **Spending.** `ledger.ts` records every request in `ai_usage`, with its feature (`ask`, `draft_pattern` or `draft_schedule`), including failed ones that may have been billed. The cap is checked before each request. An answer's cost includes what any failed provider cost for the same question.
 
 ## Database
 

@@ -2,7 +2,9 @@ import {
   hexToRgb,
   orderLightStrings,
   rgbToHex,
+  type AiPatternDraftRequest,
   type DeviceDto,
+  type PatternDraft,
   type PatternStringSetting,
   type PresetActionInput,
   type PresetDto,
@@ -367,3 +369,35 @@ export function readableTextColor(hex: string): string {
   const { r, g, b } = hexToRgb(hex);
   return (r * 299 + g * 587 + b * 114) / 1000 > 140 ? '#15181b' : '#ffffff';
 }
+
+/** What a pattern draft needs to know about the strings: names and sizes only, in order. */
+export function describeStrings(strings: PatternString[]): AiPatternDraftRequest['strings'] {
+  return strings
+    .filter((s) => s.included && s.segments.length > 0)
+    .map((s) => ({
+      name: s.name.slice(0, 80),
+      cells: s.segments.length,
+      ledsPerCell: s.ledCount ? Math.max(1, Math.round(s.ledCount / s.segments.length)) : null,
+    }));
+}
+
+/**
+ * Turns a drafted pattern into editor state, using the editor's own tools. Cells are numbered
+ * along the whole run, as `canvasCells` lists them. Anything outside the canvas is ignored.
+ */
+export function applyPatternDraft(draft: PatternDraft, cells: PatternCell[]): PatternState {
+  let state = emptyPattern(draft.background);
+  for (const step of draft.steps) {
+    const slice = cells.slice(step.from, Math.min(step.to, cells.length - 1) + 1);
+    if (slice.length === 0) continue;
+    if (step.op === 'paint') {
+      for (const cell of slice) state = paintCell(state, cell.key, step.color);
+    } else if (step.op === 'gradient') {
+      state = gradientFill(state, slice, step.startColor, step.endColor);
+    } else {
+      state = repeatFill(state, slice, step.colors, step.run);
+    }
+  }
+  return state;
+}
+

@@ -1,9 +1,19 @@
 import type { Logger } from 'pino';
-import type { AiAnswerDto, AiReferenceDto, AiStatusDto, AppSettings } from '@glm/shared';
+import type {
+  AiAnswerDto,
+  AiPatternDraftDto,
+  AiPatternDraftRequest,
+  AiReferenceDto,
+  AiScheduleDraftDto,
+  AiScheduleDraftRequest,
+  AiStatusDto,
+  AppSettings,
+} from '@glm/shared';
 import type { AiProviderConfig, AppConfig } from '../config/env.js';
 import type { Clock } from '../shared/clock.js';
 import { AppError } from '../shared/errors.js';
 import { ASK_TOOLS, ReferenceRegistry, type AskTools } from './ask-tools.js';
+import { checkPattern, checkSchedule, extractJson, patternPrompt, schedulePrompt, type Checked, type ScheduleContext } from './drafts.js';
 import type { AiLedger } from './ledger.js';
 import {
   AiProviderError,
@@ -13,6 +23,8 @@ import {
   providerLabel,
   type AiErrorCategory,
   type ChatMessage,
+  type ChatResult,
+  type ToolDefinition,
 } from './providers.js';
 
 /** Most requests one question may make, across every provider it tries. */
@@ -20,6 +32,8 @@ const MAX_REQUESTS = 8;
 /** Longest one question may take, across every provider, so the one-question lock is always released. */
 const QUESTION_BUDGET_MS = 120_000;
 const MAX_ANSWER_TOKENS = 1_500;
+/** Tries per provider for a draft: the first, and one correction. */
+const DRAFT_ATTEMPTS = 2;
 /** Tool calls run from one reply. Calls past this get a short error instead. */
 const MAX_TOOL_CALLS_PER_REPLY = 6;
 /** Tool output per question, in characters. After this the model must answer with what it has. */
@@ -47,8 +61,10 @@ interface ProviderState {
   note: string | null;
 }
 
-/** What one question has used so far, shared by every provider it tries. */
+/** What one request has used so far, shared by every provider it tries. */
 interface QuestionBudget {
+  /** Recorded in ai_usage: ask, draft_pattern or draft_schedule. */
+  feature: string;
   requestsLeft: number;
   toolChars: number;
   costUsd: number;
@@ -57,6 +73,8 @@ interface QuestionBudget {
 
 export interface AiServiceOptions {
   config: AppConfig['ai'];
+  /** What schedule drafts may refer to: lights, groups and presets, by name and id. */
+  drafts?: ScheduleContext;
   fetchImpl?: typeof fetch;
 }
 
@@ -185,45 +203,90 @@ export class AiService {
     provider.note = this.scrub(failure.message);
   }
 
-  async ask(question: string): Promise<AiAnswerDto> {
+  /** One AI request at a time, at most 6 a minute, and a time limit on each. */
+  private async guarded<T>(work: (deadlineMs: number) => Promise<T>): Promise<T> {
     this.assertCanAsk();
-    if (this.busy) throw new AppError(429, 'ai_busy', 'Another question is still being answered. Try again in a moment.');
+    if (this.busy) throw new AppError(429, 'ai_busy', 'Another AI request is still running. Try again in a moment.');
     const now = this.clock.nowMs();
     this.recent = this.recent.filter((t) => now - t < MINUTE_MS);
     if (this.recent.length >= MAX_PER_MINUTE) {
-      throw new AppError(429, 'ai_rate_limited', 'Too many questions in the last minute. Try again shortly.', undefined, 60);
+      throw new AppError(429, 'ai_rate_limited', 'Too many AI requests in the last minute. Try again shortly.', undefined, 60);
     }
     this.recent.push(now);
     this.busy = true;
     try {
-      return await this.answer(question, now + QUESTION_BUDGET_MS);
+      return await work(now + QUESTION_BUDGET_MS);
     } finally {
       this.busy = false;
     }
   }
 
-  private async answer(question: string, deadlineMs: number): Promise<AiAnswerDto> {
-    const budget: QuestionBudget = { requestsLeft: MAX_REQUESTS, toolChars: 0, costUsd: 0, deadlineMs };
+  async ask(question: string): Promise<AiAnswerDto> {
+    return this.guarded(async (deadlineMs) => {
+      const { result, costUsd } = await this.withProviders('ask', deadlineMs, (provider, budget) =>
+        this.answerWith(provider, question, budget),
+      );
+      // Outside the failover loop on purpose: failing to save is a local problem, not a reason to ask again.
+      return this.ledger.saveQuestion({ question, ...result, costUsd });
+    });
+  }
+
+  /** A pattern for the editor. Nothing is sent to the lights or saved. */
+  async draftPattern(request: AiPatternDraftRequest): Promise<AiPatternDraftDto> {
+    const totalCells = request.strings.reduce((n, s) => n + s.cells, 0);
+    return this.guarded(async (deadlineMs) => {
+      const { result, provider, model, costUsd } = await this.withProviders('draft_pattern', deadlineMs, (p, budget) =>
+        this.draftWith(p, budget, patternPrompt(request), request.description, (json) => checkPattern(json, totalCells)),
+      );
+      return { draft: result, provider, model, costUsd };
+    });
+  }
+
+  /** A schedule for the editor to fill in. Nothing is saved. */
+  async draftSchedule(request: AiScheduleDraftRequest): Promise<AiScheduleDraftDto> {
+    const timeZone = this.getSettings().defaultTimeZone;
+    const context = this.options.drafts;
+    if (!context) throw new AppError(503, 'ai_not_configured', 'Schedule drafts are not available.');
+    return this.guarded(async (deadlineMs) => {
+      const prompt = schedulePrompt(context, this.clock.nowIso(), timeZone);
+      const { result, provider, model, costUsd } = await this.withProviders('draft_schedule', deadlineMs, (p, budget) =>
+        this.draftWith(p, budget, prompt, request.description, (json) => checkSchedule(json, context, timeZone)),
+      );
+      return { draft: result, provider, model, costUsd };
+    });
+  }
+
+  /**
+   * Runs one request's work against the providers in turn, until one succeeds. The budget of
+   * requests, time and money is shared by every provider tried.
+   */
+  private async withProviders<T>(
+    feature: string,
+    deadlineMs: number,
+    attempt: (provider: AiProviderConfig, budget: QuestionBudget) => Promise<T>,
+  ): Promise<{ result: T; provider: AiProviderConfig['id']; model: string; costUsd: number }> {
+    const budget: QuestionBudget = { feature, requestsLeft: MAX_REQUESTS, toolChars: 0, costUsd: 0, deadlineMs };
     const order = this.rotation();
     const failures: string[] = [];
-    let answered: { provider: ProviderState; result: Omit<AiAnswerDto, 'id' | 'createdAt' | 'question' | 'costUsd'> } | null = null;
+    let answered: { provider: ProviderState; result: T } | null = null;
 
     for (const provider of order) {
       if (budget.requestsLeft <= 0 || this.clock.nowMs() >= budget.deadlineMs) break;
       try {
-        answered = { provider, result: await this.answerWith(provider.config, question, budget) };
+        answered = { provider, result: await attempt(provider.config, budget) };
         break;
       } catch (error) {
-        // Only a provider's own failure moves the question on. A local error, such as a database
+        // Only a provider's own failure moves the request on. A local error, such as a database
         // problem, is not the provider's fault: it is reported as it is, and nobody is rested.
         if (!(error instanceof AiProviderError)) throw error;
-        this.rest(provider, error);
-        failures.push(provider.note ?? error.message);
-        this.logger.warn({ provider: provider.config.id, category: error.category }, 'AI provider failed, trying the next one');
+        // Unusable output is the model's, not a sign the provider is down, so it is not rested.
+        if (error.category !== 'invalid_output') this.rest(provider, error);
+        failures.push(this.scrub(error.message));
+        this.logger.warn({ provider: provider.config.id, category: error.category, feature }, 'AI provider failed, trying the next one');
       }
     }
 
-    // The next question starts after whoever answered, or after the first one tried.
+    // The next request starts after whoever answered, or after the first one tried.
     const last = answered?.provider ?? order[0]!;
     this.cursor = (this.providers.indexOf(last) + 1) % this.providers.length;
 
@@ -234,15 +297,19 @@ export class AiService {
     answered.provider.unavailableUntilMs = 0;
     answered.provider.restReason = null;
     answered.provider.note = null;
-    // Outside the failover loop on purpose: failing to save is a local problem, not a reason to ask again.
-    return this.ledger.saveQuestion({ question, ...answered.result, costUsd: Math.round(budget.costUsd * 1e6) / 1e6 });
+    return {
+      result: answered.result,
+      provider: answered.provider.config.id,
+      model: answered.provider.config.model,
+      costUsd: Math.round(budget.costUsd * 1e6) / 1e6,
+    };
   }
 
   private record(provider: AiProviderConfig, inputTokens: number, outputTokens: number, outcome: 'ok' | 'error', budget: QuestionBudget, error?: string): void {
     const cost = estimateCostUsd(provider.model, inputTokens, outputTokens);
     budget.costUsd += cost;
     this.ledger.record({
-      feature: 'ask',
+      feature: budget.feature,
       provider: provider.id,
       model: provider.model,
       inputTokens,
@@ -251,6 +318,52 @@ export class AiService {
       outcome,
       error: error === undefined ? null : this.scrub(error),
     });
+  }
+
+  /**
+   * One request, with the cap, the deadline and the request budget checked first. Records what
+   * it cost, and treats a reply cut short as a failure.
+   */
+  private async request(
+    provider: AiProviderConfig,
+    budget: QuestionBudget,
+    messages: ChatMessage[],
+    options: { tools: ToolDefinition[]; jsonOutput: boolean },
+  ): Promise<ChatResult> {
+    // Checked before every request, so a long request cannot run far past the cap.
+    if (this.ledger.monthSpentUsd() >= this.options.config.monthlyLimitUsd) {
+      throw new AppError(429, 'ai_limit_reached', "This month's AI spending limit was reached while answering.");
+    }
+    const remainingMs = budget.deadlineMs - this.clock.nowMs();
+    if (remainingMs <= 0) throw new AppError(504, 'ai_timeout', 'This took too long, so it was stopped. Try something simpler.');
+    budget.requestsLeft -= 1;
+
+    let reply: ChatResult;
+    try {
+      reply = await chat(provider, {
+        messages,
+        tools: options.tools,
+        maxTokens: MAX_ANSWER_TOKENS,
+        timeoutMs: Math.min(this.options.config.timeoutMs, remainingMs),
+        nowMs: this.clock.nowMs(),
+        jsonOutput: options.jsonOutput,
+        ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
+      });
+    } catch (error) {
+      const billed = error instanceof AiProviderError ? error.possiblyBilled : undefined;
+      this.record(provider, billed?.inputTokens ?? 0, billed?.outputTokens ?? 0, 'error', budget, error instanceof Error ? error.message : 'unknown');
+      throw error;
+    }
+
+    // A reply cut short is not an answer. It is still paid for.
+    if (reply.finishReason !== null && !COMPLETE_FINISH.has(reply.finishReason)) {
+      const category: AiErrorCategory = SERVER_SIDE_FINISH.has(reply.finishReason) ? 'server' : 'bad_response';
+      const message = `${providerLabel(provider.id)}: the reply was cut short (${reply.finishReason.slice(0, 40)}).`;
+      this.record(provider, reply.inputTokens, reply.outputTokens, 'error', budget, message);
+      throw new AiProviderError(provider.id, category, message);
+    }
+    this.record(provider, reply.inputTokens, reply.outputTokens, 'ok', budget);
+    return reply;
   }
 
   private async answerWith(
@@ -266,40 +379,9 @@ export class AiService {
     const label = providerLabel(provider.id);
 
     while (budget.requestsLeft > 0) {
-      // Checked before every request, so a long question cannot run far past the cap.
-      if (this.ledger.monthSpentUsd() >= this.options.config.monthlyLimitUsd) {
-        throw new AppError(429, 'ai_limit_reached', "This month's AI spending limit was reached while answering.");
-      }
-      const remainingMs = budget.deadlineMs - this.clock.nowMs();
-      if (remainingMs <= 0) throw new AppError(504, 'ai_timeout', 'Answering took too long, so it was stopped. Try a narrower question.');
       // With one request left, or enough data gathered, the model must answer with what it has.
       const lastRequest = budget.requestsLeft === 1 || budget.toolChars >= MAX_TOOL_CHARS_PER_QUESTION;
-      budget.requestsLeft -= 1;
-
-      let reply;
-      try {
-        reply = await chat(provider, {
-          messages,
-          tools: lastRequest ? [] : ASK_TOOLS,
-          maxTokens: MAX_ANSWER_TOKENS,
-          timeoutMs: Math.min(this.options.config.timeoutMs, remainingMs),
-          nowMs: this.clock.nowMs(),
-          ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
-        });
-      } catch (error) {
-        const billed = error instanceof AiProviderError ? error.possiblyBilled : undefined;
-        this.record(provider, billed?.inputTokens ?? 0, billed?.outputTokens ?? 0, 'error', budget, error instanceof Error ? error.message : 'unknown');
-        throw error;
-      }
-
-      // A reply cut short is not an answer. It is still paid for.
-      if (reply.finishReason !== null && !COMPLETE_FINISH.has(reply.finishReason)) {
-        const category: AiErrorCategory = SERVER_SIDE_FINISH.has(reply.finishReason) ? 'server' : 'bad_response';
-        const message = `${label}: the reply was cut short (${reply.finishReason.slice(0, 40)}).`;
-        this.record(provider, reply.inputTokens, reply.outputTokens, 'error', budget, message);
-        throw new AiProviderError(provider.id, category, message);
-      }
-      this.record(provider, reply.inputTokens, reply.outputTokens, 'ok', budget);
+      const reply = await this.request(provider, budget, messages, { tools: lastRequest ? [] : ASK_TOOLS, jsonOutput: false });
 
       if (reply.toolCalls.length === 0 || lastRequest) {
         const text = reply.content?.trim() ?? '';
@@ -323,6 +405,44 @@ export class AiService {
       });
     }
     throw new AiProviderError(provider.id, 'bad_response', `${label}: no answer within ${MAX_REQUESTS} steps.`);
+  }
+
+  /**
+   * A draft in JSON, checked against the app's own rules. One correction is allowed: the model
+   * is told exactly what was wrong. After that the request moves to the next provider.
+   */
+  private async draftWith<T>(
+    provider: AiProviderConfig,
+    budget: QuestionBudget,
+    prompt: string,
+    description: string,
+    check: (json: unknown) => Checked<T>,
+  ): Promise<T> {
+    const messages: ChatMessage[] = [
+      { role: 'system', content: prompt },
+      { role: 'user', content: description },
+    ];
+    let problems = '';
+    for (let attempt = 1; attempt <= DRAFT_ATTEMPTS && budget.requestsLeft > 0; attempt++) {
+      const reply = await this.request(provider, budget, messages, { tools: [], jsonOutput: true });
+      const text = reply.content ?? '';
+      let json: unknown;
+      try {
+        json = extractJson(text);
+      } catch {
+        problems = 'The reply was not a JSON object.';
+        messages.push({ role: 'assistant', content: text.slice(0, 4_000) }, { role: 'user', content: `${problems} Reply with only the JSON object.` });
+        continue;
+      }
+      const checked = check(json);
+      if ('value' in checked) return checked.value;
+      problems = checked.problems.slice(0, 600);
+      messages.push(
+        { role: 'assistant', content: text.slice(0, 4_000) },
+        { role: 'user', content: `That JSON has problems: ${problems}. Reply with the corrected JSON object only.` },
+      );
+    }
+    throw new AiProviderError(provider.id, 'invalid_output', `${providerLabel(provider.id)}: the draft did not follow the rules (${problems.slice(0, 200)}).`);
   }
 
   /** A tool that breaks becomes an error the model can read, rather than ending the question. */

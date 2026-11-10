@@ -234,7 +234,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     scrub,
     logger,
     clock,
-    { config: config.ai, ...(overrides.aiFetch ? { fetchImpl: overrides.aiFetch } : {}) },
+    { config: config.ai, drafts: { devices, groups, presets }, ...(overrides.aiFetch ? { fetchImpl: overrides.aiFetch } : {}) },
   );
 
   return {

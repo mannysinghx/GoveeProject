@@ -2,7 +2,10 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import type {
   ActivityListDto,
   AiAnswerDto,
+  AiPatternDraftDto,
+  AiPatternDraftRequest,
   AiQuestionListDto,
+  AiScheduleDraftDto,
   AiStatusDto,
   ActivityQuery,
   AppSettings,
@@ -563,3 +566,22 @@ export function useAskAi() {
     onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
   });
 }
+
+/** A drafted pattern for the editor. Nothing reaches the lights until Send is pressed. */
+export function useDraftPattern() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AiPatternDraftRequest) => api<AiPatternDraftDto>('/ai/draft-pattern', { method: 'POST', body }),
+    onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
+  });
+}
+
+/** A drafted schedule for the editor. Nothing is saved until Save is pressed. */
+export function useDraftSchedule() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (description: string) => api<AiScheduleDraftDto>('/ai/draft-schedule', { method: 'POST', body: { description } }),
+    onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
+  });
+}
+

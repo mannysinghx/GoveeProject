@@ -5,6 +5,7 @@ import {
   recurrenceSchema,
   type MissedRunPolicy,
   type Recurrence,
+  type ScheduleDraft,
   type ScheduleAction,
   type ScheduleDto,
   type Target,
@@ -12,7 +13,8 @@ import {
 import { Button, Dialog, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
 import { timeZoneOptions } from '../../lib/format';
 import { useDebounced } from '../../lib/hooks';
-import { usePresets, useSaveSchedule, useSchedulePreview, useSettings } from '../../lib/queries';
+import { useDraftSchedule, usePresets, useSaveSchedule, useSchedulePreview, useSettings } from '../../lib/queries';
+import { DescribeBox } from '../ai/DescribeBox';
 import { parseTarget, TargetOptions } from '../presets/ApplyPresetDialog';
 
 type RepeatMode = 'once' | 'daily' | 'weekdays' | 'weekends' | 'custom' | 'solar' | 'yearly' | 'holiday';
@@ -90,6 +92,39 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
 
   const zones = useMemo(() => timeZoneOptions(timeZone), [timeZone]);
 
+  const draft = useDraftSchedule();
+  const [drafted, setDrafted] = useState<{ message: string; note: string | null } | null>(null);
+  /** Fills the form from a draft. Nothing is saved until Save is pressed. */
+  const fillFromDraft = (d: ScheduleDraft) => {
+    const r = d.recurrence;
+    setName(d.name);
+    setTimeZone(d.timeZone);
+    setMode(modeFromRecurrence(r.kind === 'solar' ? { ...r, latitude: 0, longitude: 0 } : r));
+    if (r.kind === 'once') setDate(r.date);
+    if (r.kind === 'yearly') {
+      setMonth(r.month);
+      setDay(r.day);
+    }
+    if (r.kind === 'holiday') setHoliday(r.holiday);
+    if ('time' in r) setTime(r.time);
+    if (r.kind === 'weekly') setCustomDays(r.weekdays);
+    setStartDate('startDate' in r ? (r.startDate ?? '') : '');
+    setEndDate('endDate' in r ? (r.endDate ?? '') : '');
+    if (r.kind === 'solar') {
+      // The location comes from Settings, here in the browser. It is never sent to the model.
+      setSolarEvent(r.event);
+      setOffset(r.offsetMinutes);
+    }
+    setTarget(targetValue(d.target));
+    if (d.action.type === 'preset') {
+      setActionKind('preset');
+      setPresetId(d.action.presetId);
+    } else {
+      setActionKind(d.action.on ? 'on' : 'off');
+    }
+    setPolicy(d.missedRunPolicy);
+  };
+
   const recurrenceInput = useMemo<unknown>(() => {
     const bounds = { ...(startDate ? { startDate } : {}), ...(endDate ? { endDate } : {}) };
     switch (mode) {
@@ -155,6 +190,24 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
   return (
     <Dialog title={schedule ? `Edit "${schedule.name}"` : 'New schedule'} open onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-5">
+        {schedule ? null : (
+          <DescribeBox
+            label="Describe it"
+            placeholder="Fridays in December at sunset, apply Christmas"
+            busy={draft.isPending}
+            error={draft.error}
+            result={drafted}
+            onDescribe={(text) => {
+              setDrafted(null);
+              draft.mutate(text, {
+                onSuccess: (result) => {
+                  fillFromDraft(result.draft);
+                  setDrafted({ message: 'The form is filled in below. Check it and the next runs, then Save.', note: result.draft.note });
+                },
+              });
+            }}
+          />
+        )}
         <Field label="Name">
           {(props) => (
             <input {...props} className={inputClass} required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />

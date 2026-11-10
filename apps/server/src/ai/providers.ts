@@ -15,6 +15,8 @@ import type { AiProviderConfig } from '../config/env.js';
 interface ProviderSpec {
   label: string;
   url: string;
+  /** Whether the provider documents `response_format: {type: 'json_object'}` on this endpoint. */
+  jsonObject: boolean;
   /** Extra request fields for a model. Thinking is turned off or kept low: these answers are short. */
   extra: (model: string) => Record<string, unknown>;
 }
@@ -23,18 +25,22 @@ const PROVIDERS: Record<AiProviderId, ProviderSpec> = {
   deepseek: {
     label: 'DeepSeek',
     url: 'https://api.deepseek.com/chat/completions',
+    jsonObject: true,
     // Thinking is on by default, and with tools its reasoning would have to be sent back each round.
     extra: () => ({ thinking: { type: 'disabled' } }),
   },
   gemini: {
     label: 'Google Gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+    // Its compatible endpoint documents schema-based structured output, not json_object, so JSON is asked for in the prompt.
+    jsonObject: false,
     // Gemini 3 models cannot turn thinking off. This keeps it low.
     extra: () => ({ reasoning_effort: 'low' }),
   },
   glm: {
     label: 'Z.ai GLM',
     url: 'https://api.z.ai/api/paas/v4/chat/completions',
+    jsonObject: true,
     // The GLM-5.3 series can only think, and defaults to maximum effort. Older models can turn it off.
     extra: (model) =>
       model.toLowerCase().startsWith('glm-5.3')
@@ -116,7 +122,16 @@ export interface ChatResult {
   outputTokens: number;
 }
 
-export type AiErrorCategory = 'auth' | 'rate_limited' | 'bad_request' | 'server' | 'network' | 'timeout' | 'bad_response';
+export type AiErrorCategory =
+  | 'auth'
+  | 'rate_limited'
+  | 'bad_request'
+  | 'server'
+  | 'network'
+  | 'timeout'
+  | 'bad_response'
+  /** The provider worked, but the model's output was unusable. Not a reason to rest the provider. */
+  | 'invalid_output';
 
 /** A failed provider request. The message is safe to show and log: it never holds the key. */
 export class AiProviderError extends Error {
@@ -202,6 +217,8 @@ export interface ChatOptions {
   maxTokens: number;
   timeoutMs: number;
   nowMs: number;
+  /** Ask for a JSON object reply, where the provider supports it. */
+  jsonOutput?: boolean;
   fetchImpl?: typeof fetch;
 }
 
@@ -217,6 +234,7 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
     ...(options.tools.length > 0 ? { tools: options.tools, tool_choice: 'auto' } : {}),
     max_tokens: options.maxTokens,
     stream: false,
+    ...(options.jsonOutput && spec.jsonObject ? { response_format: { type: 'json_object' } } : {}),
     ...spec.extra(provider.model),
   });
   const sentTokens = estimateTokens(body);
