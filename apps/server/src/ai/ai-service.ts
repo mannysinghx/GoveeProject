@@ -11,12 +11,19 @@ import {
   estimateCostUsd,
   knownPrice,
   providerLabel,
+  type AiErrorCategory,
   type ChatMessage,
 } from './providers.js';
 
-/** Most requests one question may make: each tool round is one request. */
-const MAX_ROUNDS = 8;
+/** Most requests one question may make, across every provider it tries. */
+const MAX_REQUESTS = 8;
+/** Longest one question may take, across every provider, so the one-question lock is always released. */
+const QUESTION_BUDGET_MS = 120_000;
 const MAX_ANSWER_TOKENS = 1_500;
+/** Tool calls run from one reply. Calls past this get a short error instead. */
+const MAX_TOOL_CALLS_PER_REPLY = 6;
+/** Tool output per question, in characters. After this the model must answer with what it has. */
+const MAX_TOOL_CHARS_PER_QUESTION = 60_000;
 /** Questions allowed per rolling minute, on top of one at a time. */
 const MAX_PER_MINUTE = 6;
 const MINUTE_MS = 60_000;
@@ -25,12 +32,27 @@ const COOL_DOWN_MS = 60_000;
 /** A refused key will not fix itself, so that provider is skipped for longer. */
 const AUTH_COOL_DOWN_MS = 3_600_000;
 
+/** Stop reasons that mean the reply is complete. Anything else means it was cut short. */
+const COMPLETE_FINISH = new Set(['stop', 'tool_calls']);
+const SERVER_SIDE_FINISH = new Set(['insufficient_system_resource', 'aborted', 'network_error']);
+
 const REFERENCE = /\[\[(light|schedule|run|command|incident|activity):([A-Za-z0-9_-]{1,64})\]\]/g;
+
+type RestReason = 'failure' | 'retry_after' | 'auth';
 
 interface ProviderState {
   config: AiProviderConfig;
   unavailableUntilMs: number;
+  restReason: RestReason | null;
   note: string | null;
+}
+
+/** What one question has used so far, shared by every provider it tries. */
+interface QuestionBudget {
+  requestsLeft: number;
+  toolChars: number;
+  costUsd: number;
+  deadlineMs: number;
 }
 
 export interface AiServiceOptions {
@@ -45,10 +67,11 @@ function systemPrompt(nowIso: string, timeZone: string): string {
     '',
     'How to answer:',
     '- Look things up with the tools before answering. Never guess at what happened.',
+    '- Ask for only what you need: a few tool calls at a time, with narrow time ranges.',
     '- Cite every record you rely on by writing its ref in double square brackets, for example [[run:abc123]]. Use only refs the tools returned.',
     "- If the records don't answer the question, say so plainly, and say what you checked.",
     '- Plain text, no Markdown headings or tables. Usually 2 to 5 short sentences.',
-    '- You cannot change anything. If something needs doing, say where in the app: Schedules, Presets, Groups, a light\'s page, Connections or Settings.',
+    "- You cannot change anything. If something needs doing, say where in the app: Schedules, Presets, Groups, a light's page, Connections or Settings.",
     '',
     'Facts about the app:',
     '- Schedules run in the app, not on the lights. If the app or Govee is down, a run can be missed.',
@@ -76,7 +99,7 @@ export class AiService {
     private readonly clock: Clock,
     private readonly options: AiServiceOptions,
   ) {
-    this.providers = options.config.providers.map((config) => ({ config, unavailableUntilMs: 0, note: null }));
+    this.providers = options.config.providers.map((config) => ({ config, unavailableUntilMs: 0, restReason: null, note: null }));
     for (const provider of options.config.providers) {
       if (!knownPrice(provider.model)) {
         logger.warn(
@@ -129,16 +152,37 @@ export class AiService {
     }
   }
 
-  /** Providers to try for one question: round-robin, starting after the last one used, skipping any cooling down. */
+  /**
+   * Providers to try for one question: round-robin from the cursor, skipping any that are resting.
+   * If every one is resting, only those that failed in passing are tried again. A refused key, or
+   * a provider that said when to come back, is left alone until then.
+   */
   private rotation(): ProviderState[] {
     const now = this.clock.nowMs();
     const count = this.providers.length;
     const ordered: ProviderState[] = [];
     for (let i = 0; i < count; i++) ordered.push(this.providers[(this.cursor + i) % count]!);
-    this.cursor = (this.cursor + 1) % Math.max(1, count);
     const ready = ordered.filter((p) => p.unavailableUntilMs <= now);
-    // If every provider is cooling down, try them anyway rather than refuse outright.
-    return ready.length > 0 ? ready : ordered;
+    if (ready.length > 0) return ready;
+    const retryable = ordered.filter((p) => p.restReason === 'failure');
+    if (retryable.length > 0) return retryable;
+    const soonest = Math.min(...ordered.map((p) => p.unavailableUntilMs));
+    const seconds = Math.max(1, Math.ceil((soonest - now) / 1000));
+    throw new AppError(
+      503,
+      'ai_resting',
+      `Every AI provider is resting after an error. Try again in ${Math.ceil(seconds / 60)} minute(s).`,
+      undefined,
+      seconds,
+    );
+  }
+
+  private rest(provider: ProviderState, failure: AiProviderError): void {
+    const reason: RestReason = failure.category === 'auth' ? 'auth' : failure.retryAfterMs !== undefined ? 'retry_after' : 'failure';
+    const ms = reason === 'auth' ? AUTH_COOL_DOWN_MS : Math.max(COOL_DOWN_MS, failure.retryAfterMs ?? 0);
+    provider.unavailableUntilMs = this.clock.nowMs() + ms;
+    provider.restReason = reason;
+    provider.note = this.scrub(failure.message);
   }
 
   async ask(question: string): Promise<AiAnswerDto> {
@@ -152,103 +196,143 @@ export class AiService {
     this.recent.push(now);
     this.busy = true;
     try {
-      return await this.answer(question);
+      return await this.answer(question, now + QUESTION_BUDGET_MS);
     } finally {
       this.busy = false;
     }
   }
 
-  private async answer(question: string): Promise<AiAnswerDto> {
+  private async answer(question: string, deadlineMs: number): Promise<AiAnswerDto> {
+    const budget: QuestionBudget = { requestsLeft: MAX_REQUESTS, toolChars: 0, costUsd: 0, deadlineMs };
+    const order = this.rotation();
     const failures: string[] = [];
-    for (const provider of this.rotation()) {
+    let answered: { provider: ProviderState; result: Omit<AiAnswerDto, 'id' | 'createdAt' | 'question' | 'costUsd'> } | null = null;
+
+    for (const provider of order) {
+      if (budget.requestsLeft <= 0 || this.clock.nowMs() >= budget.deadlineMs) break;
       try {
-        const result = await this.answerWith(provider.config, question);
-        provider.note = null;
-        return this.ledger.saveQuestion({ question, ...result });
+        answered = { provider, result: await this.answerWith(provider.config, question, budget) };
+        break;
       } catch (error) {
-        if (error instanceof AppError) throw error;
-        const failure =
-          error instanceof AiProviderError
-            ? error
-            : new AiProviderError(provider.config.id, 'bad_response', `${providerLabel(provider.config.id)}: something unexpected went wrong.`);
-        if (!(error instanceof AiProviderError)) this.logger.error({ err: error, provider: provider.config.id }, 'Unexpected AI error');
-        const coolDown = failure.category === 'auth' ? AUTH_COOL_DOWN_MS : Math.max(COOL_DOWN_MS, failure.retryAfterMs ?? 0);
-        provider.unavailableUntilMs = this.clock.nowMs() + coolDown;
-        provider.note = this.scrub(failure.message);
-        failures.push(provider.note);
-        this.logger.warn({ provider: provider.config.id, category: failure.category }, 'AI provider failed, trying the next one');
+        // Only a provider's own failure moves the question on. A local error, such as a database
+        // problem, is not the provider's fault: it is reported as it is, and nobody is rested.
+        if (!(error instanceof AiProviderError)) throw error;
+        this.rest(provider, error);
+        failures.push(provider.note ?? error.message);
+        this.logger.warn({ provider: provider.config.id, category: error.category }, 'AI provider failed, trying the next one');
       }
     }
-    throw new AppError(502, 'ai_unavailable', `No AI provider could answer right now. ${failures.join(' ')}`.trim().slice(0, 600));
+
+    // The next question starts after whoever answered, or after the first one tried.
+    const last = answered?.provider ?? order[0]!;
+    this.cursor = (this.providers.indexOf(last) + 1) % this.providers.length;
+
+    if (!answered) {
+      const why = failures.length > 0 ? failures.join(' ') : 'It ran out of time or steps.';
+      throw new AppError(502, 'ai_unavailable', `No AI provider could answer right now. ${why}`.slice(0, 600));
+    }
+    answered.provider.unavailableUntilMs = 0;
+    answered.provider.restReason = null;
+    answered.provider.note = null;
+    // Outside the failover loop on purpose: failing to save is a local problem, not a reason to ask again.
+    return this.ledger.saveQuestion({ question, ...answered.result, costUsd: Math.round(budget.costUsd * 1e6) / 1e6 });
+  }
+
+  private record(provider: AiProviderConfig, inputTokens: number, outputTokens: number, outcome: 'ok' | 'error', budget: QuestionBudget, error?: string): void {
+    const cost = estimateCostUsd(provider.model, inputTokens, outputTokens);
+    budget.costUsd += cost;
+    this.ledger.record({
+      feature: 'ask',
+      provider: provider.id,
+      model: provider.model,
+      inputTokens,
+      outputTokens,
+      costUsd: cost,
+      outcome,
+      error: error === undefined ? null : this.scrub(error),
+    });
   }
 
   private async answerWith(
     provider: AiProviderConfig,
     question: string,
-  ): Promise<Omit<AiAnswerDto, 'id' | 'createdAt' | 'question'>> {
+    budget: QuestionBudget,
+  ): Promise<Omit<AiAnswerDto, 'id' | 'createdAt' | 'question' | 'costUsd'>> {
     const refs = new ReferenceRegistry();
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt(this.clock.nowIso(), this.getSettings().defaultTimeZone) },
       { role: 'user', content: question },
     ];
-    let costUsd = 0;
+    const label = providerLabel(provider.id);
 
-    for (let round = 1; round <= MAX_ROUNDS; round++) {
+    while (budget.requestsLeft > 0) {
       // Checked before every request, so a long question cannot run far past the cap.
       if (this.ledger.monthSpentUsd() >= this.options.config.monthlyLimitUsd) {
         throw new AppError(429, 'ai_limit_reached', "This month's AI spending limit was reached while answering.");
       }
-      const lastRound = round === MAX_ROUNDS;
+      const remainingMs = budget.deadlineMs - this.clock.nowMs();
+      if (remainingMs <= 0) throw new AppError(504, 'ai_timeout', 'Answering took too long, so it was stopped. Try a narrower question.');
+      // With one request left, or enough data gathered, the model must answer with what it has.
+      const lastRequest = budget.requestsLeft === 1 || budget.toolChars >= MAX_TOOL_CHARS_PER_QUESTION;
+      budget.requestsLeft -= 1;
+
       let reply;
       try {
         reply = await chat(provider, {
           messages,
-          // On the last round the model must answer with what it has.
-          tools: lastRound ? [] : ASK_TOOLS,
+          tools: lastRequest ? [] : ASK_TOOLS,
           maxTokens: MAX_ANSWER_TOKENS,
-          timeoutMs: this.options.config.timeoutMs,
+          timeoutMs: Math.min(this.options.config.timeoutMs, remainingMs),
+          nowMs: this.clock.nowMs(),
           ...(this.options.fetchImpl ? { fetchImpl: this.options.fetchImpl } : {}),
         });
       } catch (error) {
-        this.ledger.record({
-          feature: 'ask',
-          provider: provider.id,
-          model: provider.model,
-          inputTokens: 0,
-          outputTokens: 0,
-          costUsd: 0,
-          outcome: 'error',
-          error: error instanceof Error ? this.scrub(error.message) : 'unknown',
-        });
+        const billed = error instanceof AiProviderError ? error.possiblyBilled : undefined;
+        this.record(provider, billed?.inputTokens ?? 0, billed?.outputTokens ?? 0, 'error', budget, error instanceof Error ? error.message : 'unknown');
         throw error;
       }
-      const cost = estimateCostUsd(provider.model, reply.inputTokens, reply.outputTokens);
-      costUsd += cost;
-      this.ledger.record({
-        feature: 'ask',
-        provider: provider.id,
-        model: provider.model,
-        inputTokens: reply.inputTokens,
-        outputTokens: reply.outputTokens,
-        costUsd: cost,
-        outcome: 'ok',
-      });
 
-      if (reply.toolCalls.length === 0 || lastRound) {
+      // A reply cut short is not an answer. It is still paid for.
+      if (reply.finishReason !== null && !COMPLETE_FINISH.has(reply.finishReason)) {
+        const category: AiErrorCategory = SERVER_SIDE_FINISH.has(reply.finishReason) ? 'server' : 'bad_response';
+        const message = `${label}: the reply was cut short (${reply.finishReason.slice(0, 40)}).`;
+        this.record(provider, reply.inputTokens, reply.outputTokens, 'error', budget, message);
+        throw new AiProviderError(provider.id, category, message);
+      }
+      this.record(provider, reply.inputTokens, reply.outputTokens, 'ok', budget);
+
+      if (reply.toolCalls.length === 0 || lastRequest) {
         const text = reply.content?.trim() ?? '';
-        if (text === '') {
-          throw new AiProviderError(provider.id, 'bad_response', `${providerLabel(provider.id)}: the reply was empty.`);
-        }
+        if (text === '') throw new AiProviderError(provider.id, 'bad_response', `${label}: the reply was empty.`);
         const { answer, references } = this.resolveReferences(this.scrub(text), refs);
-        return { answer, references, provider: provider.id, model: provider.model, costUsd: Math.round(costUsd * 1e6) / 1e6 };
+        return { answer, references, provider: provider.id, model: provider.model };
       }
 
       messages.push({ role: 'assistant', content: reply.content, tool_calls: reply.toolCalls });
-      for (const call of reply.toolCalls) {
-        messages.push({ role: 'tool', tool_call_id: call.id, content: this.tools.run(call.function.name, call.function.arguments, refs) });
-      }
+      reply.toolCalls.forEach((call, index) => {
+        let content: string;
+        if (index >= MAX_TOOL_CALLS_PER_REPLY) {
+          content = JSON.stringify({ error: `Too many tool calls at once. At most ${MAX_TOOL_CALLS_PER_REPLY} run per reply; ask for fewer.` });
+        } else if (budget.toolChars >= MAX_TOOL_CHARS_PER_QUESTION) {
+          content = JSON.stringify({ error: 'Enough records have been read for this question. Answer with what you have.' });
+        } else {
+          content = this.runTool(call.function.name, call.function.arguments, refs);
+          budget.toolChars += content.length;
+        }
+        messages.push({ role: 'tool', tool_call_id: call.id, content });
+      });
     }
-    throw new AiProviderError(provider.id, 'bad_response', `${providerLabel(provider.id)}: no answer after ${MAX_ROUNDS} steps.`);
+    throw new AiProviderError(provider.id, 'bad_response', `${label}: no answer within ${MAX_REQUESTS} steps.`);
+  }
+
+  /** A tool that breaks becomes an error the model can read, rather than ending the question. */
+  private runTool(name: string, args: string, refs: ReferenceRegistry): string {
+    try {
+      return this.tools.run(name, args, refs);
+    } catch (error) {
+      this.logger.error({ err: error, tool: name }, 'An Ask tool failed');
+      return JSON.stringify({ error: 'That lookup failed inside the app. Try a different one.' });
+    }
   }
 
   /** Keeps only references to records the tools returned. Anything else is removed from the text. */

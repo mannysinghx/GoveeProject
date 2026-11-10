@@ -123,19 +123,21 @@ export function AskCard() {
         </form>
       )}
 
-      {ask.isPending ? <p className="mt-3 text-sm text-ink-300">Looking through the records…</p> : null}
-      {ask.isError ? (
-        <div className="mt-3">
-          <ErrorNotice error={ask.error} title="No answer this time" />
-        </div>
-      ) : null}
-      {latest ? (
-        <div className="mt-4 rounded-lg bg-ink-850 p-3">
-          <p className="mb-1 text-xs font-medium text-ink-300">{latest.question}</p>
-          <AnswerText answer={latest} />
-          <AnswerMeta answer={latest} provider={providerLabel(latest.provider)} />
-        </div>
-      ) : null}
+      <div aria-live="polite">
+        {ask.isPending ? <p className="mt-3 text-sm text-ink-300">Looking through the records…</p> : null}
+        {ask.isError ? (
+          <div className="mt-3">
+            <ErrorNotice error={ask.error} title="No answer this time" />
+          </div>
+        ) : null}
+        {latest ? (
+          <div className="mt-4 rounded-lg bg-ink-850 p-3">
+            <p className="mb-1 text-xs font-medium text-ink-300">{latest.question}</p>
+            <AnswerText answer={latest} />
+            <AnswerMeta answer={latest} provider={providerLabel(latest.provider)} />
+          </div>
+        ) : null}
+      </div>
 
       {earlier.length > 0 ? (
         <details className="mt-4">

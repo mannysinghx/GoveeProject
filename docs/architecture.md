@@ -185,10 +185,19 @@ Background status failures are recorded as incidents, not as a line in the activ
 
 `apps/server/src/ai/` holds Ask. Only `providers.ts` talks to AI providers, through one small client for the OpenAI-style chat completions request that DeepSeek, Gemini and GLM all accept. Hosts are fixed in code.
 
-- **Round-robin.** `AiService` keeps a cursor, and each question starts with the next provider. A question stays on one provider for all its tool rounds; if that provider fails, the whole question moves to the next. A provider that fails rests for a minute, or an hour if it refused the key.
+- **Round-robin.** `AiService` keeps a cursor, and each question starts with the provider after the one that answered last. A question stays on one provider for all its tool rounds. If that provider fails, the question moves to the next one.
+- **Resting.** A provider that fails rests for a minute, or as long as its Retry-After asks (at most 6 hours), or an hour if it refused the key. When every provider is resting, only those that failed in passing are tried again. Otherwise the question is refused with `ai_resting`.
+- **Local errors.** A local error, such as a database problem, is reported as it is: no provider is blamed or rested.
 - **Tools.** `ask-tools.ts` defines six read-only tools over the existing services. Their results leave out Govee device ids, sign-in history and location, and are cut to 12,000 characters.
 - **References.** Tool results carry refs such as `run:<id>`. The answer may cite them as `[[run:<id>]]`, and `AiService` removes any the tools did not return.
-- **Spending.** `ledger.ts` records every request in `ai_usage`, and the cap is checked before each request, so one question cannot run far past it. At most 8 requests per question, and the last one is sent without tools, so the model has to answer.
+- **Limits per question.**
+  - At most 8 requests, across every provider tried. The last is sent without tools, so the model has to answer.
+  - 120 seconds in all.
+  - At most 6 tool calls run per reply.
+  - 60,000 characters of tool output, after which the model must answer.
+- **Cut-short replies.** A reply whose `finish_reason` is anything but `stop` or `tool_calls` counts as a failure and moves to the next provider, though its cost still counts.
+- **Gemini 3.** Its tool calls carry `extra_content`, holding a thought signature. It is sent back unchanged, because Gemini refuses the next round without it.
+- **Spending.** `ledger.ts` records every request in `ai_usage`, including failed ones that may have been billed. The cap is checked before each request. An answer's cost includes what any failed provider cost for the same question.
 
 ## Database
 

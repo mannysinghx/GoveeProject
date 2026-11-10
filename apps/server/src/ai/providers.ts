@@ -15,30 +15,41 @@ import type { AiProviderConfig } from '../config/env.js';
 interface ProviderSpec {
   label: string;
   url: string;
-  /** Extra request fields. Thinking is turned off or kept low: these answers are short. */
-  extra: Record<string, unknown>;
+  /** Extra request fields for a model. Thinking is turned off or kept low: these answers are short. */
+  extra: (model: string) => Record<string, unknown>;
 }
 
 const PROVIDERS: Record<AiProviderId, ProviderSpec> = {
   deepseek: {
     label: 'DeepSeek',
     url: 'https://api.deepseek.com/chat/completions',
-    extra: { thinking: { type: 'disabled' } },
+    // Thinking is on by default, and with tools its reasoning would have to be sent back each round.
+    extra: () => ({ thinking: { type: 'disabled' } }),
   },
   gemini: {
     label: 'Google Gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    extra: { reasoning_effort: 'low' },
+    // Gemini 3 models cannot turn thinking off. This keeps it low.
+    extra: () => ({ reasoning_effort: 'low' }),
   },
   glm: {
     label: 'Z.ai GLM',
     url: 'https://api.z.ai/api/paas/v4/chat/completions',
-    extra: { thinking: { type: 'disabled' } },
+    // The GLM-5.3 series can only think, and defaults to maximum effort. Older models can turn it off.
+    extra: (model) =>
+      model.toLowerCase().startsWith('glm-5.3')
+        ? { thinking: { type: 'enabled' }, reasoning_effort: 'low' }
+        : { thinking: { type: 'disabled' } },
   },
 };
 
 export function providerLabel(id: AiProviderId): string {
   return PROVIDERS[id].label;
+}
+
+/** The extra fields a request to this provider and model carries. Exported for tests. */
+export function requestExtras(id: AiProviderId, model: string): Record<string, unknown> {
+  return PROVIDERS[id].extra(model);
 }
 
 /**
@@ -68,6 +79,11 @@ export function knownPrice(model: string): boolean {
   return PRICES[model.toLowerCase()] !== undefined;
 }
 
+/** A rough token count for text, at about 3 characters a token. */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
 /* ------------------------------ request shape ------------------------------ */
 
 export interface ToolDefinition {
@@ -79,6 +95,11 @@ export interface ToolCall {
   id: string;
   type: 'function';
   function: { name: string; arguments: string };
+  /**
+   * Provider data that must go back unchanged. Gemini 3 puts its thought signature here,
+   * and refuses the next request if it is missing.
+   */
+  extra_content?: unknown;
 }
 
 export type ChatMessage =
@@ -89,6 +110,8 @@ export type ChatMessage =
 export interface ChatResult {
   content: string | null;
   toolCalls: ToolCall[];
+  /** Why the provider stopped. Null when it did not say. */
+  finishReason: string | null;
   inputTokens: number;
   outputTokens: number;
 }
@@ -102,6 +125,11 @@ export class AiProviderError extends Error {
     readonly category: AiErrorCategory,
     message: string,
     readonly retryAfterMs?: number,
+    /**
+     * Tokens the provider may have billed although the reply was unusable, such as a timeout
+     * after it started, or a reply that would not parse. Counted against the cap.
+     */
+    readonly possiblyBilled?: { inputTokens: number; outputTokens: number },
   ) {
     super(message);
     this.name = 'AiProviderError';
@@ -112,6 +140,7 @@ const responseSchema = z.looseObject({
   choices: z
     .array(
       z.looseObject({
+        finish_reason: z.string().nullable().optional(),
         message: z.looseObject({
           content: z.string().nullable().optional(),
           tool_calls: z
@@ -119,6 +148,7 @@ const responseSchema = z.looseObject({
               z.looseObject({
                 id: z.string().optional(),
                 function: z.looseObject({ name: z.string(), arguments: z.string().optional() }),
+                extra_content: z.unknown().optional(),
               }),
             )
             .nullable()
@@ -128,7 +158,11 @@ const responseSchema = z.looseObject({
     )
     .min(1),
   usage: z
-    .looseObject({ prompt_tokens: z.number().optional(), completion_tokens: z.number().optional() })
+    .looseObject({
+      prompt_tokens: z.number().optional(),
+      completion_tokens: z.number().optional(),
+      total_tokens: z.number().optional(),
+    })
     .nullable()
     .optional(),
 });
@@ -145,11 +179,21 @@ function categoryFor(status: number): AiErrorCategory {
   return 'bad_request';
 }
 
-function retryAfterMs(headers: Headers): number | undefined {
+/** Longest rest a provider can ask for, so a strange header cannot switch it off for days. */
+const MAX_RETRY_AFTER_MS = 6 * 3600 * 1000;
+
+/** Retry-After is either seconds or an HTTP date. */
+export function retryAfterMs(headers: Headers, nowMs: number): number | undefined {
   const raw = headers.get('retry-after');
   if (raw === null) return undefined;
   const seconds = Number(raw);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds * 1000 : undefined;
+  let ms: number | undefined;
+  if (raw.trim() !== '' && Number.isFinite(seconds) && seconds >= 0) ms = seconds * 1000;
+  else {
+    const date = Date.parse(raw);
+    if (!Number.isNaN(date)) ms = Math.max(0, date - nowMs);
+  }
+  return ms === undefined ? undefined : Math.min(ms, MAX_RETRY_AFTER_MS);
 }
 
 export interface ChatOptions {
@@ -157,6 +201,7 @@ export interface ChatOptions {
   tools: ToolDefinition[];
   maxTokens: number;
   timeoutMs: number;
+  nowMs: number;
   fetchImpl?: typeof fetch;
 }
 
@@ -166,17 +211,20 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
   const fetchImpl = options.fetchImpl ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-  const fail = (category: AiErrorCategory, message: string, retry?: number) =>
-    new AiProviderError(provider.id, category, `${spec.label}: ${message}`, retry);
-
   const body = JSON.stringify({
     model: provider.model,
     messages: options.messages,
     ...(options.tools.length > 0 ? { tools: options.tools, tool_choice: 'auto' } : {}),
     max_tokens: options.maxTokens,
     stream: false,
-    ...spec.extra,
+    ...spec.extra(provider.model),
   });
+  const sentTokens = estimateTokens(body);
+  const fail = (
+    category: AiErrorCategory,
+    message: string,
+    extra: { retry?: number | undefined; billed?: { inputTokens: number; outputTokens: number } } = {},
+  ) => new AiProviderError(provider.id, category, `${spec.label}: ${message}`, extra.retry, extra.billed);
 
   let response: Response;
   let text: string;
@@ -191,7 +239,12 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
     });
     text = await response.text();
   } catch {
-    if (controller.signal.aborted) throw fail('timeout', `no reply within ${Math.round(options.timeoutMs / 1000)} seconds.`);
+    if (controller.signal.aborted) {
+      // The provider may have read the whole request before the time ran out, so it is counted.
+      throw fail('timeout', `no reply within ${Math.round(options.timeoutMs / 1000)} seconds.`, {
+        billed: { inputTokens: sentTokens, outputTokens: 0 },
+      });
+    }
     throw fail('network', 'could not be reached.');
   } finally {
     clearTimeout(timer);
@@ -205,34 +258,43 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
   }
 
   if (!response.ok) {
-    const body = errorBodySchema.safeParse(json);
-    const said = body.success
-      ? typeof body.data.error === 'string'
-        ? body.data.error
-        : (body.data.error?.message ?? body.data.message)
+    // Gemini's compatible endpoint can wrap its error in a one-item array.
+    const unwrapped = Array.isArray(json) && json.length === 1 ? json[0] : json;
+    const errorBody = errorBodySchema.safeParse(unwrapped);
+    const said = errorBody.success
+      ? typeof errorBody.data.error === 'string'
+        ? errorBody.data.error
+        : (errorBody.data.error?.message ?? errorBody.data.message)
       : undefined;
     // The provider's own words help with troubleshooting. The key is never in the request
     // body, but it is stripped anyway in case a provider echoes the header back.
     const detail = said ? ` It said: ${said.split(provider.apiKey).join('[REDACTED]').slice(0, 200)}` : '';
-    throw fail(categoryFor(response.status), `the request was refused (HTTP ${response.status}).${detail}`, retryAfterMs(response.headers));
+    throw fail(categoryFor(response.status), `the request was refused (HTTP ${response.status}).${detail}`, {
+      retry: retryAfterMs(response.headers, options.nowMs),
+    });
   }
 
   const parsed = responseSchema.safeParse(json);
-  if (!parsed.success) throw fail('bad_response', 'the reply was not in the expected format.');
-  const message = parsed.data.choices[0]!.message;
+  if (!parsed.success) {
+    throw fail('bad_response', 'the reply was not in the expected format.', {
+      billed: { inputTokens: sentTokens, outputTokens: estimateTokens(text) },
+    });
+  }
+  const choice = parsed.data.choices[0]!;
+  const message = choice.message;
   const toolCalls: ToolCall[] = (message.tool_calls ?? []).map((call, index) => ({
     id: call.id && call.id.length > 0 ? call.id : `call_${index}`,
     type: 'function',
     function: { name: call.function.name, arguments: call.function.arguments ?? '{}' },
+    // Only this field is carried over, not the whole object, so nothing else is echoed back.
+    ...(call.extra_content !== undefined ? { extra_content: call.extra_content } : {}),
   }));
   const content = message.content ?? null;
-  // A reply without token counts is estimated at about 3 characters a token, so it still
-  // counts against the monthly cap.
-  const replyLength = (content?.length ?? 0) + toolCalls.reduce((n, c) => n + c.function.arguments.length, 0);
-  return {
-    content,
-    toolCalls,
-    inputTokens: parsed.data.usage?.prompt_tokens ?? Math.ceil(body.length / 3),
-    outputTokens: parsed.data.usage?.completion_tokens ?? Math.ceil(replyLength / 3),
-  };
+  const usage = parsed.data.usage;
+  const replyText = (content ?? '') + toolCalls.map((c) => c.function.arguments).join('');
+  const inputTokens = usage?.prompt_tokens ?? sentTokens;
+  // Some providers leave thinking out of completion_tokens but include it in total_tokens.
+  const fromTotal = usage?.total_tokens !== undefined ? usage.total_tokens - inputTokens : 0;
+  const outputTokens = Math.max(usage?.completion_tokens ?? estimateTokens(replyText), fromTotal);
+  return { content, toolCalls, finishReason: choice.finish_reason ?? null, inputTokens, outputTokens };
 }

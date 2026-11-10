@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { activityEventTypes, activityOutcomes, type AiReferenceDto, type AiReferenceKind } from '@glm/shared';
+import { activityEventTypes, activityOutcomes, type AiReferenceDto, type AiReferenceKind, type Recurrence } from '@glm/shared';
 import type { ActivityService } from '../activity/activity-service.js';
 import type { CommandStore } from '../commands/command-store.js';
 import type { ConnectionMonitor } from '../connection/connection-monitor.js';
@@ -40,6 +40,14 @@ export class ReferenceRegistry {
   get size(): number {
     return this.refs.size;
   }
+}
+
+/** Sunrise and sunset schedules store the home's latitude and longitude. They never leave the server. */
+function withoutLocation(recurrence: Recurrence): Record<string, unknown> {
+  const copy: Record<string, unknown> = { ...recurrence };
+  delete copy.latitude;
+  delete copy.longitude;
+  return copy;
 }
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
@@ -155,10 +163,12 @@ export const ASK_TOOLS: ToolDefinition[] = [
 /** Longest tool result sent back, in characters, so one result cannot blow up the cost. */
 const MAX_RESULT_CHARS = 12_000;
 
+const SHORTENED = 'SHORTENED: ask for fewer items or a narrower time range. Partial result: ';
+
 function capped(value: unknown): string {
   const text = JSON.stringify(value);
   if (text.length <= MAX_RESULT_CHARS) return text;
-  return JSON.stringify({ note: 'Result shortened. Ask for fewer items or a narrower time range.', partial: text.slice(0, MAX_RESULT_CHARS) });
+  return SHORTENED + text.slice(0, MAX_RESULT_CHARS - SHORTENED.length);
 }
 
 export class AskTools {
@@ -166,7 +176,7 @@ export class AskTools {
 
   /** Runs one tool call. Bad arguments and unknown names come back as errors for the model, never thrown. */
   run(name: string, rawArguments: string, refs: ReferenceRegistry): string {
-    if (!(name in argSchemas)) return JSON.stringify({ error: `There is no tool called ${name}.` });
+    if (!Object.hasOwn(argSchemas, name)) return JSON.stringify({ error: `There is no tool called ${name}.` });
     let raw: unknown;
     try {
       raw = rawArguments.trim() === '' ? {} : JSON.parse(rawArguments);
@@ -235,7 +245,7 @@ export class AskTools {
       name: s.name,
       enabled: s.enabled,
       timeZone: s.timeZone,
-      repeats: s.recurrence,
+      repeats: withoutLocation(s.recurrence),
       target: s.targetName,
       does: s.actionSummary,
       missedRunPolicy: s.missedRunPolicy,
@@ -308,18 +318,21 @@ export class AskTools {
 
   private searchActivity(args: Record<string, unknown>, refs: ReferenceRegistry) {
     const limit = args.limit as number;
-    // Sign-in events hold IP addresses, so they are never searched or returned.
-    const page = this.deps.activity.list({
-      ...(args.from ? { from: args.from as string } : {}),
-      ...(args.to ? { to: args.to as string } : {}),
-      ...(args.light_id ? { deviceId: args.light_id as string } : {}),
-      ...(args.type ? { eventType: args.type as (typeof QUERYABLE_TYPES)[number] } : {}),
-      ...(args.outcome ? { outcome: args.outcome as (typeof activityOutcomes)[number] } : {}),
-      limit: Math.min(500, limit * 3),
-    });
+    // Sign-in events hold IP addresses, so they are never searched or returned. They are left out
+    // in the query itself, so many failed sign-ins cannot crowd out the events that matter.
+    const page = this.deps.activity.list(
+      {
+        ...(args.from ? { from: args.from as string } : {}),
+        ...(args.to ? { to: args.to as string } : {}),
+        ...(args.light_id ? { deviceId: args.light_id as string } : {}),
+        ...(args.type ? { eventType: args.type as (typeof QUERYABLE_TYPES)[number] } : {}),
+        ...(args.outcome ? { outcome: args.outcome as (typeof activityOutcomes)[number] } : {}),
+        limit,
+      },
+      { excludeEventTypes: ['auth'] },
+    );
     return page.events
       .filter((e) => e.eventType !== 'auth')
-      .slice(0, limit)
       .map((e) => ({
         ref: refs.add('activity', String(e.id), e.message, '/activity'),
         at: e.createdAt,

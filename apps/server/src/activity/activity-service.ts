@@ -70,9 +70,14 @@ export class ActivityService {
     );
   }
 
-  list(query: ActivityQuery): ActivityListDto {
+  /** `excludeEventTypes` is for internal callers, such as Ask, that must never see some events. */
+  list(query: ActivityQuery, options: { excludeEventTypes?: ActivityEventType[] } = {}): ActivityListDto {
     const where: string[] = [];
     const params: unknown[] = [];
+    if (options.excludeEventTypes && options.excludeEventTypes.length > 0) {
+      where.push(`a.event_type NOT IN (${options.excludeEventTypes.map(() => '?').join(', ')})`);
+      params.push(...options.excludeEventTypes);
+    }
     if (query.deviceId) {
       where.push('a.device_id = ?');
       params.push(query.deviceId);
