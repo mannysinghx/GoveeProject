@@ -15,7 +15,7 @@ The plan itself is [ai-features-plan.md](ai-features-plan.md). [PROGRESS.md](PRO
 | Based on | `main` at `81e115b`, merged in as `543bbe3` |
 | Uncommitted | Nothing |
 | Pushed? | **Yes**, as a backup, with the owner's approval ("Yes, after CI"). `origin/claude/stoic-antonelli-c7ec73` holds `9c139c2`; later documentation commits may be local until the next push. Railway deploys only `main`, so pushing deployed nothing. |
-| Deployed? | No. Production on Railway runs `main` and has none of this. |
+| Deployed? | **Yes.** `main` was fast-forwarded to `9cb9eb3` on 10 November 2026 at 07:14 UTC, with the owner's approval. Railway deployment `6dceade9` succeeded, migration `005_ai.sql` applied, and the three providers loaded from Railway variables. Roll back by redeploying `2de021d` in Railway. |
 | Where it is on disk | `/Volumes/ARGUS5/PROJECTS/GoveeProject/.claude/worktrees/stoic-antonelli-c7ec73`, a git worktree of `/Volumes/ARGUS5/PROJECTS/GoveeProject` |
 
 The code is safe on GitHub. To back up commits made since the last push, run local CI on them and then push again, with the owner's approval:
@@ -62,7 +62,6 @@ Still open, for the owner (details in the plan):
 Nothing is half-done. Not started yet:
 
 - **The first real questions to each provider.** This needs the owner's keys in `.env` locally, or in Railway. Each question costs a fraction of a cent.
-- **Deployment.** One push to `main`, after approval. It redeploys the `@glm/server` service and applies migration `005_ai.sql`, which only adds the tables `ai_usage` and `ai_questions`.
 
 ## 5. Open findings
 
@@ -97,10 +96,10 @@ Still open:
 
 ## 6. Next steps, in order
 
-1. The owner decides D3 (the cap) and D7 (which providers' data terms are acceptable), and puts the chosen keys in a local `.env` or in Railway.
-2. With the owner's keys in a local `.env`, never pasted into a chat, ask one real question per provider against the dev-mock stack. Record the real token counts in the plan's Cost section, and correct any model or parameter the providers reject, open findings 1 and 2 especially.
+1. The owner asks a few questions in Ask on www.lightup.ink. Round-robin means three questions reach all three providers. Then check Settings, then AI, for any provider marked as resting, and its note.
+2. Fix any model or parameter a provider rejects. Record the real token counts in the plan's Cost section, and correct any model or parameter the providers reject, open findings 1 and 2 especially.
 3. Check Ask against five real past events from production data, which needs the owner: a missed run, an offline light, a rate limit, a schedule skipped by policy, and a catch-up.
-4. Merge `main` in again, check the migration number, re-run CI, and propose one deployment, with what changed, what was tested, the risk and how to undo it. Undo is redeploying the previous `main` commit in Railway; the two new tables can stay.
+4. The owner decides D3 (the cap; the default is $5) and D7 (which providers' data terms are acceptable). Drop a provider by removing its key in Railway.
 5. Then Phase 2 of the plan.
 
 ## 7. Facts the code depends on
