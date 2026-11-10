@@ -30,18 +30,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-**AI Ask (Phase 1 of `docs/ai-features-plan.md`)** is built and committed on the branch `claude/stoic-antonelli-c7ec73`. It is not pushed or deployed.
-
-- **Providers:** DeepSeek, Gemini and GLM, in rotation, through one built-in client with no SDK.
-- **Changes:**
-  - new: `apps/server/src/ai/`, `migrations/005_ai.sql`, `packages/shared/src/ai.ts`, `apps/web/src/features/ai/`
-  - Ask boxes on the Connections and Activity pages, and an AI section in Settings
-  - docs and `.env.example`
-- **Tests:** server and web tests pass. Local CI results are below.
-- **Not done:**
-  - Real-provider check. It needs the owner's keys in `.env` or Railway, and real questions cost a fraction of a cent each.
-  - Deployment, which waits for the owner's approval. It redeploys `@glm/server` and applies migration `005_ai.sql`, which only adds two tables.
-- **Merge notes:** the branch also carries `docs/multi-user-plan.md` (on hold) and `docs/ai-features-plan.md`. It merged `main` at `81e115b`, so check for a newer migration number before merging.
+**AI Ask (Phase 1 of `docs/ai-features-plan.md`)** is built on the branch `claude/stoic-antonelli-c7ec73`, which is **not pushed and not deployed**. Local CI on `ed0fd9b` fails at the type check in `apps/server/tests/ai.test.ts:99`. The fix is written down. **Everything needed to carry on is in [ai-build-progress.md](ai-build-progress.md):** where it stopped, what is verified, the open findings, the next steps, and how to resume on any computer.
 
 Nothing else in this checkout. The white-LED fix is on the branch `fix/white-leds`, not deployed, and needs a rebase onto `origin/main`. The untracked `marketing/` folder is not part of this work.
 
