@@ -2,7 +2,7 @@
 
 This file is for whoever picks up the AI work next, on any account, tool or computer, without the conversation that produced it. Everything needed is in this repository; nothing depends on a chat history, a scratch folder or a running session.
 
-Last updated: 9 November 2026, 20:45 UTC.
+Last updated: 9 November 2026, after the review fixes and the first push.
 
 The plan itself is [ai-features-plan.md](ai-features-plan.md). [PROGRESS.md](PROGRESS.md) remains the progress document for the whole project and points here.
 
@@ -11,23 +11,17 @@ The plan itself is [ai-features-plan.md](ai-features-plan.md). [PROGRESS.md](PRO
 | | |
 |---|---|
 | Branch | `claude/stoic-antonelli-c7ec73` |
-| Last commit | `ed0fd9b` Add Ask, answered by DeepSeek, Gemini and GLM in turn. This document is committed after it. |
+| Last code commit | `9c139c2` Fix what the review of Ask found. Local CI passed on it in full. This document's update is committed after it. |
 | Based on | `main` at `81e115b`, merged in as `543bbe3` |
 | Uncommitted | Nothing |
-| **Pushed?** | **No.** The branch exists only on the owner's Mac. GitHub (`origin`) has `main` only. |
+| Pushed? | **Yes**, as a backup, with the owner's approval ("Yes, after CI"). `origin/claude/stoic-antonelli-c7ec73` holds `9c139c2`; later documentation commits may be local until the next push. Railway deploys only `main`, so pushing deployed nothing. |
 | Deployed? | No. Production on Railway runs `main` and has none of this. |
 | Where it is on disk | `/Volumes/ARGUS5/PROJECTS/GoveeProject/.claude/worktrees/stoic-antonelli-c7ec73`, a git worktree of `/Volumes/ARGUS5/PROJECTS/GoveeProject` |
 
-**The one thing that could lose work:** the branch is not on GitHub. If this Mac's disk were lost, so would these commits be. To protect it, push the branch once local CI passes. A branch other than `main` does not deploy, because Railway watches `main` only. Pushing needs the owner's approval under the project rules.
+The code is safe on GitHub. To back up commits made since the last push, run local CI on them and then push again, with the owner's approval:
 
 ```bash
-git -C /Volumes/ARGUS5/PROJECTS/GoveeProject push -u origin claude/stoic-antonelli-c7ec73
-```
-
-If pushing is not wanted, a single-file backup of the branch can be kept anywhere, and restored with `git clone ai-build.bundle`:
-
-```bash
-git -C /Volumes/ARGUS5/PROJECTS/GoveeProject bundle create ~/ai-build.bundle main claude/stoic-antonelli-c7ec73
+git -C /Volumes/ARGUS5/PROJECTS/GoveeProject/.claude/worktrees/stoic-antonelli-c7ec73 push
 ```
 
 ## 2. What the owner decided
@@ -54,70 +48,60 @@ Still open, for the owner (details in the plan):
 |---|---|---|
 | Plans: [multi-user-plan.md](multi-user-plan.md), [ai-features-plan.md](ai-features-plan.md) | Claims checked against code and against provider and Railway documentation; scale measured in Docker (evidence in `docs/multi-user-evidence/`) | Committed `30127c9`, `372e3d7` |
 | Provider facts: model names, endpoints, prices, data terms | Read from each provider's own documentation on 9 November 2026; links in the plan's "The providers" section | Recorded in the plan and in section 7 below |
-| Server: the `apps/server/src/ai/` module, config, migration `005_ai.sql`, routes, wiring | `npx vitest run` in `apps/server`, in the Node 26 container | **407 passed**: the existing 392, plus 15 new in `tests/ai.test.ts` |
-| Web: Ask on the Connections and Activity pages, AI section in Settings | `npx vitest run` in `apps/web`: 148 passed before the new tests; the new `src/features/ai/ai.test.tsx` alone, 5 passed | Passed. The full web suite was not re-run after the new test file was added. |
-| Type check | `npm run typecheck -w @glm/server` and `-w @glm/web` | **Passed before `tests/ai.test.ts` was written. Fails now**, see 4a |
-| Lint | `npx eslint apps/server packages/shared apps/web` | Clean |
+| Server: the `apps/server/src/ai/` module, config, migration `005_ai.sql`, routes, wiring | `npm test` in the Node 26 container | **428 passed**: the existing 392, plus 36 in `tests/ai.test.ts` |
+| Web: Ask on the Connections and Activity pages, AI section in Settings | `npm test` | **153 passed**, including 5 in `src/features/ai/ai.test.tsx` |
+| Shared | `npm test` | 55 passed |
+| Type check and lint | `npm run typecheck`, `npx eslint .` | Clean |
+| Independent review of `ed0fd9b` | 5 reviewers, each finding checked by 2 skeptics: 41 distinct findings, 25 confirmed, 8 split, 8 refuted | All confirmed findings fixed in `9c139c2`, each with a test. The two serious ones were checked by undoing each fix and watching its test fail. See section 5. |
 | In a real browser | Production build against the Govee mock, with no AI key: Connections, Activity and Settings at desktop width and 375 px. No horizontal scroll, no console errors. | Shows "No AI provider is set up yet" as intended. **What an answer looks like has only been seen in tests,** because no AI key was available. |
-| Local CI on `ed0fd9b`: `bash scripts/ci-local.sh --image ed0fd9b` | Clean checkout in Linux, Node 26 | **Failed at type check**, see 4a. Build and install passed; tests, audit and image were not reached. |
+| Local CI on `ed0fd9b` | `bash scripts/ci-local.sh --image ed0fd9b` | Failed at the type check: a test file only, fixed in `9c139c2` |
+| **Local CI on `9c139c2`** | `bash scripts/ci-local.sh --image 9c139c2`: clean checkout, Linux, Node 26 | **Passed in full:** install, build, type check, lint, all tests, production dependency audit (0 vulnerabilities), the frontend bundle check, the production image build and its smoke test |
 
 ## 4. In flight
 
-### 4a. CI failure to fix (blocks any push)
-
-`apps/server/tests/ai.test.ts:99`, in the test "uses only providers with a key, in the order given". It spreads `testConfig()`, which is an already-parsed `AppConfig`, into `loadConfig()`, which expects raw environment strings. Vitest does not type-check, so the test passes; `tsc` rejects it with TS2352.
-
-**Fix:** replace `...testConfig(),` with the raw values the test needs, and remove the `as NodeJS.ProcessEnv` cast if it is no longer needed:
-
-```ts
-const config = loadConfig({
-  NODE_ENV: 'test',
-  DATABASE_PATH: ':memory:',
-  AI_PROVIDERS: 'glm, nonsense, deepseek, glm',
-  DEEPSEEK_API_KEY: 'a-key',
-  GLM_API_KEY: 'b-key',
-  GEMINI_API_KEY: '',
-});
-```
-
-Then remove `testConfig` from that file's imports if nothing else uses it, and re-run the type check and the whole of `scripts/ci-local.sh --image`.
-
-### 4b. Independent review, running when this was written
-
-A multi-agent review of `ed0fd9b` was started:
-
-- **The reviewers:** five, one angle each: provider API correctness against the saved docs, security and privacy, concurrency and the spending cap, integration with the existing app, and test strength.
-- **Verification:** two skeptics per finding try to refute it.
-- **Its results live only in that session.** If they never arrive here, run the review again; the angles above are the brief.
-- **How to apply them:** apply the confirmed findings together with 4a, as one batch.
-
-When results arrive, record them in section 5 with file, line and severity.
-
-### 4c. Not started
+Nothing is half-done. Not started yet:
 
 - **The first real questions to each provider.** This needs the owner's keys in `.env` locally, or in Railway. Each question costs a fraction of a cent.
 - **Deployment.** One push to `main`, after approval. It redeploys the `@glm/server` service and applies migration `005_ai.sql`, which only adds the tables `ai_usage` and `ai_questions`.
 
 ## 5. Open findings
 
+Review findings fixed in `9c139c2`, recorded so nobody re-raises them:
+
+- Sunrise and sunset schedules leaked latitude and longitude through `list_schedules`.
+- Gemini 3's `extra_content` (thought signature) was dropped from replayed tool calls.
+- `finish_reason` was ignored.
+- The 8-request limit applied per provider rather than per question.
+- There was no deadline per question, and no cap on tool calls or tool output.
+- Local errors rested every provider.
+- Retry-After was ignored for a lone provider, and a provider stayed marked as resting after answering.
+- An answer's cost left out what failed providers spent.
+- Failed sign-ins could crowd real events out of `search_activity`.
+- Tool names on `Object.prototype` were accepted.
+- GLM-5.3 was sent thinking "disabled".
+- Gemini's array-wrapped errors were not read.
+- Answers were not announced to screen readers.
+- Several tests were too weak to catch a regression.
+
+Still open:
+
 | # | Finding | Where | Severity | Who decides |
 |---|---|---|---|---|
-| 1 | Type error breaks local CI | `apps/server/tests/ai.test.ts:99` | High: blocks push | Fix, see 4a |
-| 2 | GLM-4.7-Flash with `thinking: {type: 'disabled'}` is unverified. Z.ai's docs say GLM-4.7 "will think compulsorily" when thinking is on, but do not say whether disabling it is accepted. | `apps/server/src/ai/providers.ts`, the `glm` entry | Medium | First real question. If GLM rejects it, the question moves to the next provider and the error shows in Settings. |
-| 3 | A new Gemini key may not reach `gemini-2.5-flash-lite`, because Google limits 2.5 models to people who used them before. The default is therefore `gemini-3.1-flash-lite`. | `GEMINI_MODEL` | Low | Owner, if they want the cheaper model |
+| 1 | GLM-4.7-Flash with `thinking: {type: 'disabled'}` is unverified. Z.ai documents it as optional, "disabled" or "enabled", but it has not been sent for real. | `apps/server/src/ai/providers.ts`, the `glm` entry | Medium | The first real question. If GLM rejects it, the question moves on and the error shows in Settings. |
+| 2 | Gemini's `extra_content` handling follows Google's thought-signature rules, but has only been tested against the stand-in. | `providers.ts` | Medium | The first real Gemini question that uses a tool |
+| 3 | A new Gemini key may not reach `gemini-2.5-flash-lite`, because Google limits 2.5 models to people who used them before. The default is `gemini-3.1-flash-lite`. | `GEMINI_MODEL` | Low | Owner, if they want the cheaper model |
 | 4 | `docs/govee-integration.md`, row 14, says no page confirms that a new Govee key disables the old one. Govee's notice, effective 15 May 2026, now does. The Settings text "may invalidate" is out of date too. | `docs/govee-integration.md`, `apps/web/src/features/settings/SettingsPage.tsx` (`ServerConfiguration`) | Low | Anyone, separately from the AI work |
 | 5 | `scripts/ci-local.sh` is not executable in git (mode 100644), so `scripts/ci-local.sh --image` fails with "permission denied". Use `bash scripts/ci-local.sh --image`, as `npm run ci` does. | `scripts/ci-local.sh` | Low | Owner; a mode change is a one-line commit |
 | 6 | `main` keeps moving, because other sessions work on it. This branch's `docs/PROGRESS.md` and `docs/OPS_LOG.md` changes may conflict, and migration `005` must still be the next free number when merging. | Merge time | Medium | Whoever merges |
+| 7 | Split review points, judged not worth changing now. A request that a provider bills but that returns HTTP 200 with an unusable body is estimated, not exact. The cursor is not persisted, so a restart begins again with the first provider. | `ai-service.ts` | Low | None needed |
 
 ## 6. Next steps, in order
 
-1. Fix 4a, apply the confirmed review findings, and commit.
-2. Run `bash scripts/ci-local.sh --image` on that exact commit. It must pass completely.
-3. Ask the owner to push the branch as a backup, then decide D3 and D7.
-4. With the owner's keys in a local `.env`, never pasted into a chat, ask one real question per provider against the dev-mock stack. Record the real token counts in the plan's Cost section, and correct any model or parameter the providers reject, finding 2 especially.
-5. Check Ask against five real past events from production data, which needs the owner: a missed run, an offline light, a rate limit, a schedule skipped by policy, and a catch-up.
-6. Merge `main` in again, check the migration number, re-run CI, and propose one deployment, with what changed, what was tested, the risk and how to undo it. Undo is redeploying the previous `main` commit in Railway; the two new tables can stay.
-7. Then Phase 2 of the plan.
+1. The owner decides D3 (the cap) and D7 (which providers' data terms are acceptable), and puts the chosen keys in a local `.env` or in Railway.
+2. With the owner's keys in a local `.env`, never pasted into a chat, ask one real question per provider against the dev-mock stack. Record the real token counts in the plan's Cost section, and correct any model or parameter the providers reject, open findings 1 and 2 especially.
+3. Check Ask against five real past events from production data, which needs the owner: a missed run, an offline light, a rate limit, a schedule skipped by policy, and a catch-up.
+4. Merge `main` in again, check the migration number, re-run CI, and propose one deployment, with what changed, what was tested, the risk and how to undo it. Undo is redeploying the previous `main` commit in Railway; the two new tables can stay.
+5. Then Phase 2 of the plan.
 
 ## 7. Facts the code depends on
 
@@ -152,7 +136,7 @@ git log --oneline -5
 
 ### On another computer
 
-Only possible after the branch is pushed, or copied as a bundle (section 1).
+The branch is on GitHub.
 
 ```bash
 git clone https://github.com/mannysinghx/GoveeProject && cd GoveeProject
