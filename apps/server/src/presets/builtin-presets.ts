@@ -4,7 +4,11 @@ import {
   BUILTIN_PRESETS,
   builtinPresetActions,
   FIREWORKS_PRESET,
+  HOLIDAYS,
+  addMinutesToTime,
+  builtinPresetByKey,
   orderLightStrings,
+  type HolidayDefinition,
   type AppSettings,
   type BuiltinString,
   type GroupDto,
@@ -120,6 +124,7 @@ export class BuiltinPresets {
     }
     const group = this.syncGroup(ordered);
     this.installFireworks(group);
+    this.installHolidays(group);
   }
 
   /** Scenes are only fetched once per light here. A failure leaves the color fallback, and is retried. */
@@ -217,6 +222,80 @@ export class BuiltinPresets {
     if (!group) return null;
     const same = group.deviceIds.length === ids.length && ids.every((id) => group.deviceIds.includes(id));
     return same ? group : this.groups.update(group.id, { deviceIds: ids });
+  }
+
+  /** Each show is set up once, and all of it or none of it. Deleted stays deleted. */
+  private installHolidays(group: GroupDto | null): void {
+    if (!group) return;
+    let added = 0;
+    for (const holiday of HOLIDAYS) {
+      const installKey = `holiday:${holiday.key}`;
+      if (this.installed(installKey) !== undefined) continue;
+      try {
+        this.db.transaction(() => {
+          if (holiday.key === FIREWORKS_PRESET.key) this.tagFireworks();
+          else this.createShow(holiday, group);
+          this.markInstalled(installKey, null);
+        })();
+        if (holiday.key !== FIREWORKS_PRESET.key) added += 1;
+      } catch (error) {
+        // One bad show must not stop the others. The next sync tries it again.
+        this.logger.error({ err: error, holiday: holiday.key }, 'Could not set up a holiday show');
+      }
+    }
+    if (added > 0) {
+      this.activity.record({ eventType: 'schedule', outcome: 'info', message: `Set up ${added} holiday show(s). See Schedules.` });
+    }
+  }
+
+  private presetId(key: string): string {
+    const row = this.db.prepare('SELECT id FROM presets WHERE builtin_key = ?').get(key) as { id: string } | undefined;
+    if (!row) throw new Error(`Built-in preset ${key} is missing.`);
+    return row.id;
+  }
+
+  private createShow(holiday: HolidayDefinition, group: GroupDto): void {
+    const timeZone = this.getSettings().defaultTimeZone;
+    const target = { type: 'group' as const, groupId: group.id };
+    holiday.steps.forEach((step, index) => {
+      const time = addMinutesToTime(holiday.startTime, step.minutesAfterStart);
+      this.schedules.create(
+        {
+          name: index === 0 ? holiday.name : `${builtinPresetByKey(step.presetKey)?.name ?? holiday.name} (${time})`,
+          enabled: true,
+          timeZone,
+          recurrence: { kind: 'holiday', holiday: holiday.key, time },
+          target,
+          action: { type: 'preset', presetId: this.presetId(step.presetKey) },
+          missedRunPolicy: 'skip',
+        },
+        { key: holiday.key, quiet: index > 0 },
+      );
+    });
+    if (holiday.endTime === null) return;
+    this.schedules.create(
+      {
+        name: `${holiday.name}: end`,
+        enabled: true,
+        timeZone,
+        recurrence: { kind: 'holiday', holiday: holiday.key, time: holiday.endTime },
+        target,
+        action: { type: 'power', on: false },
+        // Late is better than lights left running all night.
+        missedRunPolicy: 'run_latest',
+      },
+      { key: holiday.key, quiet: true },
+    );
+  }
+
+  /** The fireworks schedules came first, so they join the calendar by being tagged. */
+  private tagFireworks(): void {
+    const key = FIREWORKS_PRESET.key;
+    const showId = this.installed(INSTALL_FIREWORKS);
+    if (showId) this.db.prepare('UPDATE schedules SET builtin_show = ? WHERE id = ?').run(key, showId);
+    this.db
+      .prepare(`UPDATE schedules SET builtin_show = ?, quiet = 1 WHERE name = ? AND builtin_show IS NULL`)
+      .run(key, `${FIREWORKS_PRESET.name}: end`);
   }
 
   /** Runs once. If the owner later deletes these schedules, they stay deleted. */

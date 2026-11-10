@@ -1,8 +1,9 @@
-import { Activity, CalendarClock, Layers, Lightbulb, LogOut, Settings, Sparkles, Wifi } from 'lucide-react';
+import { Activity, Bell, CalendarClock, Layers, Lightbulb, LogOut, Settings, Sparkles, Wifi } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '../components/ui';
 import { useLogout } from '../features/auth/useSession';
+import { useNotifications } from '../lib/queries';
 
 const NAV = [
   { to: '/', label: 'Dashboard', short: 'Home', icon: Lightbulb, end: true },
@@ -14,8 +15,20 @@ const NAV = [
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
+function UnreadCount({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="ml-auto min-w-5 rounded-full bg-amber-glow px-1.5 text-center text-xs font-semibold text-ink-900 tabular-nums">
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
+
 export function AppShell({ username, children }: { username: string; children: ReactNode }) {
   const logout = useLogout();
+  const notifications = useNotifications();
+  const unread = notifications.data?.unread ?? 0;
+  const bellLabel = unread > 0 ? `Notifications, ${unread} unread` : 'Notifications';
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[15rem_1fr]">
@@ -49,6 +62,21 @@ export function AppShell({ username, children }: { username: string; children: R
               {label}
             </NavLink>
           ))}
+          <NavLink
+            to="/notifications"
+            aria-label={bellLabel}
+            className={({ isActive }) =>
+              `flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${
+                isActive
+                  ? 'bg-amber-wash font-medium text-amber-soft'
+                  : 'text-ink-300 hover:bg-ink-800 hover:text-ink-100'
+              }`
+            }
+          >
+            <Bell className="size-4" aria-hidden />
+            Notifications
+            <UnreadCount count={unread} />
+          </NavLink>
         </nav>
         <div className="border-t border-ink-700/70 p-3">
           <p className="truncate px-2 pb-2 text-xs text-ink-400">Signed in as {username}</p>
@@ -64,6 +92,20 @@ export function AppShell({ username, children }: { username: string; children: R
           </Button>
         </div>
       </aside>
+
+      {/* The bottom bar is full on a phone, so the bell has its own place. */}
+      <NavLink
+        to="/notifications"
+        aria-label={bellLabel}
+        className="fixed top-[max(0.5rem,env(safe-area-inset-top))] right-2 z-40 flex size-11 items-center justify-center rounded-full border border-ink-700 bg-ink-900 text-ink-200 md:hidden"
+      >
+        <Bell className="size-5" aria-hidden />
+        {unread > 0 ? (
+          <span className="absolute -top-1 -right-1 min-w-5 rounded-full bg-amber-glow px-1 text-center text-[11px] font-semibold text-ink-900 tabular-nums">
+            {unread > 99 ? '99+' : unread}
+          </span>
+        ) : null}
+      </NavLink>
 
       <main id="main" className="min-w-0 px-4 pt-5 pb-24 sm:px-6 md:pb-10 lg:px-8">
         <div className="mx-auto max-w-6xl">{children}</div>

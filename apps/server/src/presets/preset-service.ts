@@ -328,7 +328,14 @@ export class PresetService {
   async apply(
     id: string,
     target: Target | undefined,
-    source?: { type: CommandSourceType; id: string; name: string; correlationId?: string | null },
+    source?: {
+      type: CommandSourceType;
+      id: string;
+      name: string;
+      correlationId?: string | null;
+      quiet?: boolean;
+      noCatchUp?: boolean;
+    },
     correlationId?: string,
   ): Promise<RunResultDto> {
     const preset = this.get(id);
@@ -337,7 +344,7 @@ export class PresetService {
       {
         ...(source ?? { type: 'preset', id, name: preset.name, correlationId }),
         // A show tied to a moment should not run hours later when a light comes back.
-        noCatchUp: preset.builtin?.isAutomaticShow ?? false,
+        noCatchUp: (source?.noCatchUp ?? false) || (preset.builtin?.isAutomaticShow ?? false),
       },
       plans,
       skipped,

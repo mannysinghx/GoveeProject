@@ -1,3 +1,4 @@
+import { holidayByKey } from './holidays.js';
 import type { DeviceAction, Recurrence, ScheduleAction } from './schemas.js';
 
 /** "0-4, 7, 9-10". Sorted and collapsed so long selections stay readable. */
@@ -71,6 +72,8 @@ export function describeRecurrence(recurrence: Recurrence): string {
       return `${describeWeekdays(recurrence.weekdays).replace(/^./, (c) => c.toUpperCase())} at ${recurrence.time}${bounds(recurrence)}`;
     case 'yearly':
       return `Every year on ${MONTHS[recurrence.month - 1]} ${recurrence.day} at ${recurrence.time}${bounds(recurrence)}`;
+    case 'holiday':
+      return `${holidayByKey(recurrence.holiday)?.name ?? recurrence.holiday}, every year at ${recurrence.time}${bounds(recurrence)}`;
     case 'solar': {
       const offset = recurrence.offsetMinutes;
       const when =

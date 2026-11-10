@@ -32,6 +32,16 @@ export interface RunSource {
   correlationId?: string | null;
   /** Do not keep this for lights that were offline. */
   noCatchUp?: boolean;
+  /** Only notify if something goes wrong. */
+  quiet?: boolean;
+}
+
+export interface RunFinished {
+  source: RunSource;
+  plans: DevicePlan[];
+  outcomes: ActionOutcomeDto[];
+  status: Exclude<RunStatus, 'running'>;
+  runId: string;
 }
 
 export type PlannedSkip = { deviceName: string; deviceId: string | null; action: DeviceAction; reason: string };
@@ -44,6 +54,9 @@ const DIRECT_WAIT_MS = 20_000;
  * Nothing here claims devices changed together: each device runs independently.
  */
 export class ActionService {
+  private readonly runListeners: ((run: RunFinished) => void)[] = [];
+  private onListenerError: ((error: unknown) => void) | null = null;
+
   constructor(
     private readonly db: Db,
     private readonly scenes: SceneStore,
@@ -53,6 +66,12 @@ export class ActionService {
     private readonly clock: Clock,
     private readonly missed: MissedDeliveryStore,
   ) {}
+
+  /** Told about each run once its commands have been sent. */
+  onRunFinished(listener: (run: RunFinished) => void, onError?: (error: unknown) => void): void {
+    this.runListeners.push(listener);
+    if (onError) this.onListenerError = onError;
+  }
 
   /** Sends one action from the UI. Waits for the outcome, up to a limit. */
   async dispatchDirect(
@@ -140,6 +159,15 @@ export class ActionService {
       message: `${source.name}: ${accepted} of ${outcomes.length} action(s) accepted by Govee.`,
       details: { runId, status },
     });
+
+    // A listener's failure must never turn a run that worked into one that looks failed.
+    for (const listener of this.runListeners) {
+      try {
+        listener({ source, plans, outcomes, status, runId });
+      } catch (error) {
+        this.onListenerError?.(error);
+      }
+    }
 
     return {
       runId,

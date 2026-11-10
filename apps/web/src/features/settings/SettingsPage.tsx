@@ -19,7 +19,15 @@ function GeneralSettings({ settings }: { settings: AppSettings }) {
   const submit = (event: FormEvent) => {
     event.preventDefault();
     // These are edited on their own screens. A stale copy here must not overwrite them.
-    const { patternStrings: _patternStrings, catchUpEnabled: _catchUpEnabled, ...rest } = form;
+    const {
+      patternStrings: _patternStrings,
+      catchUpEnabled: _catchUpEnabled,
+      notifyScheduleStarts: _notifyScheduleStarts,
+      notifyPatternStarts: _notifyPatternStarts,
+      notifyHeadsUp: _notifyHeadsUp,
+      notifyProblems: _notifyProblems,
+      ...rest
+    } = form;
     update.mutate({
       ...rest,
       latitude: latitude === '' ? null : Number(latitude),

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { FESTIVAL_PRESETS, FIREWORKS_PRESET, recurrenceSchema, type DiscoveryResultDto, type PresetDto, type ScheduleDto } from '@glm/shared';
+import { BUILTIN_PRESETS, FESTIVAL_PRESETS, FIREWORKS_PRESET, recurrenceSchema, type DiscoveryResultDto, type PresetDto, type ScheduleDto } from '@glm/shared';
 import { nextOccurrence, occurrenceOnDate } from '../src/scheduler/occurrences.js';
 import { authedClient, createHarness, type Harness } from './support/harness.js';
 import { mockFullDevice } from './support/mock-govee.js';
@@ -57,7 +57,7 @@ describe('the built-in presets', () => {
     const { h, left, center, right } = await house();
     const all = presets(h).filter((p) => p.builtin);
     expect(FESTIVAL_PRESETS).toHaveLength(20);
-    expect(all).toHaveLength(21);
+    expect(all).toHaveLength(BUILTIN_PRESETS.length);
     for (const preset of all) {
       expect(preset.needsTarget).toBe(false);
       expect(new Set(preset.actions.map((a) => a.deviceId))).toEqual(new Set([left, center, right]));
@@ -264,10 +264,10 @@ describe('fireworks at midnight on January 1', () => {
 describe('waking at the exact time', () => {
   it('wakes exactly when a run is due before the next regular check', async () => {
     const { h } = await house();
-    const midnight = Date.parse('2027-01-01T08:00:00.000Z');
-    expect(h.ctx.scheduler.nextWakeDelayMs(midnight - 7_000)).toBe(7_000);
-    expect(h.ctx.scheduler.nextWakeDelayMs(midnight - 60_000)).toBeNull(); // A regular check comes first.
-    expect(h.ctx.scheduler.nextWakeDelayMs(midnight + 1)).toBeNull(); // Already due: the next check takes it.
+    const soonest = Math.min(...h.ctx.schedules.list().flatMap((s) => (s.nextRun ? [Date.parse(s.nextRun.at)] : [])));
+    expect(h.ctx.scheduler.nextWakeDelayMs(soonest - 7_000)).toBe(7_000);
+    expect(h.ctx.scheduler.nextWakeDelayMs(soonest - 60_000)).toBeNull(); // A regular check comes first.
+    expect(h.ctx.scheduler.nextWakeDelayMs(soonest + 1)).toBeNull(); // Already due: the next check takes it.
   });
 });
 

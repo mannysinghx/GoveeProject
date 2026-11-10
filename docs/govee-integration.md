@@ -60,6 +60,10 @@ Govee's supported-model list includes `H805C`. The list says nothing about which
 
 The scenes endpoint returned 113 scenes for a real H805C, including Fireworks, New Years, Thanksgiving, Christmas Eve, Winter Wonderland and Fall. Scene ids are read from Govee for each light, never hard-coded. **None of these has been activated on real lights from this app yet**, so how they look, and whether they carry on after the app stops sending commands, is unconfirmed.
 
+### Diwali dates
+
+These come from [Drik Panchang's Lakshmi Puja listing for Los Angeles](https://www.drikpanchang.com/festivals/lakshmipuja/festivals-lakshmipuja-timings.html?geoname-id=5368361), read on 2026-11-07. 2026-11-08, 2027-10-28 and 2030-10-25 were read on their own year pages. 2028-10-17, 2029-11-05, 2031-11-13, 2032-11-02, 2033-10-22, 2034-11-09, 2035-10-30, 2036-10-18 and 2037-11-06 are list entries on those pages. They are not from Govee or any government. Calendars for India differ by a day in some years, such as 2027-10-29 and 2030-10-26, and the date also depends on location. The editor changes times, not dates. To use a different date in a given year, skip that year's show and add a one-time schedule.
+
 ### LEDs per string
 
 Govee's API reports neither length nor LED count, so these come from outside it:

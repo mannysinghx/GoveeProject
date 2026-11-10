@@ -46,11 +46,30 @@
 - **Other schedules still run.** A nightly "turn off" still runs on New Year's Eve, and the show turns the lights back on at midnight.
 - **Festival dates are not automatic.** Only the fireworks run by themselves. Other festival presets run when you apply or schedule them.
 
+## Limits of the holiday calendar
+
+- **Your own schedules still run.** A daily "turn on" and "apply pattern" show your usual pattern until the holiday starts, and a nightly "turn off" still runs, including during New Year's Eve.
+- **Diwali's date is one calendar's, for Los Angeles.** It is not a fact from Govee or a government, and it ends at 2037.
+- **Many holidays have no official colors.** Those are suggestions. Duplicate a preset and point the schedule at your copy to change one.
+- **Effects are not blended with patterns.** A string shows either fixed colors or an effect, so Diwali takes turns rather than combining them.
+- **New holidays need an app update.** The list is built in, though you can add your own schedule for any date.
+- **Holiday dates cannot be edited.** They are worked out for each year. To use another date, skip that year's show and add a one-time schedule.
+- **Steps stay on one date.** A show cannot cross midnight, so to end after midnight, turn off its end time and add a schedule of your own.
+- **Your changes apply every year,** not just to the next date.
+
+## Limits of notifications
+
+- **Real phone delivery has not been tested.** It was checked up to the point of handing a correctly signed, encrypted message to the push library. It depends on Apple, Google or Mozilla's push service and your phone.
+- **iPhones need the app on the Home Screen,** on iOS 16.4 or later. Notification buttons may not appear there; tap the notification to answer in the app.
+- **Web Push uses your browser maker's push service.** It needs no account, and the content is encrypted, but the service does see that a message was sent to your device, and when. If that service is down, the app still shows the notification.
+- **A notification appears when sending finishes,** a few seconds after a run starts, so it can report what really happened.
+- **Skip must arrive before the show starts.** Answering after that records the answer but cannot undo what has run.
+
 ## Limits of connection monitoring
 
 - **It diagnoses and retries. It does not repair.** Govee's public API has no restart, Wi-Fi or firmware commands, and a hosted server cannot reach your home network.
 - **Causes are likely, not certain.** They come from comparing which lights respond.
-- **Alerts appear only in the app.** There is no email or text alert.
+- **There are no email or text alerts.** Problems appear under Notifications, and on your phone if you turn that on.
 - **Delay.** A drop can take a couple of minutes to appear, and a shorter drop between checks can go unnoticed.
 - **Accepted is not confirmed.** A resent pattern is reported as accepted by Govee, which does not report segment colors.
 - **Catching up restores segment colors, not everything.** Only what the app tried to send while the light was offline is kept, and only the newest for each light. Changes made in the Govee Home app are not known to it.

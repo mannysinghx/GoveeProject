@@ -18,6 +18,7 @@ import { constantTimeEqual, type SessionInfo } from '../auth/auth-service.js';
 import { SESSION_COOKIE } from '../auth/cookies.js';
 import { isLoopbackHost } from '../config/env.js';
 import { registerConnectionRoutes } from '../connection/connection-routes.js';
+import { registerNotificationRoutes } from '../notifications/notification-routes.js';
 import { registerDeviceRoutes } from '../devices/device-routes.js';
 import { registerGroupRoutes } from '../groups/group-routes.js';
 import { registerPresetRoutes } from '../presets/preset-routes.js';
@@ -166,6 +167,7 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
       registerScheduleRoutes(api, ctx);
       registerActivityRoutes(api, ctx);
       registerConnectionRoutes(api, ctx);
+      registerNotificationRoutes(api, ctx);
     },
     { prefix: '/api/v1' },
   );

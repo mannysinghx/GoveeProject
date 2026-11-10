@@ -282,7 +282,7 @@ export function ConnectionPage() {
             By itself, the app rechecks your device list, retries through temporary Govee failures, and resends missed patterns
             if you turn that on. It cannot restart a controller, change Wi-Fi settings, read firmware or repair hardware, because
             Govee's public API offers no way to, and this server is not on your home network. The causes above are its best
-            reading of what is and is not working. Problems appear here only, with no email or text alerts.
+            reading of what is and is not working. Problems also appear under Notifications, and on your phone if you turn that on. There are no email or text alerts.
           </Notice>
         </div>
       ) : null}

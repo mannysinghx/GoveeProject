@@ -502,6 +502,8 @@ describe('schedules', () => {
     missedRunPolicy: 'skip',
     nextRun: { at: '2027-03-14T07:30:00.000Z', local: '2027-03-14 03:30 EDT', note: 'dst_gap_moved_forward' },
     problem: null,
+    builtinShow: null,
+    quiet: false,
     lastExecution: null,
     createdAt: '',
     updatedAt: '',

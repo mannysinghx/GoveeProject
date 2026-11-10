@@ -90,6 +90,7 @@ export class ConnectionMonitor {
   private lastManualCheckMs = 0;
   private lastHealDiscoveryMs = 0;
   private current: Promise<void> | null = null;
+  private incidentListener: ((event: 'opened' | 'closed', kind: IncidentKind, deviceName: string | undefined) => void) | null = null;
 
   constructor(
     private readonly db: Db,
@@ -256,6 +257,19 @@ export class ConnectionMonitor {
       .get(kind, deviceId ?? '') as IncidentRow | undefined;
   }
 
+  /** Told when a problem starts or ends. */
+  onIncident(listener: (event: 'opened' | 'closed', kind: IncidentKind, deviceName: string | undefined) => void): void {
+    this.incidentListener = listener;
+  }
+
+  private tellListener(event: 'opened' | 'closed', kind: IncidentKind, deviceName: string | undefined): void {
+    try {
+      this.incidentListener?.(event, kind, deviceName);
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Could not report a connection change');
+    }
+  }
+
   private open(kind: IncidentKind, deviceId: string | null, deviceName?: string): void {
     const now = this.clock.nowIso();
     const existing = this.findOpen(kind, deviceId);
@@ -271,6 +285,7 @@ export class ConnectionMonitor {
     const label = deviceName ? `${deviceName} ${INCIDENT_LABEL[kind]}` : INCIDENT_LABEL[kind];
     this.activity.record({ eventType: 'connection', outcome: 'warning', deviceId, message: `${label}.` });
     this.logger.warn({ kind, deviceId }, 'Connection problem detected');
+    this.tellListener('opened', kind, deviceName);
   }
 
   private close(kind: IncidentKind, deviceId: string | null, deviceName?: string): void {
@@ -287,6 +302,7 @@ export class ConnectionMonitor {
           : `Resolved after ${lasted}: ${INCIDENT_LABEL[kind]}.`;
     this.activity.record({ eventType: 'connection', outcome: 'success', deviceId, message });
     this.logger.info({ kind, deviceId }, 'Connection problem resolved');
+    this.tellListener('closed', kind, deviceName);
   }
 
   /* -------------------------------- catch-up ------------------------------- */

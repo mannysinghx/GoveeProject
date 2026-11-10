@@ -837,7 +837,7 @@ describe('activity and diagnostics', () => {
     const status = (await client.get('/api/v1/system/status')).json();
     expect(status).toMatchObject({
       backend: 'ok',
-      database: { status: 'ok', schemaVersion: '003_builtin_presets.sql' },
+      database: { status: 'ok', schemaVersion: '004_holidays_notifications.sql' },
       govee: { keyConfigured: true, usingLocalTestEndpoint: true },
       devices: { discovered: 1, noLongerDiscovered: 0 },
       queue: { pending: 0, pausedUntil: null },

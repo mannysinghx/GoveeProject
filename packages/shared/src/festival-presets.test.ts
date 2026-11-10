@@ -15,8 +15,8 @@ const string = (deviceId: string, segments: number, overrides: Partial<BuiltinSt
 describe('the festival catalog', () => {
   it('has exactly 20 festival presets, with unique keys and names', () => {
     expect(FESTIVAL_PRESETS).toHaveLength(20);
-    expect(new Set(BUILTIN_PRESETS.map((p) => p.key)).size).toBe(21);
-    expect(new Set(BUILTIN_PRESETS.map((p) => p.name.toLowerCase())).size).toBe(21);
+    expect(new Set(BUILTIN_PRESETS.map((p) => p.key)).size).toBe(BUILTIN_PRESETS.length);
+    expect(new Set(BUILTIN_PRESETS.map((p) => p.name.toLowerCase())).size).toBe(BUILTIN_PRESETS.length);
   });
 
   it('covers every occasion asked for, including the days around New Year', () => {
