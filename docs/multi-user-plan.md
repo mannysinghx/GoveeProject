@@ -1,6 +1,8 @@
 # Letting other people use lightup.ink with their own lights
 
 **Status: a plan only. Nothing here is built, and production was not changed.**
+
+**On hold.** On 9 November 2026 the owner said no sign-up is needed for now. Nothing below should be built unless that changes.
 Written 7 November 2026 UTC, against `main` at `10bb5c8`. Line references are to that commit.
 
 ## The short version

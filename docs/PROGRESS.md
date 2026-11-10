@@ -77,4 +77,5 @@ scripts/ci-local.sh --image
 
 ## Proposals not started
 
-Letting other people sign up and use their own lights: see [the plan](multi-user-plan.md). It is waiting on the owner's decisions, and nothing is built.
+- Letting other people sign up: [the plan](multi-user-plan.md). **On hold.** On 9 November 2026 the owner said no sign-up is needed for now.
+- AI features for the owner's own account, free to use, with a monthly spending cap: [the plan](ai-features-plan.md). It is waiting on the decisions listed in it, and nothing is built.
