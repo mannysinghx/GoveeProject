@@ -49,12 +49,14 @@ import {
   paintableDevices,
   paintCell,
   paintedSpan,
+  paintedStart,
   patternFromPreset,
   patternToActions,
   readableTextColor,
   repeatFill,
   repeatPainted,
   resolveStrings,
+  sameLook,
   serpentineRows,
   slowestStringCommands,
   toSettings,
@@ -449,17 +451,51 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
     commit(before, after);
   };
 
-  // Repeating again straight away, such as with a different gap, starts from the original
-  // pattern. Otherwise the first repeat would count as the pattern, leaving nothing to fill.
-  const lastRepeat = useRef<{ before: PatternState; after: PatternState } | null>(null);
-  const repeat = () => {
-    const previous = lastRepeat.current;
-    const source = previous && previous.after === latest.current ? previous.before : latest.current;
-    const after = repeatPainted(source, cells, repeatGap, repeatDirection);
-    change(() => after);
-    lastRepeat.current = after === source ? null : { before: source, after };
+  // Each Repeat result remembers the pattern it was made from, keyed to the result itself. So
+  // repeating again, with a different gap or direction, after an Undo or Redo, or after a background
+  // change, starts from the original. Otherwise the first repeat would count as the pattern. Any
+  // painting makes a new pattern, which is then treated as the new original.
+  const [repeatOrigins] = useState(() => new WeakMap<object, PatternState>());
+  const repeatSource = (state: PatternState): PatternState => {
+    const origin = repeatOrigins.get(state.cells);
+    return origin ? { ...origin, background: state.background } : state;
   };
-  const span = paintedSpan(lastRepeat.current?.after === pattern ? lastRepeat.current.before : pattern, cells);
+  const repeat = () => {
+    const before = latest.current;
+    const from = repeatSource(before);
+    const after = repeatPainted(from, cells, repeatGap, repeatDirection);
+    if (sameLook(after, before, cells)) return;
+    repeatOrigins.set(after.cells, from);
+    change(() => after);
+  };
+  const wasRepeated = repeatOrigins.has(pattern.cells);
+  const repeatFrom = repeatSource(pattern);
+  const span = paintedSpan(repeatFrom, cells);
+  const spanStart = paintedStart(repeatFrom, cells);
+  // Whether pressing Repeat now would change anything, so the button and the message can say so.
+  const repeatWouldChange = span > 0 && !sameLook(repeatPainted(repeatFrom, cells, repeatGap, repeatDirection), pattern, cells);
+  const repeatStatus = ((): string => {
+    if (span === 0) return 'Paint the start of your pattern above, then Repeat carries it on from where it ends, in the same order.';
+    if (!repeatWouldChange) {
+      if (wasRepeated) {
+        return repeatDirection === 'onward' && spanStart > 0
+          ? `Your ${span}-segment pattern now repeats from segment ${spanStart + 1} to the end of the last string. Segments before it are unchanged. Undo goes back to it.`
+          : `Your ${span}-segment pattern now repeats along all ${cells.length} segments. Undo goes back to it.`;
+      }
+      if (repeatDirection === 'onward' && spanStart + span >= cells.length) {
+        return 'Your pattern already reaches the last segment, so there is nothing left to carry on. Choose "both ways" to fill the segments before it.';
+      }
+      if (repeatDirection === 'both' && span >= cells.length) return 'Your pattern already covers every box.';
+      if (repeatDirection === 'onward' && spanStart + span + repeatGap >= cells.length) {
+        return 'The gap leaves no room for another copy after your pattern. Try a smaller gap.';
+      }
+      return 'Repeat would not change anything with these settings.';
+    }
+    if (wasRepeated) return `Press Repeat to use these settings on your ${span}-segment pattern. Undo goes back to what you have now.`;
+    return repeatDirection === 'onward'
+      ? `Repeat carries on after your ${span}-segment pattern, in the same order, to the end of the last string. Segments before it stay as they are.`
+      : `Repeat copies your ${span}-segment pattern across every other box, replacing what's there, on all the strings shown.`;
+  })();
 
   const undo = () => {
     const previous = undoStack.at(-1);
@@ -627,7 +663,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                   size="sm"
                   variant="primary"
                   icon={<Copy className="size-4" aria-hidden />}
-                  disabled={span === 0}
+                  disabled={!repeatWouldChange}
                   onClick={repeat}
                 >
                   Repeat
@@ -658,15 +694,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 </label>
               </div>
               <p className="text-xs text-ink-400" role="status">
-                {span === 0
-                  ? 'Paint the start of your pattern above, then Repeat fills every other box with it.'
-                  : span >= cells.length
-                    ? 'Your pattern already covers every box.'
-                  : lastRepeat.current?.after === pattern
-                    ? `Your ${span}-segment pattern now repeats along all ${cells.length} segments. Undo goes back to it.`
-                    : repeatDirection === 'onward'
-                      ? `Repeat carries on after your ${span}-segment pattern, in the same order, to the end of the last string. Boxes before it stay as they are.`
-                      : `Repeat copies your ${span}-segment pattern across every other box, replacing what's there, on all the strings shown.`}
+                {repeatStatus}
               </p>
             </div>
 

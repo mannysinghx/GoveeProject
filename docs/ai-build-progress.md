@@ -71,7 +71,9 @@ Not started yet:
 ### Also built after Phase 2 (not part of the AI plan)
 
 - **Repeat onward.** Repeat in the pattern editor now carries the painted sequence on from where it ends. A selector offers "both ways", the earlier behaviour. `repeatPainted` in `pattern-model.ts` has a `direction` argument.
-- **18 month and heritage presets** in `MONTH_PRESETS` (`packages/shared/src/festival-presets.ts`), installed as ordinary presets, with no schedules.
+  - The editor remembers the pattern each Repeat result came from (a `WeakMap` keyed to the result), so repeating again after an Undo, a gap or direction change, or a background change starts from the original.
+  - Repeat turns itself off when it would change nothing (the pattern already reaches the last segment, or the gap leaves no room), and says why.
+- **18 month and heritage presets** (reviewed by 4 reviewers and 2 skeptics per finding, all confirmed points fixed) in `MONTH_PRESETS` (`packages/shared/src/festival-presets.ts`), installed as ordinary presets, with no schedules.
 - **Per-LED colour is not possible** through Govee's API. See `docs/known-limitations.md`.
 
 ## 5. Open findings

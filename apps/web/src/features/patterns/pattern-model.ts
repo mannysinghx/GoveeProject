@@ -238,6 +238,16 @@ export function paintedSpan(state: PatternState, cells: PatternCell[]): number {
   return first === undefined || last === undefined ? 0 : last - first + 1;
 }
 
+/** Position of the first painted cell along the run, or -1 when nothing is painted. */
+export function paintedStart(state: PatternState, cells: PatternCell[]): number {
+  return cells.findIndex((cell) => state.cells[cell.key] !== undefined);
+}
+
+/** True when two states show exactly the same colours in these cells, including the background. */
+export function sameLook(a: PatternState, b: PatternState, cells: PatternCell[]): boolean {
+  return a.background === b.background && cells.every((cell) => a.cells[cell.key] === b.cells[cell.key]);
+}
+
 /**
  * onward: copies carry on after the pattern, in the same order, and nothing before it changes.
  * both: copies also fill backwards, so the whole run is covered.

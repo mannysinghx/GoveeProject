@@ -522,6 +522,97 @@ describe('pattern editor', () => {
       expect(label('Outdoor Left', 2)).toContain('#ff0000');
       expect(label('Outdoor Left', 3)).toContain('#00ff00');
     });
+
+    const fillColor = (hex: string) => setColor('Fill color', hex);
+    const strip = (name: string, from: number, to: number) =>
+      Array.from({ length: to - from + 1 }, (_, i) => (label(name, from + i).split(', ').pop() ?? '').replace(/^.*(#[0-9a-f]{6})$/i, '$1'));
+    const status = () => screen.getByText(/pattern|Paint the start|covers every box|nothing left|gap leaves|would not change/i, { selector: '[role=status]' }).textContent ?? '';
+    const paintTwo = () => {
+      fillColor('#ff0000');
+      paint('Outdoor Left', 4);
+      fillColor('#00ff00');
+      paint('Outdoor Left', 5);
+    };
+
+    it('says what an onward Repeat did, leaving the boxes before it alone', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      paintTwo();
+      expect(status()).toMatch(/carries on after your 2-segment pattern, in the same order/);
+      await userEvent.click(repeatButton());
+      expect(status()).toMatch(/now repeats from segment 5 to the end of the last string. Segments before it are unchanged/);
+      expect(status()).not.toMatch(/along all 81 segments/);
+    });
+
+    it('turns Repeat off, and says why, when there is nothing left to carry on', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      // The last two segments of the last string, so no copy fits after them.
+      fillColor('#ff0000');
+      paint('Outdoor Right', 25);
+      fillColor('#00ff00');
+      paint('Outdoor Right', 26);
+      expect(repeatButton()).toBeDisabled();
+      expect(status()).toMatch(/already reaches the last segment, so there is nothing left to carry on/);
+      // Choosing both ways has something to fill, so it comes back on.
+      await userEvent.selectOptions(screen.getByLabelText('Where Repeat fills'), 'both');
+      expect(repeatButton()).toBeEnabled();
+    });
+
+    it('turns Repeat off when the gap leaves no room for another copy', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      paintTwo();
+      fireEvent.change(screen.getByLabelText('Segments left blank between repeats'), { target: { value: '200' } });
+      expect(repeatButton()).toBeDisabled();
+      expect(status()).toMatch(/gap leaves no room for another copy/);
+    });
+
+    it('turns Repeat off straight after it runs, and back on when the settings change', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      paintTwo();
+      await userEvent.click(repeatButton());
+      expect(repeatButton()).toBeDisabled();
+      fireEvent.change(screen.getByLabelText('Segments left blank between repeats'), { target: { value: '1' } });
+      expect(repeatButton()).toBeEnabled();
+      expect(status()).toMatch(/Press Repeat to use these settings on your 2-segment pattern/);
+      await userEvent.click(repeatButton());
+      // Red, green, blank, red, green, blank: from the original pattern, not from the first result.
+      expect(strip('Outdoor Left', 4, 9)).toEqual(['#ff0000', '#00ff00', '#ffffff', '#ff0000', '#00ff00', '#ffffff']);
+    });
+
+    it('still repeats the original after an Undo, so both ways gives the same as a fresh press', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      paintTwo();
+      await userEvent.click(repeatButton());
+      await userEvent.selectOptions(screen.getByLabelText('Where Repeat fills'), 'both');
+      await userEvent.click(repeatButton());
+      const fresh = strip('Outdoor Left', 0, 13);
+      expect(fresh.slice(0, 4)).toEqual(['#ff0000', '#00ff00', '#ff0000', '#00ff00']);
+      // Undo the both-ways Repeat, then press it again: it must give exactly the same result.
+      await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+      await userEvent.click(repeatButton());
+      expect(strip('Outdoor Left', 0, 13)).toEqual(fresh);
+    });
+
+    it('still repeats the original after the background changes', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      paintTwo();
+      await userEvent.click(repeatButton());
+      setColor('Background', '#0000ff');
+      await userEvent.selectOptions(screen.getByLabelText('Where Repeat fills'), 'both');
+      await userEvent.click(repeatButton());
+      expect(strip('Outdoor Left', 0, 5)).toEqual(['#ff0000', '#00ff00', '#ff0000', '#00ff00', '#ff0000', '#00ff00']);
+    });
   });
 
   describe('one color for everything', () => {

@@ -411,6 +411,7 @@ const TRANS_PINK = '#f5a9b8';
 const TRANS_BLUE = '#5bcefa';
 const BROWN = '#8b4513';
 const RIBBON_PINK = '#ff4da6';
+const BLUSH = '#ffa6cf';
 const HANUKKAH_BLUE = '#1e50ff';
 
 /**
@@ -465,7 +466,7 @@ export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
     key: 'month-eid',
     name: 'Eid: Crescent Green & Gold',
     occasion: 'Eid',
-    when: 'After Ramadan, and at Eid al-Adha. Dates follow the lunar calendar.',
+    when: 'After Ramadan, and about ten weeks later at Eid al-Adha. Both move about 11 days earlier each year.',
     description: 'Emerald green with gold and white.',
     colors: [...run(EMERALD, 3), GOLD, WHITE],
   },
@@ -532,7 +533,7 @@ export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
     occasion: 'Breast Cancer Awareness Month',
     when: 'All of October',
     description: 'Pink and white, for Breast Cancer Awareness Month.',
-    colors: [...run(RIBBON_PINK, 3), WHITE, ...run(RIBBON_PINK, 2), PINK],
+    colors: [...run(RIBBON_PINK, 3), WHITE, ...run(RIBBON_PINK, 2), BLUSH],
   },
   {
     key: 'month-dia-de-muertos',
@@ -546,7 +547,7 @@ export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
     key: 'month-hanukkah',
     name: 'Hanukkah: Blue & Silver',
     occasion: 'Hanukkah',
-    when: 'Eight nights. The date follows the Hebrew calendar.',
+    when: 'Eight nights from 25 Kislev, in late November or December. The date follows the Hebrew calendar.',
     description: 'Blue, white and silver, with a gold accent.',
     colors: [HANUKKAH_BLUE, HANUKKAH_BLUE, WHITE, SILVER, HANUKKAH_BLUE, GOLD],
   },
@@ -554,7 +555,7 @@ export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
     key: 'month-winter-solstice',
     name: 'Winter Solstice: Longest Night',
     occasion: 'Winter Solstice',
-    when: 'December 21',
+    when: 'Around December 21. The exact day is December 20 to 22, depending on the year and your time zone.',
     description: 'Midnight blue brightening to ice white and back, looping with no jump.',
     colors: wave(['#0b1d6e', '#3a5bff', '#e6f0ff'], 3),
   },

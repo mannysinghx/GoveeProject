@@ -52,7 +52,7 @@
 - **They are only presets.** Nothing schedules them. Apply one from Scenes & Presets, or make a schedule that uses it.
 - **Most have no official colors.** They are suggestions from flags, ribbons and common custom, and sources differ. Childhood-cancer gold, for example, is listed for different months in different places, so it is not included.
 - **Black is a dark segment.** Black History Month, Progress Pride and Kwanzaa include black, which stays unlit and leaves a gap in the pattern. That has not been tried on real lights.
-- **Moving dates are for you to choose.** Lunar New Year, Holi, Eid and Hanukkah follow lunar or Hebrew calendars, so their cards say when they usually fall, and the app does not know the date.
+- **Moving dates are for you to choose.** Lunar New Year, Holi, Eid and Hanukkah follow lunar or Hebrew calendars, and the Winter Solstice shifts by a day between years. Their cards say roughly when they fall, and the app does not know the date.
 - **Smooth looks are steps.** The wave presets (Aurora, Cherry Blossom, Sunset, Winter Solstice) use 5 to 7 colors, because every color is a separate command.
 
 ## Limits of the holiday calendar

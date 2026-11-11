@@ -52,8 +52,58 @@ describe('the month and heritage presets', () => {
   it('are listed after the others, in calendar order, without disturbing them', () => {
     const keys = BUILTIN_PRESETS.map((p) => p.key);
     expect(keys.slice(-18)).toEqual(MONTH_PRESETS.map((p) => p.key));
-    expect(MONTH_PRESETS[0]!.key).toBe('month-january-aurora');
-    expect(MONTH_PRESETS.at(-1)!.key).toBe('month-kwanzaa');
+    expect(MONTH_PRESETS.map((p) => p.key)).toEqual([
+      'month-january-aurora',
+      'month-lunar-new-year',
+      'month-black-history',
+      'month-womens-history',
+      'month-holi',
+      'month-eid',
+      'month-april-cherry-blossom',
+      'month-earth-day',
+      'month-cinco-de-mayo',
+      'month-pride-rainbow',
+      'month-pride-progress',
+      'month-summer-sunset',
+      'month-hispanic-heritage',
+      'month-pink-ribbon',
+      'month-dia-de-muertos',
+      'month-hanukkah',
+      'month-winter-solstice',
+      'month-kwanzaa',
+    ]);
+  });
+
+  it('match what their cards claim', () => {
+    const colors = (key: string) => MONTH_PRESETS.find((p) => p.key === key)!.colors;
+    const distinct = (key: string) => new Set(colors(key)).size;
+    // The Progress Pride card says it uses 11 colors, and Pride Rainbow has the six stripes.
+    expect(distinct('month-pride-progress')).toBe(11);
+    expect(distinct('month-pride-rainbow')).toBe(6);
+    expect(colors('month-pride-progress').slice(0, 5)).toEqual(['#ffffff', '#f5a9b8', '#5bcefa', '#8b4513', '#000000']);
+    // Black History Month and Kwanzaa carry red, black and green.
+    for (const key of ['month-black-history', 'month-kwanzaa']) {
+      expect(colors(key), key).toEqual(expect.arrayContaining(['#ff0000', '#000000', '#00b040']));
+    }
+    // Cinco de Mayo is green, white and red in two segments each, like the flag.
+    expect(colors('month-cinco-de-mayo')).toEqual(['#00a000', '#00a000', '#ffffff', '#ffffff', '#ff0000', '#ff0000']);
+    // No preset spends a command on two colors that look the same.
+    const near = (a: string, b: string) => Math.max(...(['r', 'g', 'b'] as const).map((c) => Math.abs(hexToRgb(a)[c] - hexToRgb(b)[c]))) < 40;
+    for (const preset of MONTH_PRESETS.filter((p) => !p.key.match(/aurora|cherry|sunset|solstice/))) {
+      const unique = [...new Set(preset.colors)];
+      for (const [i, a] of unique.entries()) {
+        for (const b of unique.slice(i + 1)) expect(near(a, b), `${preset.name}: ${a} and ${b}`).toBe(false);
+      }
+    }
+  });
+
+  it('say roughly when moving festivals fall, not a fixed date', () => {
+    for (const key of ['month-lunar-new-year', 'month-holi', 'month-eid', 'month-hanukkah', 'month-winter-solstice']) {
+      const when = MONTH_PRESETS.find((p) => p.key === key)!.when;
+      expect(when.length, key).toBeGreaterThan(25);
+    }
+    expect(MONTH_PRESETS.find((p) => p.key === 'month-hanukkah')!.when).toMatch(/November or December/);
+    expect(MONTH_PRESETS.find((p) => p.key === 'month-winter-solstice')!.when).toMatch(/20 to 22/);
   });
 
   it('are only presets: no holiday schedule uses them, so nothing is scheduled by itself', () => {
