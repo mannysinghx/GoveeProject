@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PRESETS, builtinPresetByKey, FESTIVAL_PRESETS, HOLIDAY_PRESETS } from './festival-presets.js';
+import { BUILTIN_PRESETS, builtinPresetByKey, FESTIVAL_PRESETS, HOLIDAY_PRESETS, MONTH_PRESETS } from './festival-presets.js';
 import { addMinutesToTime, DIWALI_LAST_YEAR, HOLIDAYS, holidayByKey, holidayDate } from './holidays.js';
 import { colorEmoji } from './color.js';
 import { recurrenceSchema } from './schemas.js';
@@ -99,9 +99,9 @@ describe('the calendar', () => {
     expect(holidayByKey('new-year-fireworks')?.startTime).toBe('00:00');
   });
 
-  it('keeps the 20 festival presets separate from the holiday ones', () => {
+  it('keeps the 20 festival presets separate from the holiday and month ones', () => {
     expect(FESTIVAL_PRESETS).toHaveLength(20);
-    expect(BUILTIN_PRESETS).toHaveLength(21 + HOLIDAY_PRESETS.length);
+    expect(BUILTIN_PRESETS).toHaveLength(21 + HOLIDAY_PRESETS.length + MONTH_PRESETS.length);
     expect(new Set(BUILTIN_PRESETS.map((p) => p.key)).size).toBe(BUILTIN_PRESETS.length);
   });
 });

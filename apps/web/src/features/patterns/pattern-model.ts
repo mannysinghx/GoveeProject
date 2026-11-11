@@ -239,12 +239,18 @@ export function paintedSpan(state: PatternState, cells: PatternCell[]): number {
 }
 
 /**
- * Copies what has been painted along the whole run, carrying on from one string to the
- * next. The part from the first painted cell to the last is the pattern, including any
- * unpainted cells inside it, and it stays where it was painted. `gap` leaves that many
- * cells showing the background between copies.
+ * onward: copies carry on after the pattern, in the same order, and nothing before it changes.
+ * both: copies also fill backwards, so the whole run is covered.
  */
-export function repeatPainted(state: PatternState, cells: PatternCell[], gap = 0): PatternState {
+export type RepeatDirection = 'onward' | 'both';
+
+/**
+ * Copies what has been painted along the run, carrying on from one string to the next. The
+ * part from the first painted cell to the last is the pattern, including any unpainted cells
+ * inside it, and it stays where it was painted. `gap` leaves that many cells showing the
+ * background between copies. Every copy is the same sequence, starting where the last one ended.
+ */
+export function repeatPainted(state: PatternState, cells: PatternCell[], gap = 0, direction: RepeatDirection = 'both'): PatternState {
   const span = paintedSpan(state, cells);
   if (span === 0) return state;
   const start = cells.findIndex((cell) => state.cells[cell.key] !== undefined);
@@ -253,6 +259,7 @@ export function repeatPainted(state: PatternState, cells: PatternCell[], gap = 0
   const next = { ...state.cells };
   let changed = false;
   cells.forEach((cell, i) => {
+    if (direction === 'onward' && i < start) return;
     const color = motif[(((i - start) % period) + period) % period] ?? null;
     if ((next[cell.key] ?? null) === color) return;
     changed = true;

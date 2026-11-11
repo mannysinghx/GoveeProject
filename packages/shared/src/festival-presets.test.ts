@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PRESETS, builtinPresetActions, FESTIVAL_PRESETS, FIREWORKS_PRESET, orderLightStrings, type BuiltinString } from './festival-presets.js';
-import { isHexColor } from './color.js';
+import { BUILTIN_PRESETS, builtinPresetActions, FESTIVAL_PRESETS, FIREWORKS_PRESET, MONTH_PRESETS, orderLightStrings, type BuiltinString } from './festival-presets.js';
+import { hexToRgb, isHexColor } from './color.js';
+import { HOLIDAYS } from './holidays.js';
 import { presetCreateSchema } from './schemas.js';
 
 const string = (deviceId: string, segments: number, overrides: Partial<BuiltinString> = {}): BuiltinString => ({
@@ -33,6 +34,59 @@ describe('the festival catalog', () => {
       const actions = builtinPresetActions(preset, [string('a', 27), string('b', 27)]);
       expect(presetCreateSchema.safeParse({ name: preset.name, description: preset.description, actions }).success, preset.name).toBe(true);
     }
+  });
+});
+
+describe('the month and heritage presets', () => {
+  it('adds 18, each with its own occasion note and a short run of colors', () => {
+    expect(MONTH_PRESETS).toHaveLength(18);
+    for (const preset of MONTH_PRESETS) {
+      expect(preset.key.startsWith('month-'), preset.key).toBe(true);
+      expect(preset.when.length, preset.name).toBeGreaterThan(0);
+      expect(preset.description.length, preset.name).toBeGreaterThan(10);
+      // Each distinct color is one command to Govee, about a second each, so it stays short.
+      expect(new Set(preset.colors).size, preset.name).toBeLessThanOrEqual(11);
+    }
+  });
+
+  it('are listed after the others, in calendar order, without disturbing them', () => {
+    const keys = BUILTIN_PRESETS.map((p) => p.key);
+    expect(keys.slice(-18)).toEqual(MONTH_PRESETS.map((p) => p.key));
+    expect(MONTH_PRESETS[0]!.key).toBe('month-january-aurora');
+    expect(MONTH_PRESETS.at(-1)!.key).toBe('month-kwanzaa');
+  });
+
+  it('are only presets: no holiday schedule uses them, so nothing is scheduled by itself', () => {
+    const monthKeys = new Set(MONTH_PRESETS.map((p) => p.key));
+    for (const holiday of HOLIDAYS) for (const step of holiday.steps) expect(monthKeys.has(step.presetKey), holiday.key).toBe(false);
+  });
+
+  it('loop smoothly: the end of a wave leads back into its start with no jump', () => {
+    const waves = ['month-january-aurora', 'month-april-cherry-blossom', 'month-summer-sunset', 'month-winter-solstice'];
+    for (const key of waves) {
+      const colors = MONTH_PRESETS.find((p) => p.key === key)!.colors;
+      const step = (a: string, b: string) => Math.max(...(['r', 'g', 'b'] as const).map((c) => Math.abs(hexToRgb(a)[c] - hexToRgb(b)[c])));
+      const steps = colors.map((color, i) => step(color, colors[(i + 1) % colors.length]!));
+      // No neighbour, including the wrap from last back to first, is a bigger jump than the rest.
+      expect(Math.max(...steps), key).toBeLessThanOrEqual(110);
+      expect(steps.at(-1), key).toBeLessThanOrEqual(Math.max(...steps.slice(0, -1)));
+      expect(colors[0], key).not.toBe(colors.at(-1));
+    }
+  });
+
+  it('keep black as a dark segment, and send it like any other color', () => {
+    const black = MONTH_PRESETS.filter((p) => p.colors.includes('#000000')).map((p) => p.key);
+    expect(black).toEqual(['month-black-history', 'month-pride-progress', 'month-kwanzaa']);
+    const steps = builtinPresetActions(MONTH_PRESETS.find((p) => p.key === 'month-kwanzaa')!, [string('a', 27)]);
+    expect(steps.some((s) => s.action.type === 'segmentColor' && s.action.hex === '#000000')).toBe(true);
+  });
+
+  it('spread the Kwanzaa candles as three red, one black, three green', () => {
+    const kwanzaa = MONTH_PRESETS.find((p) => p.key === 'month-kwanzaa')!;
+    expect(kwanzaa.colors).toHaveLength(7);
+    expect(kwanzaa.colors.filter((c) => c === '#ff0000')).toHaveLength(3);
+    expect(kwanzaa.colors.filter((c) => c === '#000000')).toHaveLength(1);
+    expect(kwanzaa.colors.filter((c) => c === '#00b040')).toHaveLength(3);
   });
 });
 

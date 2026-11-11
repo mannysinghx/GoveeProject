@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { BUILTIN_PRESETS, FESTIVAL_PRESETS, FIREWORKS_PRESET, recurrenceSchema, type DiscoveryResultDto, type PresetDto, type ScheduleDto } from '@glm/shared';
+import { BUILTIN_PRESETS, FESTIVAL_PRESETS, FIREWORKS_PRESET, MONTH_PRESETS, recurrenceSchema, type DiscoveryResultDto, type PresetDto, type ScheduleDto } from '@glm/shared';
 import { nextOccurrence, occurrenceOnDate } from '../src/scheduler/occurrences.js';
 import { authedClient, createHarness, type Harness } from './support/harness.js';
 import { mockFullDevice } from './support/mock-govee.js';
@@ -62,6 +62,24 @@ describe('the built-in presets', () => {
       expect(preset.needsTarget).toBe(false);
       expect(new Set(preset.actions.map((a) => a.deviceId))).toEqual(new Set([left, center, right]));
     }
+  });
+
+  it('adds the month and heritage presets, and schedules none of them', async () => {
+    const { h, left } = await house();
+    expect(MONTH_PRESETS).toHaveLength(18);
+    const ids = new Set<string>();
+    for (const definition of MONTH_PRESETS) {
+      const preset = builtin(h, definition.key);
+      expect(preset, definition.key).toBeDefined();
+      expect(preset.builtin?.occasion).toBe(definition.occasion);
+      ids.add(preset.id);
+    }
+    expect(schedules(h).some((s) => s.action.type === 'preset' && ids.has(s.action.presetId))).toBe(false);
+    // A wave covers every segment too, using a handful of colors rather than one command per segment.
+    const aurora = builtin(h, 'month-january-aurora').actions.filter((a) => a.deviceId === left && a.action.type === 'segmentColor');
+    const covered = aurora.flatMap((a) => (a.action.type === 'segmentColor' ? a.action.segments : []));
+    expect([...covered].sort((x, y) => x - y)).toEqual(Array.from({ length: 27 }, (_, i) => i));
+    expect(aurora.length).toBeLessThanOrEqual(7);
   });
 
   it('colors every segment of every string exactly once', async () => {

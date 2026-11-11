@@ -61,6 +61,7 @@ import {
   withLedCount,
   type PatternState,
   type PatternString,
+  type RepeatDirection,
 } from './pattern-model';
 
 /** Fewer per row when each segment shows several LED boxes, so the boxes stay visible on a phone. */
@@ -403,6 +404,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   const [tool, setTool] = useState<'paint' | 'erase'>('paint');
   const [runLength, setRunLength] = useState(3);
   const [repeatGap, setRepeatGap] = useState(0);
+  const [repeatDirection, setRepeatDirection] = useState<RepeatDirection>('onward');
   const [turnOn, setTurnOn] = useState(true);
   const [useBrightness, setUseBrightness] = useState(false);
   const [brightness, setBrightness] = useState(100);
@@ -453,7 +455,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
   const repeat = () => {
     const previous = lastRepeat.current;
     const source = previous && previous.after === latest.current ? previous.before : latest.current;
-    const after = repeatPainted(source, cells, repeatGap);
+    const after = repeatPainted(source, cells, repeatGap, repeatDirection);
     change(() => after);
     lastRepeat.current = after === source ? null : { before: source, after };
   };
@@ -643,6 +645,17 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                   />
                   segments
                 </label>
+                <label className="flex items-center gap-2 text-sm text-ink-300">
+                  <select
+                    aria-label="Where Repeat fills"
+                    className="min-h-9 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                    value={repeatDirection}
+                    onChange={(e) => setRepeatDirection(e.target.value as RepeatDirection)}
+                  >
+                    <option value="onward">onward from the end of my pattern</option>
+                    <option value="both">both ways, covering every box</option>
+                  </select>
+                </label>
               </div>
               <p className="text-xs text-ink-400" role="status">
                 {span === 0
@@ -651,7 +664,9 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                     ? 'Your pattern already covers every box.'
                   : lastRepeat.current?.after === pattern
                     ? `Your ${span}-segment pattern now repeats along all ${cells.length} segments. Undo goes back to it.`
-                    : `Repeat copies your ${span}-segment pattern across every other box, replacing what's there, on all the strings shown.`}
+                    : repeatDirection === 'onward'
+                      ? `Repeat carries on after your ${span}-segment pattern, in the same order, to the end of the last string. Boxes before it stay as they are.`
+                      : `Repeat copies your ${span}-segment pattern across every other box, replacing what's there, on all the strings shown.`}
               </p>
             </div>
 

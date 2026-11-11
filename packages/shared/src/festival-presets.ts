@@ -1,3 +1,4 @@
+import { hexToRgb, rgbToHex } from './color.js';
 import type { DeviceAction, PatternStringSetting, PresetActionInput } from './schemas.js';
 
 /**
@@ -370,7 +371,209 @@ export const HOLIDAY_PRESETS: readonly BuiltinPresetDefinition[] = [
   },
 ];
 
-export const BUILTIN_PRESETS: readonly BuiltinPresetDefinition[] = [...FESTIVAL_PRESETS, FIREWORKS_PRESET, ...HOLIDAY_PRESETS];
+/**
+ * Colors blending evenly from one stop to the next, `perLeg` colors per leg, with the last
+ * stop included once. Each distinct color is a separate command to Govee, so keep this short.
+ */
+function blend(stops: string[], perLeg: number): string[] {
+  const out: string[] = [];
+  stops.slice(0, -1).forEach((from, i) => {
+    const a = hexToRgb(from);
+    const b = hexToRgb(stops[i + 1] as string);
+    for (let k = 0; k < perLeg; k++) {
+      const t = k / perLeg;
+      out.push(rgbToHex({ r: Math.round(a.r + (b.r - a.r) * t), g: Math.round(a.g + (b.g - a.g) * t), b: Math.round(a.b + (b.b - a.b) * t) }));
+    }
+  });
+  out.push(stops.at(-1) as string);
+  return out;
+}
+
+/** Blends out and back, so the pattern repeats along the strings with no jump between copies. */
+function wave(stops: string[], perLeg: number): string[] {
+  const out = blend(stops, perLeg);
+  return [...out, ...out.slice(1, -1).reverse()];
+}
+
+const BLACK = '#000000';
+const VIOLET = '#8000ff';
+const PAN_GREEN = '#00b040';
+const EMERALD = '#00a86b';
+const OCEAN = '#0a78ff';
+const LEAF = '#00b050';
+const FLAG_GREEN = '#00a000';
+const YELLOW = '#ffd800';
+const PRIDE_ORANGE = '#ff7a00';
+const PRIDE_GREEN = '#00c040';
+const PRIDE_BLUE = '#0050ff';
+const PRIDE_VIOLET = '#8000c0';
+const TRANS_PINK = '#f5a9b8';
+const TRANS_BLUE = '#5bcefa';
+const BROWN = '#8b4513';
+const RIBBON_PINK = '#ff4da6';
+const HANUKKAH_BLUE = '#1e50ff';
+
+/**
+ * Colors for months, heritage and awareness months, and festivals that move around the calendar.
+ * They are only presets: nothing here is scheduled automatically. Many of these have no official
+ * colors, so they are suggestions drawn from flags, ribbons and common custom. Black is a dark
+ * segment, not a color, so it leaves a gap in the pattern. Each is a short run of colors, because
+ * every distinct color is one command to Govee.
+ */
+export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
+  {
+    key: 'month-january-aurora',
+    name: 'January: Aurora',
+    occasion: 'January',
+    when: 'All of January',
+    description: 'Green, teal and violet that blend smoothly and loop, like the northern lights.',
+    colors: wave(['#00e08a', '#00b4b4', '#6a3dff'], 3),
+  },
+  {
+    key: 'month-lunar-new-year',
+    name: 'Lunar New Year: Red & Gold',
+    occasion: 'Lunar New Year',
+    when: 'Late January to mid-February. The date follows the lunar calendar.',
+    description: 'Red lanterns with gold sparks.',
+    colors: [...run(RED, 3), GOLD, RED, RED, GOLD],
+  },
+  {
+    key: 'month-black-history',
+    name: 'February: Black History Month',
+    occasion: 'Black History Month',
+    when: 'All of February',
+    description: 'Red, black and green from the Pan-African flag, with gold. Black segments stay dark.',
+    colors: [...run(RED, 2), BLACK, ...run(PAN_GREEN, 2), BLACK, GOLD],
+  },
+  {
+    key: 'month-womens-history',
+    name: "March: Women's History Month",
+    occasion: "Women's History Month",
+    when: 'All of March',
+    description: 'Purple, white and green, the suffragette colors.',
+    colors: [...run(VIOLET, 2), WHITE, ...run(PAN_GREEN, 2), WHITE],
+  },
+  {
+    key: 'month-holi',
+    name: 'Holi: Festival of Colors',
+    occasion: 'Holi',
+    when: 'Spring full moon. The date follows the lunar calendar.',
+    description: 'Magenta, orange, gold, lime, turquoise, blue and pink, all bright.',
+    colors: [MAGENTA, ORANGE, GOLD, LIME, TURQUOISE, ROYAL, PINK],
+  },
+  {
+    key: 'month-eid',
+    name: 'Eid: Crescent Green & Gold',
+    occasion: 'Eid',
+    when: 'After Ramadan, and at Eid al-Adha. Dates follow the lunar calendar.',
+    description: 'Emerald green with gold and white.',
+    colors: [...run(EMERALD, 3), GOLD, WHITE],
+  },
+  {
+    key: 'month-april-cherry-blossom',
+    name: 'April: Cherry Blossom',
+    occasion: 'April',
+    when: 'All of April',
+    description: 'Soft pink fading to white and back, looping with no jump.',
+    colors: wave(['#ff7aa8', '#ffe9f1'], 4),
+  },
+  {
+    key: 'month-earth-day',
+    name: 'Earth Day: Blue & Green',
+    occasion: 'Earth Day',
+    when: 'April 22',
+    description: 'Ocean blue, leaf green and cloud white.',
+    colors: [...run(OCEAN, 2), ...run(LEAF, 2), WHITE],
+  },
+  {
+    key: 'month-cinco-de-mayo',
+    name: 'Cinco de Mayo: Green, White & Red',
+    occasion: 'Cinco de Mayo',
+    when: 'May 5',
+    description: 'The colors of the Mexican flag.',
+    colors: [...run(FLAG_GREEN, 2), ...run(WHITE, 2), ...run(RED, 2)],
+  },
+  {
+    key: 'month-pride-rainbow',
+    name: 'June: Pride Rainbow',
+    occasion: 'Pride Month',
+    when: 'All of June',
+    description: 'The six stripes of the rainbow flag.',
+    colors: [RED, PRIDE_ORANGE, YELLOW, PRIDE_GREEN, PRIDE_BLUE, PRIDE_VIOLET],
+  },
+  {
+    key: 'month-pride-progress',
+    name: 'June: Progress Pride',
+    occasion: 'Pride Month',
+    when: 'All of June',
+    description:
+      'The Progress Pride flag: its white, pink and light blue chevron, brown and black, then the rainbow. Black stays dark. It uses 11 colors, so it takes a little longer to send.',
+    colors: [WHITE, TRANS_PINK, TRANS_BLUE, BROWN, BLACK, RED, PRIDE_ORANGE, YELLOW, PRIDE_GREEN, PRIDE_BLUE, PRIDE_VIOLET],
+  },
+  {
+    key: 'month-summer-sunset',
+    name: 'Summer: Sunset',
+    occasion: 'Summer',
+    when: 'June to August',
+    description: 'Violet, magenta, orange and gold, blending smoothly and looping like a sunset sky.',
+    colors: wave(['#7a1fff', MAGENTA, ORANGE, MARIGOLD], 2),
+  },
+  {
+    key: 'month-hispanic-heritage',
+    name: 'Hispanic Heritage Month: Fiesta',
+    occasion: 'Hispanic Heritage Month',
+    when: 'September 15 to October 15',
+    description: 'Bright papel picado colors: marigold, magenta, turquoise, lime, red and blue.',
+    colors: [MARIGOLD, MAGENTA, TURQUOISE, LIME, RED, ROYAL],
+  },
+  {
+    key: 'month-pink-ribbon',
+    name: 'October: Pink Ribbon',
+    occasion: 'Breast Cancer Awareness Month',
+    when: 'All of October',
+    description: 'Pink and white, for Breast Cancer Awareness Month.',
+    colors: [...run(RIBBON_PINK, 3), WHITE, ...run(RIBBON_PINK, 2), PINK],
+  },
+  {
+    key: 'month-dia-de-muertos',
+    name: 'Día de Muertos: Marigold Path',
+    occasion: 'Día de Muertos',
+    when: 'October 31 to November 2',
+    description: 'Marigold and orange, with purple, magenta and white, like the flowers and paper banners.',
+    colors: [MARIGOLD, ORANGE, MARIGOLD, VIOLET, MAGENTA, WHITE],
+  },
+  {
+    key: 'month-hanukkah',
+    name: 'Hanukkah: Blue & Silver',
+    occasion: 'Hanukkah',
+    when: 'Eight nights. The date follows the Hebrew calendar.',
+    description: 'Blue, white and silver, with a gold accent.',
+    colors: [HANUKKAH_BLUE, HANUKKAH_BLUE, WHITE, SILVER, HANUKKAH_BLUE, GOLD],
+  },
+  {
+    key: 'month-winter-solstice',
+    name: 'Winter Solstice: Longest Night',
+    occasion: 'Winter Solstice',
+    when: 'December 21',
+    description: 'Midnight blue brightening to ice white and back, looping with no jump.',
+    colors: wave(['#0b1d6e', '#3a5bff', '#e6f0ff'], 3),
+  },
+  {
+    key: 'month-kwanzaa',
+    name: 'Kwanzaa: Red, Black & Green',
+    occasion: 'Kwanzaa',
+    when: 'December 26 to January 1',
+    description: 'The seven candles of the kinara: three red, one black and three green. Black stays dark.',
+    colors: [...run(RED, 3), BLACK, ...run(PAN_GREEN, 3)],
+  },
+];
+
+export const BUILTIN_PRESETS: readonly BuiltinPresetDefinition[] = [
+  ...FESTIVAL_PRESETS,
+  FIREWORKS_PRESET,
+  ...HOLIDAY_PRESETS,
+  ...MONTH_PRESETS,
+];
 
 export function builtinPresetByKey(key: string): BuiltinPresetDefinition | undefined {
   return BUILTIN_PRESETS.find((preset) => preset.key === key);

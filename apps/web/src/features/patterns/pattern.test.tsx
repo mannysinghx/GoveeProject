@@ -269,6 +269,30 @@ describe('repeating what was painted', () => {
     expect(shifted[0]).toBe(GREEN);
   });
 
+  it('carries on after the pattern, in the same order, leaving what is before it alone', () => {
+    const state = repeatPainted(start([4, RED], [5, GREEN], [6, '#0000ff'], [0, '#ffff00']), cells, 0, 'onward');
+    // The pattern runs from the first painted box (0) to the last (6): yellow, blank x3, red, green, blue.
+    const result = colors(state);
+    const motif = [ '#ffff00', null, null, null, RED, GREEN, '#0000ff' ];
+    expect(result.slice(0, 7)).toEqual(motif);
+    expect(result.slice(7, 14)).toEqual(motif);
+    expect(result.slice(14, 21)).toEqual(motif);
+    const later = colors(repeatPainted(start([10, RED], [11, GREEN], [12, '#0000ff']), cells, 0, 'onward'));
+    expect(later.slice(0, 10)).toEqual(Array(10).fill(null));
+    expect(later.slice(10, 19)).toEqual([RED, GREEN, '#0000ff', RED, GREEN, '#0000ff', RED, GREEN, '#0000ff']);
+    expect(later[80]).toBe(later[10 + ((80 - 10) % 3)]);
+  });
+
+  it('onward leaves a gap after each copy, and still follows the string order', () => {
+    const result = colors(repeatPainted(start([2, RED], [3, GREEN]), cells, 1, 'onward'));
+    expect(result.slice(0, 11)).toEqual([null, null, RED, GREEN, null, RED, GREEN, null, RED, GREEN, null]);
+  });
+
+  it('onward changes nothing when the pattern already reaches the last box', () => {
+    const full = start([80, RED]);
+    expect(repeatPainted(full, cells, 0, 'onward')).toBe(full);
+  });
+
   it('follows the on-screen order of a flipped string', () => {
     const flipped = resolveStrings([left], [{ deviceId: 'left', included: true, reversed: true }]);
     const run = canvasCells(flipped);
@@ -475,6 +499,28 @@ describe('pattern editor', () => {
       await userEvent.click(repeatButton());
       expect(label('Outdoor Left', 5)).toContain('#0000ff');
       expect(label('Outdoor Left', 0)).toContain('#ff0000');
+    });
+
+    it('carries on after the pattern by default, and can fill both ways instead', async () => {
+      mockApi(routes);
+      open();
+      await ready();
+      setColor('Fill color', '#ff0000');
+      paint('Outdoor Left', 4);
+      setColor('Fill color', '#00ff00');
+      paint('Outdoor Left', 5);
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 4)).toContain('#ff0000');
+      expect(label('Outdoor Left', 6)).toContain('#ff0000');
+      expect(label('Outdoor Left', 7)).toContain('#00ff00');
+      // Nothing before the pattern is touched: those boxes still show the white background.
+      expect(label('Outdoor Left', 2)).toContain('#ffffff');
+      expect(screen.getByLabelText('Where Repeat fills')).toHaveValue('onward');
+
+      await userEvent.selectOptions(screen.getByLabelText('Where Repeat fills'), 'both');
+      await userEvent.click(repeatButton());
+      expect(label('Outdoor Left', 2)).toContain('#ff0000');
+      expect(label('Outdoor Left', 3)).toContain('#00ff00');
     });
   });
 

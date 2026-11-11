@@ -68,6 +68,12 @@ Not started yet:
 
 - **The first real questions to each provider.** This needs the owner's keys in `.env` locally, or in Railway. Each question costs a fraction of a cent.
 
+### Also built after Phase 2 (not part of the AI plan)
+
+- **Repeat onward.** Repeat in the pattern editor now carries the painted sequence on from where it ends. A selector offers "both ways", the earlier behaviour. `repeatPainted` in `pattern-model.ts` has a `direction` argument.
+- **18 month and heritage presets** in `MONTH_PRESETS` (`packages/shared/src/festival-presets.ts`), installed as ordinary presets, with no schedules.
+- **Per-LED colour is not possible** through Govee's API. See `docs/known-limitations.md`.
+
 ## 5. Open findings
 
 Review findings fixed in `9c139c2`, recorded so nobody re-raises them:

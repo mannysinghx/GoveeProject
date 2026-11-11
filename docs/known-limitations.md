@@ -16,7 +16,8 @@
 ## Limits of patterns
 
 - **Static only.** Clockwise, Twinkle, Breathe and similar effects run inside the lights, and the public API cannot send them.
-- **One box is one LED, but LEDs can only change in groups.** An H805C reports 27 segments, so its 108 LED boxes change 4 at a time. The Govee app may offer finer control, and the public API does not.
+- **One box is one LED, but LEDs can only change in groups.** An H805C reports 27 segments, so its 108 LED boxes change 4 at a time. **Colouring every LED separately is not possible through Govee's API.** Its segment command takes only a list of segment numbers ("see govee app"), and the lights report 27 segments and nothing finer (checked in Govee's documentation on 10 November 2026, and against what the lights report). The Govee app may offer finer control, and the public API does not. Govee's separate LAN control might, but it is unconfirmed for this model, and a server on Railway cannot reach lights in your home.
+- **Repeat carries on onward by default.** It copies the painted sequence in the same order from where the pattern ends, to the end of the last string, and leaves the boxes before it alone. "Both ways" fills backwards as well. Blank boxes inside the pattern repeat as blanks.
 - **The LED count is calculated, not reported.** It comes from published specs for the model, and only the H805C is listed so far. Other models show one box per segment until you enter a count. See [LEDs per string](govee-integration.md#leds-per-string).
 - **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across three strings of 27 segments takes about 27 seconds, with the strings changing at the same time.
 - **No read-back.** Govee does not report segment colors, so the app cannot show what the lights are displaying.
@@ -45,6 +46,14 @@
 - **The server's clock and the default time zone decide "midnight".** The show uses the default time zone set when it was installed. If you change that setting later, change the schedule too.
 - **Other schedules still run.** A nightly "turn off" still runs on New Year's Eve, and the show turns the lights back on at midnight.
 - **Festival dates are not automatic.** Only the fireworks run by themselves. Other festival presets run when you apply or schedule them.
+
+## Limits of the month and heritage presets
+
+- **They are only presets.** Nothing schedules them. Apply one from Scenes & Presets, or make a schedule that uses it.
+- **Most have no official colors.** They are suggestions from flags, ribbons and common custom, and sources differ. Childhood-cancer gold, for example, is listed for different months in different places, so it is not included.
+- **Black is a dark segment.** Black History Month, Progress Pride and Kwanzaa include black, which stays unlit and leaves a gap in the pattern. That has not been tried on real lights.
+- **Moving dates are for you to choose.** Lunar New Year, Holi, Eid and Hanukkah follow lunar or Hebrew calendars, so their cards say when they usually fall, and the app does not know the date.
+- **Smooth looks are steps.** The wave presets (Aurora, Cherry Blossom, Sunset, Winter Solstice) use 5 to 7 colors, because every color is a separate command.
 
 ## Limits of the holiday calendar
 
