@@ -422,7 +422,10 @@ describe('route protection', () => {
       const safe = await h.app.inject({ method: 'GET', url: '/api/v1/health', headers: { 'x-request-id': 'abc-12345' } });
       expect(safe.headers['x-request-id']).toBe('abc-12345');
       const unsafe = await h.app.inject({ method: 'GET', url: '/api/v1/health', headers: { 'x-request-id': 'bad id\twith spaces!' } });
-      expect(unsafe.headers['x-request-id']).not.toContain('bad');
+      // Replaced by a fresh id. Checked by shape, not by text: a random id can contain "bad" by
+      // chance, as dba3065a-6265-4019-badb-... did on 13 November 2026.
+      expect(unsafe.headers['x-request-id']).not.toBe('bad id\twith spaces!');
+      expect(unsafe.headers['x-request-id']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     });
   });
 });
