@@ -11,7 +11,7 @@ import type { ActivityService } from '../activity/activity-service.js';
 import type { ActionService } from '../commands/action-service.js';
 import type { Db } from '../database/database.js';
 import type { DeviceRecord } from '../devices/device-repository.js';
-import { isGoveeGroup, type DeviceService } from '../devices/device-service.js';
+import { isGoveeGroup, OFFLINE_CONFIRM_REPORTS, type DeviceService } from '../devices/device-service.js';
 import type { Clock } from '../shared/clock.js';
 import { AppError, notFound } from '../shared/errors.js';
 import { diagnose, overallStatus } from './diagnosis.js';
@@ -24,6 +24,12 @@ const BUDGET_SHARE = 0.25;
 /** Rechecking the device list as a repair is cheap, but not worth doing constantly. */
 const HEAL_DISCOVERY_EVERY_MS = HOUR_MS;
 const MANUAL_CHECK_MIN_MS = 15_000;
+/**
+ * How long to wait before asking again about a light Govee has just called offline. On
+ * 10 November 2026 all three strings were reported offline at once and were back at the next
+ * check, so one answer is not enough to raise an alarm.
+ */
+const OFFLINE_CONFIRM_DELAY_MS = 20_000;
 
 const CONNECTIVITY_FAILURES: ReadonlySet<ErrorCategory> = new Set(['network', 'timeout', 'server_error']);
 const CATEGORY_FROM_CODE = /^govee_(.+)$/;
@@ -57,6 +63,10 @@ function incidentToDto(row: IncidentRow): ConnectionIncidentDto {
     lastSeenAt: row.last_seen_at,
     closedAt: row.closed_at,
   };
+}
+
+function isConfirmedOffline(device: DeviceRecord): boolean {
+  return device.online === false && device.offlineStreak >= OFFLINE_CONFIRM_REPORTS;
 }
 
 function durationText(ms: number): string {
@@ -188,6 +198,8 @@ export class ConnectionMonitor {
       }
     }
 
+    await this.confirmNewlyOffline(targets, failures);
+
     const categories = [...failures.values()];
     this.setOpen('api_key_rejected', categories.includes('auth'));
     this.setOpen(
@@ -201,18 +213,40 @@ export class ConnectionMonitor {
       if (isGoveeGroup(device)) continue;
       this.setOpen('device_missing', device.discoveryStatus === 'missing', device);
       if (device.discoveryStatus !== 'present') continue;
-      // Govee can answer a status request by refusing it because the light is offline.
-      if (failures.get(device.id) === 'device_offline') {
-        this.open('device_offline', device.id, device.name);
-        continue;
-      }
-      if (failures.has(device.id)) continue;
-      if (device.online === false) this.open('device_offline', device.id, device.name);
+      // Govee can answer a status request by refusing it because the light is offline, which
+      // is an answer about the light. Any other failure says nothing about it either way.
+      if (failures.has(device.id) && failures.get(device.id) !== 'device_offline') continue;
+      if (isConfirmedOffline(device)) this.open('device_offline', device.id, device.name);
       if (device.online === true) this.close('device_offline', device.id, device.name);
     }
 
     await this.healDeviceList(refused || fresh.some((d) => d.discoveryStatus === 'missing'));
     await this.deliverCaughtUp();
+  }
+
+  /**
+   * Asks once more, a little later, about each light that has only just been called offline.
+   * Waits in short steps so that stopping the app is not held up.
+   */
+  private async confirmNewlyOffline(targets: DeviceRecord[], failures: Map<string, ErrorCategory>): Promise<void> {
+    const ids = new Set(targets.map((d) => d.id));
+    const unconfirmed = this.devices.repository
+      .list()
+      .filter((d) => ids.has(d.id) && d.online === false && !isConfirmedOffline(d));
+    if (unconfirmed.length === 0) return;
+    for (let waited = 0; waited < OFFLINE_CONFIRM_DELAY_MS; waited += 1000) {
+      if (this.stopped) return;
+      await this.clock.sleep(1000);
+    }
+    for (const device of unconfirmed) {
+      if (this.stopped) return;
+      try {
+        await this.devices.refreshState(device.id, 'poll');
+        failures.delete(device.id);
+      } catch (error) {
+        failures.set(device.id, this.categoryOf(error));
+      }
+    }
   }
 
   private categoryOf(error: unknown): ErrorCategory {
@@ -411,8 +445,16 @@ export class ConnectionMonitor {
       return { ...base, state: 'unknown', problemSince: null, note: device.lastStatusError?.message ?? null };
     }
     const incident = this.openIncident('device_offline', device.id);
-    if (device.online === false || incident) {
+    if (isConfirmedOffline(device) || incident) {
       return { ...base, state: 'offline', problemSince: incident?.opened_at ?? null, note: null };
+    }
+    if (device.online === false) {
+      return {
+        ...base,
+        state: 'unknown',
+        problemSince: null,
+        note: 'Govee reported this light offline once. It is being checked again before it is called offline.',
+      };
     }
     return { ...base, state: device.online === true ? 'online' : 'unknown', problemSince: null, note: null };
   }

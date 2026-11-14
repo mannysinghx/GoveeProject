@@ -31,6 +31,7 @@ import type {
   PresetCreate,
   PresetDto,
   PresetUpdate,
+  RefreshAllResultDto,
   RefreshResultDto,
   RunResultDto,
   ScenesDto,
@@ -106,6 +107,20 @@ export function useRefreshDevice(id: string) {
   return useMutation({
     mutationFn: () => api<RefreshResultDto>(`/devices/${encodeURIComponent(id)}/refresh`, { method: 'POST' }),
     onSettled: () => invalidateDeviceData(client, id),
+  });
+}
+
+/** Asks Govee for the device list and every light's status now, whatever was refused before. */
+export function useRefreshAll() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<RefreshAllResultDto>('/devices/refresh-all', { method: 'POST' }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.devices });
+      void client.invalidateQueries({ queryKey: keys.diagnostics });
+      void client.invalidateQueries({ queryKey: keys.summary });
+      void client.invalidateQueries({ queryKey: ['connection'] });
+    },
   });
 }
 

@@ -1,7 +1,7 @@
 import { CalendarClock, Lightbulb, Power, PowerOff, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { DeviceDto, DiagnosticsDto, PresetDto } from '@glm/shared';
+import type { DeviceDto, DiagnosticsDto, PresetDto, RefreshAllResultDto } from '@glm/shared';
 import {
   CommandResultLine,
   ConnectivityBadge,
@@ -15,8 +15,8 @@ import {
   useDeviceControl,
   useDevices,
   useDiagnostics,
-  useDiscover,
   usePresets,
+  useRefreshAll,
   useRefreshDue,
   useSettings,
   useSummary,
@@ -70,7 +70,7 @@ function DeviceCard({ device }: { device: DeviceDto }) {
   const missing = device.discoveryStatus === 'missing';
   const power = reportedValue(device, 'powerSwitch');
   const brightness = reportedValue(device, 'brightness');
-  const historical = device.connectivity === 'offline';
+  const historical = device.connectivity === 'offline' || device.connectivity === 'checking';
 
   return (
     <Card className="flex flex-col gap-3 p-4">
@@ -161,6 +161,38 @@ function QuickPresets({ presets }: { presets: PresetDto[] }) {
   );
 }
 
+/** What asking Govee just now found, in words. */
+function CheckResult({ result }: { result: RefreshAllResultDto }) {
+  const lights = result.devices.filter((d) => d.discoveryStatus === 'present' && !d.isGoveeGroup);
+  const online = lights.filter((d) => d.connectivity === 'online').length;
+  const notOnline = lights.filter((d) => d.connectivity === 'offline' || d.connectivity === 'checking');
+  const problems = [
+    ...(result.listError ? [`The device list could not be refreshed: ${result.listError}`] : []),
+    ...result.failures.map((f) => `${f.name}: ${f.message}`),
+  ];
+  if (problems.length > 0) {
+    return (
+      <Notice tone="warn" title="Some checks did not get through">
+        <ul className="list-disc pl-5">
+          {problems.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
+        <p className="mt-1">What is shown for those lights is from their last successful report.</p>
+      </Notice>
+    );
+  }
+  if (notOnline.length > 0) {
+    return (
+      <Notice tone="warn" title={`Asked Govee just now: ${online} of ${lights.length} lights online`}>
+        Govee says {notOnline.map((d) => d.name).join(', ')} {notOnline.length === 1 ? 'is' : 'are'} not connected. The app
+        asks once more before calling a light offline, because a single answer is sometimes wrong.
+      </Notice>
+    );
+  }
+  return <Notice tone="good">Asked Govee just now: all {lights.length} lights are online.</Notice>;
+}
+
 /** Points to the Connections page when the background checks have found something. */
 function ConnectionAlert() {
   const report = useConnectionReport();
@@ -186,7 +218,7 @@ export function DashboardPage() {
   const summary = useSummary();
   const presets = usePresets();
   const settings = useSettings();
-  const discover = useDiscover();
+  const checkAll = useRefreshAll();
   const refreshDue = useRefreshDue();
 
   // Status is only polled while this page is open and visible, at a modest configurable rate.
@@ -215,10 +247,10 @@ export function DashboardPage() {
         actions={
           <Button
             icon={<RefreshCw className="size-4" aria-hidden />}
-            busy={discover.isPending}
-            onClick={() => discover.mutate()}
+            busy={checkAll.isPending}
+            onClick={() => checkAll.mutate()}
           >
-            Refresh device list
+            Check lights now
           </Button>
         }
       />
@@ -231,13 +263,8 @@ export function DashboardPage() {
             Connected to a local test endpoint, not Govee. The devices below are test data.
           </Notice>
         ) : null}
-        {discover.isError ? <ErrorNotice error={discover.error} title="Could not refresh the device list" /> : null}
-        {discover.data ? (
-          <Notice tone="good">
-            Device list refreshed: {discover.data.total} device(s), {discover.data.added} new,{' '}
-            {discover.data.noLongerDiscovered} no longer listed.
-          </Notice>
-        ) : null}
+        {checkAll.isError ? <ErrorNotice error={checkAll.error} title="Could not check the lights" /> : null}
+        {checkAll.data ? <CheckResult result={checkAll.data} /> : null}
 
         {devices.isPending ? <Loading label="Loading devices" /> : null}
         {devices.isError ? <ErrorNotice error={devices.error} title="Could not load devices" /> : null}

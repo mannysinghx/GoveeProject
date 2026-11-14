@@ -298,10 +298,14 @@ describe('devices API', () => {
       h.mock.online.set(full.goveeDeviceId, false);
       h.clock.advance(5000);
       const refreshed = (await client.post(`/api/v1/devices/${full.id}/refresh`)).json() as { device: DeviceDto };
-      expect(refreshed.device.connectivity).toBe('offline');
+      // One offline answer is not believed yet, but its values are already treated as history.
+      expect(refreshed.device.connectivity).toBe('checking');
       const state = refreshed.device.states.find((s) => s.instance === 'brightness');
       expect(state?.reported?.historical).toBe(true);
       expect(state?.verification).toBe('unverified');
+      h.clock.advance(5000);
+      const again = (await client.post(`/api/v1/devices/${full.id}/refresh`)).json() as { device: DeviceDto };
+      expect(again.device.connectivity).toBe('offline');
     });
 
     it('records when a device was last seen online and keeps it through offline reports', async () => {
@@ -837,7 +841,7 @@ describe('activity and diagnostics', () => {
     const status = (await client.get('/api/v1/system/status')).json();
     expect(status).toMatchObject({
       backend: 'ok',
-      database: { status: 'ok', schemaVersion: '005_ai.sql' },
+      database: { status: 'ok', schemaVersion: '006_light_status.sql' },
       govee: { keyConfigured: true, usingLocalTestEndpoint: true },
       devices: { discovered: 1, noLongerDiscovered: 0 },
       queue: { pending: 0, pausedUntil: null },

@@ -114,7 +114,7 @@ Govee lists the H805C as supported, but that does not guarantee every feature is
 
 **Connections** checks every light in the background, even with no browser open. It says which light is affected, the likely cause and what to try, and keeps a history of each drop. It can recheck the device list, retry through temporary Govee failures and, if you turn it on, resend a pattern a light missed. It cannot restart a controller, change Wi-Fi settings or repair hardware, because Govee's public API offers no way to.
 
-**Not in the list?** Check that it is in the Govee Home app on the same account as your key, then choose **Refresh device list**. Models not on [Govee's supported list](https://developer.govee.com/docs/support-product-model) will not appear.
+**Not in the list?** Check that it is in the Govee Home app on the same account as your key, then choose **Check lights now** on the dashboard. Models not on [Govee's supported list](https://developer.govee.com/docs/support-product-model) will not appear.
 
 **Offline?** Check the lights in the Govee Home app first. If they are offline there too, the problem is power or Wi-Fi. While Govee reports a device as offline, the values shown are historical, and a command can be accepted by Govee without reaching the lights.
 

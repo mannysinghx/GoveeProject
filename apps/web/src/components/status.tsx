@@ -8,6 +8,7 @@ import {
   Hourglass,
   Loader2,
   MinusCircle,
+  Radar,
   Wifi,
   WifiOff,
   XCircle,
@@ -48,6 +49,13 @@ export function ConnectivityBadge({ device }: { device: DeviceDto }) {
     return (
       <Badge tone="bad" icon={<WifiOff className={ICON} aria-hidden />}>
         Offline
+      </Badge>
+    );
+  }
+  if (device.connectivity === 'checking') {
+    return (
+      <Badge tone="warn" icon={<Radar className={ICON} aria-hidden />}>
+        Checking connection
       </Badge>
     );
   }

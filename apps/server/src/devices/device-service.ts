@@ -9,6 +9,7 @@ import type {
   DiscoveryResultDto,
   ErrorCategory,
   Freshness,
+  RefreshAllResultDto,
   RefreshResultDto,
   ScenesDto,
   Verification,
@@ -31,11 +32,26 @@ import { sceneToDto, type SceneStore } from './scene-store.js';
 const PRIMARY_MODEL = 'H805C';
 const STATE_HISTORY_PER_DEVICE = 200;
 /**
- * After Govee refuses a status request outright, wait this long before polling again.
- * Govee groups do this every time ("devices not exist"), and a retry cannot change the answer.
+ * After Govee refuses a status request for a group, wait this long before polling again.
+ * Govee groups are refused every time ("devices not exist"), and a retry cannot change the answer.
  * Asking by hand always goes through, and a successful report clears this at once.
  */
-const REFUSED_STATUS_RETRY_MS = 24 * 3600 * 1000;
+const GROUP_REFUSED_RETRY_MS = 24 * 3600 * 1000;
+/**
+ * A real light can be refused by mistake: on 12 November 2026 Govee answered 400 for all three
+ * strings during a short outage, and under a one-day wait their status then froze for a day.
+ * So the first refusal is asked again at the next check, and only repeats are spaced out.
+ */
+const REFUSED_BACKOFF_BASE_MS = 5 * 60 * 1000;
+const REFUSED_BACKOFF_MAX_MS = 6 * 3600 * 1000;
+/** A light counts as offline once this many answers in a row say so. One can be wrong. */
+export const OFFLINE_CONFIRM_REPORTS = 2;
+
+/** How long to hold back status checks for a light after this many refusals in a row. */
+export function refusedBackoffMs(failuresInARow: number): number {
+  if (failuresInARow <= 1) return 0;
+  return Math.min(REFUSED_BACKOFF_MAX_MS, REFUSED_BACKOFF_BASE_MS * 2 ** (failuresInARow - 2));
+}
 
 export type StateSource = 'manual' | 'poll' | 'post_command';
 
@@ -116,6 +132,11 @@ export class DeviceService {
   ) {
     this.repository = new DeviceRepository(db);
     this.queue.onAccepted((deviceId) => this.schedulePostCommandRefresh(deviceId, 0));
+    // Govee refusing a command because the light is offline is as good as a status report saying so.
+    this.queue.onOffline((deviceId) => {
+      this.noteOffline(deviceId);
+      this.schedulePostCommandRefresh(deviceId, 0);
+    });
   }
 
   /** Called after each successful discovery. */
@@ -190,7 +211,8 @@ export class DeviceService {
     }
     let connectivity: Connectivity = 'unknown';
     if (device.online === true) connectivity = 'online';
-    if (device.online === false) connectivity = 'offline';
+    // One "offline" answer can be wrong, so it shows as being checked until a second agrees.
+    if (device.online === false) connectivity = device.offlineStreak >= OFFLINE_CONFIRM_REPORTS ? 'offline' : 'checking';
 
     return {
       id: device.id,
@@ -328,6 +350,8 @@ export class DeviceService {
     } catch (error) {
       const failure = toTransportError(error);
       this.recordStatusError(id, failure);
+      // Govee answered, and the answer was that the light is offline.
+      if (failure.category === 'device_offline') this.noteOffline(id);
       // Background checks repeat, so they report through connection incidents rather
       // than adding a line to the activity log every couple of minutes.
       if (source !== 'poll') {
@@ -373,13 +397,58 @@ export class DeviceService {
   private statusRefused(device: DeviceRecord): boolean {
     const error = device.lastStatusError;
     if (!error || (error.category !== 'bad_request' && error.category !== 'not_found')) return false;
-    return this.clock.nowMs() - Date.parse(error.at) < REFUSED_STATUS_RETRY_MS;
+    const wait = isGoveeGroup(device) ? GROUP_REFUSED_RETRY_MS : refusedBackoffMs(device.statusFailures);
+    return this.clock.nowMs() - Date.parse(error.at) < wait;
   }
 
   private recordStatusError(id: string, failure: TransportError): void {
     this.db
-      .prepare('UPDATE devices SET last_status_error_json = ? WHERE id = ?')
+      .prepare('UPDATE devices SET last_status_error_json = ?, status_failures = status_failures + 1 WHERE id = ?')
       .run(JSON.stringify({ category: failure.category, message: failure.message, at: this.clock.nowIso() }), id);
+  }
+
+  /**
+   * Records that Govee said a light is offline without sending values, as it does when it
+   * refuses a status request or a command for that reason. What it last reported is now history.
+   */
+  private noteOffline(id: string): void {
+    this.db.transaction(() => {
+      this.db
+        .prepare('UPDATE devices SET online = 0, offline_streak = offline_streak + 1, last_status_refresh_at = ? WHERE id = ?')
+        .run(this.clock.nowIso(), id);
+      this.db.prepare('UPDATE capability_states SET reported_historical = 1 WHERE device_id = ?').run(id);
+    })();
+  }
+
+  /**
+   * Asks Govee for the device list and then for every light's status, whatever was refused
+   * before. For when the owner wants to know now, instead of at the next background check.
+   */
+  async refreshAll(correlationId?: string): Promise<RefreshAllResultDto> {
+    let listError: string | null = null;
+    try {
+      await this.discover(correlationId);
+    } catch (error) {
+      listError = error instanceof Error ? error.message : 'The device list could not be refreshed.';
+    }
+    const failures: RefreshAllResultDto['failures'] = [];
+    let checked = 0;
+    for (const device of this.repository.list()) {
+      if (device.discoveryStatus !== 'present' || isGoveeGroup(device)) continue;
+      checked += 1;
+      try {
+        await this.refreshState(device.id, 'manual', correlationId);
+      } catch (error) {
+        // A light Govee says is offline has been checked: that is its status, not a failure.
+        if (error instanceof AppError && error.code === 'govee_device_offline') continue;
+        failures.push({
+          deviceId: device.id,
+          name: device.name,
+          message: error instanceof Error ? error.message : 'The status check failed.',
+        });
+      }
+    }
+    return { checked, listError, failures, devices: this.list() };
   }
 
   /**
@@ -421,10 +490,11 @@ export class DeviceService {
           `UPDATE devices
            SET online = ?, last_status_refresh_at = ?,
                last_online_at = CASE WHEN ? = 1 THEN ? ELSE last_online_at END,
-               last_status_error_json = NULL
+               offline_streak = CASE WHEN ? = 1 THEN offline_streak + 1 ELSE 0 END,
+               last_status_error_json = NULL, status_failures = 0
            WHERE id = ?`,
         )
-        .run(online === null ? null : online ? 1 : 0, now, online === true ? 1 : 0, now, id);
+        .run(online === null ? null : online ? 1 : 0, now, online === true ? 1 : 0, now, online === false ? 1 : 0, id);
 
       this.db
         .prepare(
@@ -484,7 +554,8 @@ export class DeviceService {
       // Wait for queued work first, so the report reflects the newest command.
       if (this.queue.pendingForDevice(deviceId).length > 0) return;
       const device = this.repository.get(deviceId);
-      if (!device || this.statusRefused(device)) return;
+      // A group is refused every time. A real light is asked, whatever was refused before.
+      if (!device || (isGoveeGroup(device) && this.statusRefused(device))) return;
       void this.refreshState(deviceId, 'post_command')
         .then(({ device }) => {
           // Govee's report can lag behind a command. Check once more if something still differs.

@@ -856,7 +856,7 @@ export function PatternEditorPage() {
         <Card className="p-5">
           <EmptyState title="No light here reports segment control">
             Patterns need per-segment color from the Govee API. Groups made in the Govee Home app do not report it, but their
-            individual lights might. Try refreshing the device list on the dashboard.
+            individual lights might. Try Check lights now on the dashboard.
           </EmptyState>
         </Card>
       ) : null}

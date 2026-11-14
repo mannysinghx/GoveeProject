@@ -20,6 +20,8 @@ export interface DeviceRow {
   last_request_at: string | null;
   last_accepted_at: string | null;
   last_status_error_json: string | null;
+  offline_streak: number;
+  status_failures: number;
   scenes_fetched_at: string | null;
   scene_errors_json: string | null;
   created_at: string;
@@ -43,6 +45,10 @@ export interface DeviceRecord {
   lastRequestAt: string | null;
   lastAcceptedAt: string | null;
   lastStatusError: StatusErrorDto | null;
+  /** Answers in a row that said this light was offline. */
+  offlineStreak: number;
+  /** Status requests in a row that failed. */
+  statusFailures: number;
   scenesFetchedAt: string | null;
   sceneErrors: { source: string; category: StatusErrorDto['category']; message: string }[];
 }
@@ -66,6 +72,8 @@ function toRecord(row: DeviceRow): DeviceRecord {
     lastRequestAt: row.last_request_at,
     lastAcceptedAt: row.last_accepted_at,
     lastStatusError: row.last_status_error_json ? JSON.parse(row.last_status_error_json) : null,
+    offlineStreak: row.offline_streak,
+    statusFailures: row.status_failures,
     scenesFetchedAt: row.scenes_fetched_at,
     sceneErrors: row.scene_errors_json ? JSON.parse(row.scene_errors_json) : [],
   };

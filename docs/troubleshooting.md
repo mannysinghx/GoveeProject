@@ -50,7 +50,7 @@ It changes on restart. Set `SETUP_TOKEN` in `.env` for a fixed one.
 **A device is not listed.**
 
 1. Check that it appears in the Govee Home app, on the same account as your key.
-2. Choose **Refresh device list** on the dashboard.
+2. Choose **Check lights now** on the dashboard.
 3. Check that its model is on [Govee's supported list](https://developer.govee.com/docs/support-product-model).
 
 **A device shows "No longer discovered".** Govee's last device list did not include it. History, presets and schedules are kept, but it cannot be controlled. If you removed and re-added it in the Govee app, it may come back with a new identifier and appear as a new device.

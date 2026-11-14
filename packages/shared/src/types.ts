@@ -216,7 +216,11 @@ export interface RunResultDto {
 /* Devices                                                                    */
 /* -------------------------------------------------------------------------- */
 
-export type Connectivity = 'online' | 'offline' | 'unknown';
+/**
+ * checking: Govee said offline once. It is asked again before the light is called offline,
+ * because a single answer is sometimes wrong.
+ */
+export type Connectivity = 'online' | 'offline' | 'checking' | 'unknown';
 export type Freshness = 'fresh' | 'stale' | 'never';
 
 export interface CapabilityStateDto {
@@ -280,6 +284,16 @@ export interface RefreshResultDto {
   device: DeviceDto;
   /** True when the request was served from cache to respect rate limits. */
   throttled: boolean;
+}
+
+export interface RefreshAllResultDto {
+  /** Lights whose status was asked for. Govee groups have none. */
+  checked: number;
+  /** Why the device list could not be refreshed, or null when it was. */
+  listError: string | null;
+  /** Lights whose status could not be read. A light Govee says is offline is not a failure. */
+  failures: { deviceId: string; name: string; message: string }[];
+  devices: DeviceDto[];
 }
 
 /* -------------------------------------------------------------------------- */

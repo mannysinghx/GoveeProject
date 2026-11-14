@@ -33,6 +33,14 @@ export function registerDeviceRoutes(api: FastifyInstance, ctx: AppContext): voi
 
   api.post('/devices/refresh-due', async (request) => ({ devices: await devices.refreshDue(request.id) }));
 
+  api.post('/devices/refresh-all', async (request) => {
+    const result = await devices.refreshAll(request.id);
+    // So the Connections page and any alerts catch up with what was just read. Not awaited:
+    // confirming a light that has just dropped takes a little while.
+    void ctx.connection.check();
+    return result;
+  });
+
   api.get('/devices/:id', async (request) => {
     const { id } = parseInput(idParamSchema, request.params);
     return devices.getDetail(id);

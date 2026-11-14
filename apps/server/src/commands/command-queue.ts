@@ -69,6 +69,7 @@ export class CommandQueue {
   private readonly drains = new Map<string, Promise<void>>();
   private stopped = false;
   private acceptedListener: ((deviceId: string) => void) | null = null;
+  private offlineListener: ((deviceId: string) => void) | null = null;
 
   constructor(
     private readonly transport: LightTransport,
@@ -83,6 +84,11 @@ export class CommandQueue {
 
   onAccepted(listener: (deviceId: string) => void): void {
     this.acceptedListener = listener;
+  }
+
+  /** Told when Govee refuses a command because the light is offline. */
+  onOffline(listener: (deviceId: string) => void): void {
+    this.offlineListener = listener;
   }
 
   /** Commands left over from before a restart are marked and not replayed. */
@@ -355,6 +361,13 @@ export class CommandQueue {
       { commandId, deviceId: input.deviceId, category: error.category, attempts, result: status },
       'Command did not go through',
     );
+    if (error.category === 'device_offline') {
+      try {
+        this.offlineListener?.(input.deviceId);
+      } catch (listenerError) {
+        this.logger.warn({ err: listenerError }, 'Offline listener failed');
+      }
+    }
     return result;
   }
 }

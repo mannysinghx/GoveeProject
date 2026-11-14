@@ -60,7 +60,7 @@ export function DeviceDetailPage() {
         {missing ? (
           <Notice tone="warn" title="Govee no longer lists this device">
             It was last listed {dateTime(d.lastDiscoveredAt)}. Its history, presets and schedules are kept, but it cannot
-            be controlled. If it was re-added in the Govee app, refresh the device list on the dashboard.
+            be controlled. If it was re-added in the Govee app, press Check lights now on the dashboard.
           </Notice>
         ) : null}
 
@@ -68,6 +68,13 @@ export function DeviceDetailPage() {
           <Notice tone="warn" title="Govee reports this device as offline">
             Values below are historical. Commands may be accepted by Govee and still not reach the lights. Last seen online:{' '}
             {d.lastOnlineAt ? dateTime(d.lastOnlineAt) : 'never, in this app'}.
+          </Notice>
+        ) : null}
+
+        {d.connectivity === 'checking' ? (
+          <Notice tone="warn" title="Govee reported this device as offline once">
+            The app is asking again before calling it offline, because a single answer is sometimes wrong. Values below
+            may be out of date until then.
           </Notice>
         ) : null}
 
