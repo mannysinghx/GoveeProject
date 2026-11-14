@@ -4,7 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
-- **Newest work, 13 November 2026:** branch `claude/govee-light-recognition-b1a7e4`, ahead of `main` (`adab10a`), **committed locally, not pushed and not deployed.** It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. Nothing is uncommitted.
+- **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
 - Deployed on Railway at <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). The owner has set the key and created the account. See `docs/deploy-railway.md`.
@@ -31,7 +31,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## In flight
 
-**Light status, daily color schemes, pattern search, one brightness (13 November 2026).** On `claude/govee-light-recognition-b1a7e4`: `459c84f` (light status) and `b2ee3c2` (the three features). Waiting for the owner to approve one push to `main`, which deploys `@glm/server`.
+**Light status, daily color schemes, pattern search, one brightness (13 November 2026).** `459c84f` (light status) and `b2ee3c2` (the three features), with two test and CI fixes after them. **Deployed** on 14 November 2026 at 02:53 UTC as `19166b3`, with the owner's approval ("Yes, deploy"): Railway deployment `1f11c53f` succeeded, the log shows `006_light_status.sql` applied and no warnings or errors at startup, health is OK, the three new routes return 401 without a session, and the live bundle contains the new screens. Roll back by redeploying `adab10a` (deployment `458df907`) in Railway; the two new columns can stay. **Not yet seen after the deploy:** a background check's result, the 19 new built-in presets, or anything on real lights. The owner has not switched on the daily change, so no new schedule exists.
 
 What was wrong, from the production log (Railway, read-only, 7 to 14 November):
 
@@ -92,7 +92,7 @@ Nothing else in this checkout. The white-LED fix is on the branch `fix/white-led
 
 ## Next steps, in order
 
-0. Get the owner's approval for one push of `claude/govee-light-recognition-b1a7e4` to `main`. Run `bash scripts/ci-local.sh --image` on the exact commit first (the file is not executable, so it needs `bash`, or `npm run ci -- --image`). After the deploy, check the log shows `006_light_status.sql` applied and 19 built-in presets added, then watch one background check.
+0. After the 14 November deploy: have the owner open the dashboard, press Check lights now, and compare each light with the Govee Home app. Then open Scenes & Presets, confirm the color scheme of the day is there, and switch on the daily change if wanted. Check Outdoor Center's power and Wi-Fi. Before any later push, run `bash scripts/ci-local.sh --image` on the exact commit (the file is not executable, so it needs `bash`, or `npm run ci -- --image`).
 1. Have the owner turn on alerts on a phone, using the final web address, and press Send a test.
 2. Check the first real Diwali run on 2026-11-08 at 5 PM Los Angeles time.
 3. Send a pattern to one real H805C string and check it, including the LED count, with `docs/acceptance-checklist.md`.
