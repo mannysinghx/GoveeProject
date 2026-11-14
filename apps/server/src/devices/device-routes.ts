@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import {
+  allBrightnessRequestSchema,
   brightnessRequestSchema,
   colorRequestSchema,
   colorTemperatureRequestSchema,
@@ -13,6 +14,7 @@ import type { AppContext } from '../app/context.js';
 import { AppError, notFound } from '../shared/errors.js';
 import { parseInput } from '../shared/validation.js';
 import { buildCommand } from './command-builder.js';
+import { isGoveeGroup } from './device-service.js';
 
 const sceneParamSchema = idParamSchema.extend({ sceneId: z.string().min(1).max(64) });
 const limitQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(200).default(50) });
@@ -39,6 +41,28 @@ export function registerDeviceRoutes(api: FastifyInstance, ctx: AppContext): voi
     // confirming a light that has just dropped takes a little while.
     void ctx.connection.check();
     return result;
+  });
+
+  /**
+   * One brightness for every light, so the whole display dims and brightens as a unit. Govee
+   * keeps brightness apart from color, so it stays as set when a pattern or scheme changes.
+   */
+  api.post('/lights/brightness', async (request) => {
+    const { value } = parseInput(allBrightnessRequestSchema, request.body);
+    const plans = devices.repository
+      .list()
+      .filter((d) => d.discoveryStatus === 'present' && !isGoveeGroup(d))
+      .flatMap((device) => {
+        const range = device.capabilities.find((c) => c.kind === 'brightness');
+        if (!range) return [];
+        // A percentage of each light's own range, in case one does not go from 1 to 100.
+        const scaled = Math.round(range.min + ((value - 1) / 99) * (range.max - range.min));
+        return [{ device, actions: [{ type: 'brightness', value: Math.min(range.max, Math.max(range.min, scaled)) } as DeviceAction] }];
+      });
+    if (plans.length === 0) {
+      throw new AppError(422, 'unsupported_capability', 'No light here reports brightness control through the Govee API.');
+    }
+    return actions.runPlan({ type: 'manual', id: null, name: `Brightness ${value}% for all lights`, correlationId: request.id }, plans);
   });
 
   api.get('/devices/:id', async (request) => {

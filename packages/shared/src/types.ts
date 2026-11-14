@@ -357,6 +357,36 @@ export interface BuiltinPresetInfoDto {
   when: string;
   colors: string[];
   isAutomaticShow: boolean;
+  /** Set on "Today's Color Scheme": the scheme it shows today. */
+  today?: { key: string; name: string };
+}
+
+export interface DailySchemeDayDto {
+  /** Local date, YYYY-MM-DD. */
+  date: string;
+  key: string;
+  name: string;
+  description: string;
+  colors: string[];
+  /** The preset to apply for this look, or null until the built-in presets exist. */
+  presetId: string | null;
+}
+
+export interface DailySchemeDto {
+  /** "Today's Color Scheme", or null until lights have been found. */
+  presetId: string | null;
+  timeZone: string;
+  today: DailySchemeDayDto;
+  /** From today to the end of December while it is November or December. Otherwise empty. */
+  upcoming: DailySchemeDayDto[];
+  autoChange: {
+    enabled: boolean;
+    /** Local 24-hour time the look changes each day. */
+    time: string;
+    scheduleId: string | null;
+    nextRun: NextRunDto | null;
+    targetName: string | null;
+  };
 }
 
 /* -------------------------------------------------------------------------- */

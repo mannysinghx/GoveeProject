@@ -13,6 +13,7 @@ import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { webPushSender, type PushSender } from '../notifications/push-sender.js';
 import { BuiltinPresets } from '../presets/builtin-presets.js';
+import { DailySchemeService } from '../presets/daily-scheme-service.js';
 import { HolidayCalendar } from '../presets/holiday-calendar.js';
 import { ConnectionMonitor } from '../connection/connection-monitor.js';
 import { MissedDeliveryStore } from '../connection/missed-delivery-store.js';
@@ -64,6 +65,7 @@ export interface AppContext {
   connection: ConnectionMonitor;
   builtins: BuiltinPresets;
   holidays: HolidayCalendar;
+  dailyScheme: DailySchemeService;
   notifications: NotificationService;
   ai: AiService;
 }
@@ -161,7 +163,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
   const missed = new MissedDeliveryStore(db, clock);
   const actions = new ActionService(db, scenes, queue, commands, activity, clock, missed);
   const groups = new GroupService(db, devices.repository, actions, activity, clock);
-  const presets = new PresetService(db, devices.repository, scenes, groups, actions, activity, clock);
+  const presets = new PresetService(db, devices.repository, scenes, groups, actions, activity, clock, () => settings.get().defaultTimeZone);
   const schedules = new ScheduleService(db, devices.repository, groups, presets, activity, clock);
   const scheduler = new Scheduler(
     db,
@@ -194,6 +196,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
   );
 
   const holidays = new HolidayCalendar(db, schedules, presets, activity, clock);
+  const dailyScheme = new DailySchemeService(db, devices.repository, groups, presets, schedules, activity, () => settings.get(), clock);
   // Web Push needs a contact address for the app. Its own address is the natural one.
   const pushSubject = config.allowedHosts?.[0]
     ? `https://${config.allowedHosts[0]}`
@@ -267,6 +270,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     connection,
     builtins,
     holidays,
+    dailyScheme,
     notifications,
     ai,
   };

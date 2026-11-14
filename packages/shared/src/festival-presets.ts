@@ -569,11 +569,189 @@ export const MONTH_PRESETS: readonly BuiltinPresetDefinition[] = [
   },
 ];
 
+const CREAM = '#fff0c8';
+const PUMPKIN = '#ff6a00';
+const COPPER = '#c8621e';
+const PLUM = '#6b1f5c';
+const CINNAMON = '#8b2f0f';
+const CIDER = '#d9731a';
+const MOSS = '#3c7a1e';
+const CHAMPAGNE = '#ffe0a0';
+const BERRY = '#d4003c';
+
+/**
+ * Still color schemes for November and December: fixed colors, no movement. They are what
+ * "Today's Color Scheme" picks from, one a day, together with the still patterns above for
+ * the same two months. Each is a short run, because every distinct color is one command.
+ */
+export const SEASON_PRESETS: readonly BuiltinPresetDefinition[] = [
+  {
+    key: 'season-pumpkin-patch',
+    name: 'November: Pumpkin Patch',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Pumpkin orange with green vines and a touch of cream.',
+    colors: [...run(PUMPKIN, 3), MOSS, ...run(PUMPKIN, 2), CREAM],
+  },
+  {
+    key: 'season-maple-sunset',
+    name: 'November: Maple Sunset',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Burgundy warming through orange to gold and back, looping with no jump.',
+    colors: wave([BURGUNDY, ORANGE, GOLD], 2),
+  },
+  {
+    key: 'season-golden-hour',
+    name: 'November: Golden Hour',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Warm white, gold and amber, like late afternoon light.',
+    colors: [...run(WARM, 2), ...run(GOLD, 2), AMBER],
+  },
+  {
+    key: 'season-harvest-moon',
+    name: 'November: Harvest Moon',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'A golden moon over a deep plum sky.',
+    colors: [...run(PLUM, 3), GOLD, CREAM, GOLD],
+  },
+  {
+    key: 'season-copper-plum',
+    name: 'November: Copper & Plum',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Copper and plum with a gold accent.',
+    colors: [...run(COPPER, 2), ...run(PLUM, 2), GOLD],
+  },
+  {
+    key: 'season-mulled-cider',
+    name: 'November: Mulled Cider',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Cider orange, cinnamon and cream.',
+    colors: [...run(CIDER, 2), CINNAMON, ...run(CIDER, 2), CREAM],
+  },
+  {
+    key: 'season-forest-ember',
+    name: 'November: Forest & Ember',
+    occasion: NOVEMBER,
+    when: 'All of November',
+    description: 'Evergreen with glowing rust and amber.',
+    colors: [...run(EVERGREEN, 3), RUST, AMBER],
+  },
+  {
+    key: 'season-peppermint-twist',
+    name: 'December: Peppermint Twist',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Red, white and green, twisted together.',
+    colors: [...run(RED, 2), WHITE, ...run(GREEN, 2), WHITE],
+  },
+  {
+    key: 'season-nordic',
+    name: 'December: Nordic Red & White',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Berry red broken by single whites, like a knitted sweater.',
+    colors: [...run(BERRY, 3), WHITE, BERRY, WHITE],
+  },
+  {
+    key: 'season-blue-christmas',
+    name: 'December: Blue Christmas',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Royal blue with white and silver.',
+    colors: [...run(ROYAL, 3), WHITE, ...run(ROYAL, 2), SILVER],
+  },
+  {
+    key: 'season-gingerbread',
+    name: 'December: Gingerbread House',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Gingerbread copper with white icing and red and green gumdrops.',
+    colors: [...run(COPPER, 2), WHITE, RED, ...run(COPPER, 2), WHITE, GREEN],
+  },
+  {
+    key: 'season-holly-berries',
+    name: 'December: Holly & Berries',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Deep green holly with pairs of red berries.',
+    colors: [...run(EVERGREEN, 4), ...run(RED, 2)],
+  },
+  {
+    key: 'season-starry-night',
+    name: 'December: Starry Night',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'A navy sky with white and gold stars.',
+    colors: [...run(NAVY, 3), WHITE, ...run(NAVY, 2), GOLD],
+  },
+  {
+    key: 'season-poinsettia',
+    name: 'December: Poinsettia',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Red petals, a gold center and green leaves.',
+    colors: [...run(RED, 3), GOLD, ...run(EVERGREEN, 2)],
+  },
+  {
+    key: 'season-sugar-plum',
+    name: 'December: Sugar Plum',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Purple, pink and lavender with a silver sparkle.',
+    colors: [...run(PURPLE, 2), PINK, LAVENDER, SILVER],
+  },
+  {
+    key: 'season-champagne',
+    name: 'December: Champagne Sparkle',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Warm white and pale gold, with a bright white sparkle.',
+    colors: [...run(WARM, 2), CHAMPAGNE, WHITE, CHAMPAGNE],
+  },
+  {
+    key: 'season-vintage-bulbs',
+    name: 'December: Vintage Bulbs',
+    occasion: DECEMBER,
+    when: 'All of December',
+    description: 'Red, green, blue, gold and orange, like old-fashioned Christmas bulbs.',
+    colors: [RED, GREEN, BLUE, GOLD, ORANGE],
+  },
+  {
+    key: 'season-warm-white',
+    name: 'Everyday: Warm White',
+    occasion: 'Everyday',
+    when: 'Any day',
+    description: 'A plain, soft warm white.',
+    colors: [WARM],
+  },
+];
+
+/**
+ * One preset that shows a different still scheme each day. It is an ordinary preset, so it
+ * can be applied by hand or put on a schedule, and which scheme it shows is decided at the
+ * moment it runs. See daily-scheme.ts.
+ */
+export const DAILY_SCHEME_PRESET: BuiltinPresetDefinition = {
+  key: 'daily-scheme',
+  name: "Today's Color Scheme",
+  occasion: 'Changes every day',
+  when: 'A different still scheme each day in November and December. Warm white in other months.',
+  description: 'Shows the color scheme chosen for today. Put it on a schedule and the look changes every day.',
+  colors: [PUMPKIN, GOLD, BURGUNDY, RED, WHITE, GREEN, ICE, SILVER],
+};
+
 export const BUILTIN_PRESETS: readonly BuiltinPresetDefinition[] = [
   ...FESTIVAL_PRESETS,
   FIREWORKS_PRESET,
   ...HOLIDAY_PRESETS,
   ...MONTH_PRESETS,
+  ...SEASON_PRESETS,
+  DAILY_SCHEME_PRESET,
 ];
 
 export function builtinPresetByKey(key: string): BuiltinPresetDefinition | undefined {

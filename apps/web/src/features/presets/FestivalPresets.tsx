@@ -1,8 +1,9 @@
 import { Copy, PartyPopper, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { BUILTIN_PRESETS, describeRecurrence, type PresetDto } from '@glm/shared';
+import { DAILY_SCHEME_PRESET, describeRecurrence, type PresetDto } from '@glm/shared';
 import { Badge, Button, Card, ErrorNotice, Notice } from '../../components/ui';
 import { useDuplicatePreset, useSchedules } from '../../lib/queries';
+import { filterAndSort, isFiltering, usesEffect, type PresetFilter } from './preset-list';
 
 function Swatches({ colors }: { colors: string[] }) {
   return (
@@ -12,10 +13,6 @@ function Swatches({ colors }: { colors: string[] }) {
       ))}
     </div>
   );
-}
-
-function usesEffect(preset: PresetDto): boolean {
-  return preset.actions.some((a) => a.action.type === 'scene');
 }
 
 function FestivalCard({ preset, onApply }: { preset: PresetDto; onApply: () => void }) {
@@ -94,13 +91,23 @@ function FireworksNotice({ preset, onApply }: { preset: PresetDto; onApply: () =
   );
 }
 
-export function FestivalPresets({ presets, onApply }: { presets: PresetDto[]; onApply: (preset: PresetDto) => void }) {
-  // In calendar order, as the catalog lists them, rather than by name.
-  const catalogOrder = (preset: PresetDto) => BUILTIN_PRESETS.findIndex((b) => b.key === preset.builtin?.key);
-  const builtin = presets.filter((p) => p.builtin).sort((a, b) => catalogOrder(a) - catalogOrder(b));
+export function FestivalPresets({
+  presets,
+  filter,
+  onApply,
+}: {
+  presets: PresetDto[];
+  filter: PresetFilter;
+  onApply: (preset: PresetDto) => void;
+}) {
+  const builtin = presets.filter((p) => p.builtin);
   if (builtin.length === 0) return null;
-  const fireworks = builtin.find((p) => p.builtin?.isAutomaticShow);
-  const festival = builtin.filter((p) => !p.builtin?.isAutomaticShow);
+  // The fireworks show and "Today's Color Scheme" have their own sections, not a card here.
+  const all = builtin.filter((p) => !p.builtin?.isAutomaticShow && p.builtin?.key !== DAILY_SCHEME_PRESET.key);
+  const fireworks = filterAndSort(builtin, { ...filter, sort: 'calendar' }).find((p) => p.builtin?.isAutomaticShow);
+  // In calendar order, as the catalog lists them, unless another order is chosen.
+  const festival = filterAndSort(all, filter);
+  const grouped = filter.sort === 'calendar';
   const occasions = [...new Set(festival.map((p) => p.builtin?.occasion as string))];
 
   return (
@@ -110,23 +117,36 @@ export function FestivalPresets({ presets, onApply }: { presets: PresetDto[]; on
           Festival presets
         </h2>
         <p className="mt-1 text-sm text-ink-300">
-          {festival.length} ready-made looks that span all your strings. Patterns are fixed colors. Moving effects are Govee's
+          {isFiltering(filter) ? `${festival.length} of ${all.length}` : festival.length} ready-made looks that span all your strings. Patterns are fixed colors. Moving effects are Govee's
           own, so Govee decides how they look. To change one, duplicate it and edit the copy.
         </p>
       </div>
       {fireworks ? <FireworksNotice preset={fireworks} onApply={() => onApply(fireworks)} /> : null}
-      {occasions.map((occasion) => (
-        <div key={occasion}>
-          <h3 className="mb-2 text-sm font-medium text-ink-200">{occasion}</h3>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {festival
-              .filter((p) => p.builtin?.occasion === occasion)
-              .map((preset) => (
-                <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
-              ))}
+      {festival.length === 0 && !fireworks ? (
+        <p className="rounded-lg border border-dashed border-ink-700 p-4 text-sm text-ink-300" role="status">
+          No ready-made look matches. Try fewer words, or clear the search.
+        </p>
+      ) : null}
+      {grouped ? (
+        occasions.map((occasion) => (
+          <div key={occasion}>
+            <h3 className="mb-2 text-sm font-medium text-ink-200">{occasion}</h3>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {festival
+                .filter((p) => p.builtin?.occasion === occasion)
+                .map((preset) => (
+                  <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
+                ))}
+            </div>
           </div>
+        ))
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {festival.map((preset) => (
+            <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
+          ))}
         </div>
-      ))}
+      )}
     </section>
   );
 }

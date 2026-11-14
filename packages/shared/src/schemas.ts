@@ -469,6 +469,12 @@ export type PushSubscribe = z.infer<typeof pushSubscribeSchema>;
 
 export const pushUnsubscribeSchema = z.object({ endpoint: z.url().max(2048) });
 
+export const dailySchemeUpdateSchema = z.object({ enabled: z.boolean(), time: timeOfDaySchema });
+export type DailySchemeUpdate = z.infer<typeof dailySchemeUpdateSchema>;
+
+/** One brightness for every light string, so the whole display dims and brightens together. */
+export const allBrightnessRequestSchema = z.object({ value: z.number().int().min(1).max(100) });
+
 export const holidayEnabledSchema = z.object({ enabled: z.boolean() });
 export const holidaySkipSchema = z.object({ skip: z.boolean() });
 

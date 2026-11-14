@@ -22,6 +22,7 @@ import {
   useSummary,
 } from '../../lib/queries';
 import { ApplyPresetDialog } from '../presets/ApplyPresetDialog';
+import { MasterBrightness } from '../presets/MasterBrightness';
 
 function ConnectionBanner({ diagnostics }: { diagnostics: DiagnosticsDto }) {
   const { govee } = diagnostics;
@@ -162,10 +163,13 @@ function QuickPresets({ presets }: { presets: PresetDto[] }) {
 }
 
 /** What asking Govee just now found, in words. */
-function CheckResult({ result }: { result: RefreshAllResultDto }) {
-  const lights = result.devices.filter((d) => d.discoveryStatus === 'present' && !d.isGoveeGroup);
+function CheckResult({ result, current }: { result: RefreshAllResultDto; current: DeviceDto[] }) {
+  // The second answer about a light arrives a little later, so this follows the live list.
+  const devices = current.length > 0 ? current : result.devices;
+  const lights = devices.filter((d) => d.discoveryStatus === 'present' && !d.isGoveeGroup);
   const online = lights.filter((d) => d.connectivity === 'online').length;
   const notOnline = lights.filter((d) => d.connectivity === 'offline' || d.connectivity === 'checking');
+  const stillChecking = notOnline.some((d) => d.connectivity === 'checking');
   const problems = [
     ...(result.listError ? [`The device list could not be refreshed: ${result.listError}`] : []),
     ...result.failures.map((f) => `${f.name}: ${f.message}`),
@@ -185,8 +189,10 @@ function CheckResult({ result }: { result: RefreshAllResultDto }) {
   if (notOnline.length > 0) {
     return (
       <Notice tone="warn" title={`Asked Govee just now: ${online} of ${lights.length} lights online`}>
-        Govee says {notOnline.map((d) => d.name).join(', ')} {notOnline.length === 1 ? 'is' : 'are'} not connected. The app
-        asks once more before calling a light offline, because a single answer is sometimes wrong.
+        Govee says {notOnline.map((d) => d.name).join(', ')} {notOnline.length === 1 ? 'is' : 'are'} not connected.{' '}
+        {stillChecking
+          ? 'The app asks once more before calling a light offline, because a single answer is sometimes wrong.'
+          : 'A second answer agreed, so check the power and Wi-Fi there. Connections has steps to try.'}
       </Notice>
     );
   }
@@ -264,7 +270,7 @@ export function DashboardPage() {
           </Notice>
         ) : null}
         {checkAll.isError ? <ErrorNotice error={checkAll.error} title="Could not check the lights" /> : null}
-        {checkAll.data ? <CheckResult result={checkAll.data} /> : null}
+        {checkAll.data ? <CheckResult result={checkAll.data} current={list} /> : null}
 
         {devices.isPending ? <Loading label="Loading devices" /> : null}
         {devices.isError ? <ErrorNotice error={devices.error} title="Could not load devices" /> : null}
@@ -290,6 +296,8 @@ export function DashboardPage() {
             ))}
           </section>
         ) : null}
+
+        {list.length > 0 ? <MasterBrightness devices={list} /> : null}
 
         <div className="grid gap-5 lg:grid-cols-2">
           <SectionCard

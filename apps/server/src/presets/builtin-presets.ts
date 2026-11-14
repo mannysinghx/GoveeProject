@@ -2,6 +2,9 @@ import crypto from 'node:crypto';
 import type { Logger } from 'pino';
 import {
   BUILTIN_PRESETS,
+  DAILY_SCHEME_PRESET,
+  dailyScheme,
+  localDate,
   builtinPresetActions,
   FIREWORKS_PRESET,
   HOLIDAYS,
@@ -161,8 +164,10 @@ export class BuiltinPresets {
       });
     };
     this.db.transaction(() => {
+      const today = dailyScheme(localDate(this.getSettings().defaultTimeZone, this.clock.nowMs()));
       for (const definition of BUILTIN_PRESETS) {
-        const actions = builtinPresetActions(definition, strings);
+        // Kept showing today's scheme, so a copy or a preview matches what it would send.
+        const actions = builtinPresetActions(definition.key === DAILY_SCHEME_PRESET.key ? today : definition, strings);
         const row = this.db.prepare('SELECT id FROM presets WHERE builtin_key = ?').get(definition.key) as
           | { id: string }
           | undefined;

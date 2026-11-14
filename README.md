@@ -87,6 +87,12 @@ After you create the account, the app takes you to **Connect to Govee**. Choose 
 
 **Festival presets.** **Scenes & Presets** includes 20 ready-made looks for November, Veterans Day, Thanksgiving, December, Christmas, and the days around New Year. They span all your strings. Some are fixed color patterns, and some start Govee's own moving effects. They can be applied or scheduled like any preset, and duplicated to make your own version. **New Year Fireworks** also runs by itself: at 12:00 AM on January 1 it starts Govee's Fireworks effect, and at 12:30 AM it turns the lights off. Change or turn off either under **Schedules**.
 
+**Color scheme of the day.** **Scenes & Presets** shows today's still color scheme, with a different one for every day of November and December: 26 fixed-color looks, plus Veterans Day, Thanksgiving, Christmas Eve, Christmas and New Year's Eve on their own days. Turn on **Change automatically every day** and pick a time, and the lights show that day's scheme by themselves. It is an ordinary schedule, so you can also change or pause it under **Schedules**.
+
+**Find a pattern.** The search box on **Scenes & Presets** looks through names, descriptions, occasions and colors, for the ready-made looks and your own presets alike. **Sort by** orders them by calendar, name, newest or recently changed, and **Show** separates still patterns from moving effects.
+
+**Brightness for all lights.** One slider on the dashboard and on **Scenes & Presets** sets every light to the same brightness. The colors and pattern stay as they are, and the level stays when the pattern changes.
+
 **Holiday calendar.** **Schedules** lists 21 shows that run by themselves: the 11 US federal holidays, Valentine's Day, St. Patrick's Day, Easter, Mother's Day, Father's Day, Halloween, Christmas Eve, New Year's Eve, Diwali and the New Year fireworks. Each uses that holiday's colors, starting after dark for the season and ending at 11 PM. Diwali runs 5 to 8 PM, switching between Diwali colors and Govee's Fireworks effect every 30 minutes. Choose **Edit** on any of them to change its times, what it shows, which lights it uses and when it ends, or add steps that change the lights during the evening. You can also turn one off, or skip its next date. Dates are worked out for each year, with no outside service. Your own schedules still run on those days.
 
 **Notifications.** The bell shows what your lights have been doing. To also get it on your phone, open **Notifications** and choose **Turn on for this device**. On iPhone, add the app to your Home Screen from Safari first (iOS 16.4 or later). Each notification shows the colors sent as colored squares and asks whether the lights changed, because Govee can only say it accepted the command. Holiday shows also get a reminder 15 minutes before, with a button to skip.
@@ -116,7 +122,7 @@ Govee lists the H805C as supported, but that does not guarantee every feature is
 
 **Not in the list?** Check that it is in the Govee Home app on the same account as your key, then choose **Check lights now** on the dashboard. Models not on [Govee's supported list](https://developer.govee.com/docs/support-product-model) will not appear.
 
-**Offline?** Check the lights in the Govee Home app first. If they are offline there too, the problem is power or Wi-Fi. While Govee reports a device as offline, the values shown are historical, and a command can be accepted by Govee without reaching the lights.
+**Offline?** A light shows **Checking connection** when Govee has said it is offline once, and **Offline** only when a second answer about 20 seconds later agrees, because single answers are sometimes wrong. Check the lights in the Govee Home app first. If they are offline there too, the problem is power or Wi-Fi. While Govee reports a device as offline, the values shown are historical, and a command can be accepted by Govee without reaching the lights.
 
 More in the [troubleshooting guide](docs/troubleshooting.md).
 

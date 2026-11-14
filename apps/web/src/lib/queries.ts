@@ -11,6 +11,8 @@ import type {
   AppSettings,
   CommandDto,
   ConnectionReportDto,
+  DailySchemeDto,
+  DailySchemeUpdate,
   DashboardSummaryDto,
   DeviceAction,
   DeviceDetailDto,
@@ -244,7 +246,43 @@ export function useApplyGroupAction() {
   });
 }
 
+/** One brightness for every light string, so the whole display changes together. */
+export function useAllBrightness() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (value: number) => api<RunResultDto>('/lights/brightness', { method: 'POST', body: { value } }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.devices });
+      void client.invalidateQueries({ queryKey: keys.summary });
+    },
+  });
+}
+
 /* -------------------------------- presets -------------------------------- */
+
+const DAILY_SCHEME_KEY = ['daily-scheme'];
+
+export function useDailyScheme() {
+  return useQuery({
+    queryKey: DAILY_SCHEME_KEY,
+    queryFn: () => api<DailySchemeDto>('/daily-scheme'),
+    // The scheme changes at midnight, and the schedule can be edited elsewhere.
+    refetchInterval: 60_000,
+  });
+}
+
+export function useSetDailyScheme() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (update: DailySchemeUpdate) => api<DailySchemeDto>('/daily-scheme', { method: 'PATCH', body: update }),
+    onSuccess: (status) => client.setQueryData(DAILY_SCHEME_KEY, status),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: keys.schedules });
+      void client.invalidateQueries({ queryKey: keys.groups });
+      void client.invalidateQueries({ queryKey: keys.summary });
+    },
+  });
+}
 
 export function usePresets() {
   return useQuery({

@@ -1,4 +1,4 @@
-import { Brush, Copy, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Brush, Copy, Pencil, Play, Plus, Search, Sparkles, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { DeviceDto, PresetDto } from '@glm/shared';
@@ -7,8 +7,70 @@ import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../
 import { ScenesPanel } from '../devices/ScenesPanel';
 import { isPatternPreset } from '../patterns/pattern-model';
 import { ApplyPresetDialog } from './ApplyPresetDialog';
+import { DailySchemeCard } from './DailySchemeCard';
 import { FestivalPresets } from './FestivalPresets';
+import { MasterBrightness } from './MasterBrightness';
 import { PresetEditor } from './PresetEditor';
+import { filterAndSort, isFiltering, NO_FILTER, PRESET_SORTS, type PresetFilter, type PresetKind, type PresetSort } from './preset-list';
+
+/** Search, order and type for every pattern on the page: the ready-made ones and the owner's own. */
+function PatternFinder({ filter, onChange, shown, total }: { filter: PresetFilter; onChange: (next: PresetFilter) => void; shown: number; total: number }) {
+  return (
+    <Card className="p-4">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
+        <Field label="Search patterns">
+          {(props) => (
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <input
+                {...props}
+                type="search"
+                className={`${inputClass} pl-9 pr-10`}
+                placeholder="Name, occasion or color, such as gold or Christmas"
+                value={filter.query}
+                onChange={(event) => onChange({ ...filter, query: event.target.value })}
+              />
+              {filter.query ? (
+                <button
+                  type="button"
+                  aria-label="Clear the search"
+                  className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-ink-300 hover:text-ink-100"
+                  onClick={() => onChange({ ...filter, query: '' })}
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          )}
+        </Field>
+        <Field label="Sort by">
+          {(props) => (
+            <select {...props} className={inputClass} value={filter.sort} onChange={(event) => onChange({ ...filter, sort: event.target.value as PresetSort })}>
+              {PRESET_SORTS.map((sort) => (
+                <option key={sort.value} value={sort.value}>
+                  {sort.label}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
+        <Field label="Show">
+          {(props) => (
+            <select {...props} className={inputClass} value={filter.kind} onChange={(event) => onChange({ ...filter, kind: event.target.value as PresetKind })}>
+              <option value="all">Everything</option>
+              <option value="pattern">Still patterns</option>
+              <option value="effect">Moving effects</option>
+            </select>
+          )}
+        </Field>
+      </div>
+      <p className="mt-2 text-xs text-ink-400" role="status">
+        {isFiltering(filter) ? `Showing ${shown} of ${total} patterns and presets.` : `${total} patterns and presets.`}
+        {filter.sort === 'calendar' ? ' Ready-made looks are in calendar order, and your own are by name.' : ''}
+      </p>
+    </Card>
+  );
+}
 
 function PresetCard({
   preset,
@@ -113,7 +175,11 @@ export function PresetsPage() {
   const [editing, setEditing] = useState<PresetDto | 'new' | null>(null);
   const [applying, setApplying] = useState<PresetDto | null>(null);
   const navigate = useNavigate();
-  const yourPresets = presets.data?.filter((preset) => !preset.builtin);
+  const [filter, setFilter] = useState<PresetFilter>(NO_FILTER);
+  const allYours = presets.data?.filter((preset) => !preset.builtin);
+  const yourPresets = allYours ? filterAndSort(allYours, filter) : undefined;
+  const total = presets.data?.length ?? 0;
+  const shown = presets.data ? filterAndSort(presets.data, filter).length : 0;
 
   return (
     <>
@@ -155,7 +221,10 @@ export function PresetsPage() {
       </div>
 
       <div className="space-y-6">
-        {presets.data ? <FestivalPresets presets={presets.data} onApply={setApplying} /> : null}
+        {devices.data ? <MasterBrightness devices={devices.data} /> : null}
+        {presets.data?.some((preset) => preset.builtin) ? <DailySchemeCard presets={presets.data} onApply={setApplying} /> : null}
+        {presets.data && presets.data.length > 0 ? <PatternFinder filter={filter} onChange={setFilter} shown={shown} total={total} /> : null}
+        {presets.data ? <FestivalPresets presets={presets.data} filter={filter} onApply={setApplying} /> : null}
 
         <section aria-labelledby="presets-heading">
           <h2 id="presets-heading" className="mb-3 text-lg font-semibold">
@@ -163,7 +232,12 @@ export function PresetsPage() {
           </h2>
           {presets.isPending ? <Loading label="Loading presets" /> : null}
           {presets.isError ? <ErrorNotice error={presets.error} /> : null}
-          {yourPresets?.length === 0 ? (
+          {allYours && allYours.length > 0 && yourPresets?.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-ink-700 p-4 text-sm text-ink-300" role="status">
+              None of your {allYours.length} preset{allYours.length === 1 ? '' : 's'} match. Try fewer words, or clear the search.
+            </p>
+          ) : null}
+          {allYours?.length === 0 ? (
             <EmptyState
               icon={<Sparkles className="size-8" aria-hidden />}
               title="No presets yet"

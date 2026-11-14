@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import {
+  dailySchemeUpdateSchema,
   idParamSchema,
   presetApplyRequestSchema,
   presetCreateSchema,
@@ -10,7 +11,11 @@ import type { AppContext } from '../app/context.js';
 import { parseInput } from '../shared/validation.js';
 
 export function registerPresetRoutes(api: FastifyInstance, ctx: AppContext): void {
-  const { presets } = ctx;
+  const { presets, dailyScheme } = ctx;
+
+  api.get('/daily-scheme', async () => dailyScheme.status());
+
+  api.patch('/daily-scheme', async (request) => dailyScheme.set(parseInput(dailySchemeUpdateSchema, request.body)));
 
   api.get('/presets', async () => ({ presets: presets.list() }));
 

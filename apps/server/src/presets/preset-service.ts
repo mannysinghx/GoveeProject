@@ -10,7 +10,7 @@ import type {
   RunResultDto,
   Target,
 } from '@glm/shared';
-import { builtinPresetByKey, describeAction, FIREWORKS_PRESET } from '@glm/shared';
+import { builtinPresetByKey, DAILY_SCHEME_PRESET, dailyScheme, describeAction, FIREWORKS_PRESET, localDate } from '@glm/shared';
 import type { ActivityService } from '../activity/activity-service.js';
 import type { ActionService, DevicePlan, PlannedSkip } from '../commands/action-service.js';
 import type { Db } from '../database/database.js';
@@ -48,7 +48,19 @@ export class PresetService {
     private readonly actions: ActionService,
     private readonly activity: ActivityService,
     private readonly clock: Clock,
+    /** Decides which day it is, for "Today's Color Scheme". */
+    private readonly getTimeZone: () => string = () => 'UTC',
   ) {}
+
+  /** The scheme "Today's Color Scheme" shows right now. */
+  todaysScheme() {
+    return dailyScheme(localDate(this.getTimeZone(), this.clock.nowMs()));
+  }
+
+  findByBuiltinKey(key: string): PresetDto | null {
+    const row = this.db.prepare('SELECT * FROM presets WHERE builtin_key = ?').get(key) as PresetRow | undefined;
+    return row ? this.toDto(row) : null;
+  }
 
   private actionsFor(presetId: string): PresetActionDto[] {
     const rows = this.db
@@ -75,6 +87,7 @@ export class PresetService {
   private toDto(row: PresetRow): PresetDto {
     const actions = this.actionsFor(row.id);
     const definition = row.builtin_key ? builtinPresetByKey(row.builtin_key) : undefined;
+    const today = definition?.key === DAILY_SCHEME_PRESET.key ? this.todaysScheme() : null;
     return {
       id: row.id,
       name: row.name,
@@ -86,8 +99,9 @@ export class PresetService {
             key: definition.key,
             occasion: definition.occasion,
             when: definition.when,
-            colors: definition.colors,
+            colors: today ? today.colors : definition.colors,
             isAutomaticShow: definition.key === FIREWORKS_PRESET.key,
+            ...(today ? { today: { key: today.key, name: today.name } } : {}),
           }
         : null,
       createdAt: row.created_at,
@@ -338,7 +352,11 @@ export class PresetService {
     },
     correlationId?: string,
   ): Promise<RunResultDto> {
-    const preset = this.get(id);
+    const chosen = this.get(id);
+    // "Today's Color Scheme" stands for whichever scheme the date picks. Its own steps are
+    // only refreshed hourly, so the scheme is looked up here, at the moment it runs.
+    const todays = chosen.builtin?.today ? this.findByBuiltinKey(chosen.builtin.today.key) : null;
+    const preset = todays ?? chosen;
     const { plans, skipped } = this.buildPlan(preset, target);
     return this.actions.runPlan(
       {

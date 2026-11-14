@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BUILTIN_PRESETS, builtinPresetActions, FESTIVAL_PRESETS, FIREWORKS_PRESET, MONTH_PRESETS, orderLightStrings, type BuiltinString } from './festival-presets.js';
+import {
+  BUILTIN_PRESETS,
+  builtinPresetActions,
+  DAILY_SCHEME_PRESET,
+  FESTIVAL_PRESETS,
+  FIREWORKS_PRESET,
+  HOLIDAY_PRESETS,
+  MONTH_PRESETS,
+  orderLightStrings,
+  SEASON_PRESETS,
+  type BuiltinString,
+} from './festival-presets.js';
 import { hexToRgb, isHexColor } from './color.js';
 import { HOLIDAYS } from './holidays.js';
 import { presetCreateSchema } from './schemas.js';
@@ -51,7 +62,11 @@ describe('the month and heritage presets', () => {
 
   it('are listed after the others, in calendar order, without disturbing them', () => {
     const keys = BUILTIN_PRESETS.map((p) => p.key);
-    expect(keys.slice(-18)).toEqual(MONTH_PRESETS.map((p) => p.key));
+    // Later additions, the season schemes and "Today's Color Scheme", come after these in turn.
+    const start = keys.indexOf('month-january-aurora');
+    expect(start).toBe(21 + HOLIDAY_PRESETS.length);
+    expect(keys.slice(start, start + 18)).toEqual(MONTH_PRESETS.map((p) => p.key));
+    expect(keys.slice(start + 18)).toEqual([...SEASON_PRESETS.map((p) => p.key), DAILY_SCHEME_PRESET.key]);
     expect(MONTH_PRESETS.map((p) => p.key)).toEqual([
       'month-january-aurora',
       'month-lunar-new-year',
