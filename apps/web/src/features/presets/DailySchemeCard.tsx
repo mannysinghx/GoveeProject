@@ -49,7 +49,6 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
   const { today, upcoming, autoChange, presetId } = status.data;
   const todaysPreset = presets.find((p) => p.id === today.presetId);
   const time = draftTime ?? autoChange.time;
-  const inSeason = upcoming.length > 0 || today.key !== 'season-warm-white';
   const shown = showAll ? upcoming : upcoming.slice(0, SHORT_LIST);
 
   return (
@@ -137,7 +136,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
           {set.isError ? <ErrorNotice error={set.error} title="That was not saved" /> : null}
         </div>
 
-        {inSeason && upcoming.length > 0 ? (
+        {upcoming.length > 0 ? (
           <div>
             <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-ink-200">
               <CalendarSync className="size-4" aria-hidden />
