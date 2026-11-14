@@ -114,7 +114,9 @@ if [ "$BUILD_IMAGE" = true ]; then
       console.log('    health, frontend, auth and setup-code checks passed');
     })().catch((e) => { console.error(e); process.exit(1); });
   "
-  if ! docker logs "$NAME" 2>&1 | grep -q setupCodeForFirstRun; then
+  # Not grep -q: it stops reading at the first match, docker logs is then killed by the closed
+  # pipe, and pipefail reports that as a failure about one run in eight.
+  if ! docker logs "$NAME" 2>&1 | grep setupCodeForFirstRun >/dev/null; then
     echo "Setup code was not logged" >&2
     exit 1
   fi

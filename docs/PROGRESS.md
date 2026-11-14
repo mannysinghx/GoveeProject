@@ -4,7 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
-- **Newest work, 13 November 2026:** branch `claude/govee-light-recognition-b1a7e4`, two commits ahead of `main` (`adab10a`), **committed locally, not pushed and not deployed.** It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. Nothing is uncommitted.
+- **Newest work, 13 November 2026:** branch `claude/govee-light-recognition-b1a7e4`, ahead of `main` (`adab10a`), **committed locally, not pushed and not deployed.** It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
 - Deployed on Railway at <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). The owner has set the key and created the account. See `docs/deploy-railway.md`.
@@ -52,6 +52,7 @@ What was wrong, from the production log (Railway, read-only, 7 to 14 November):
 | Search, sort and filter on Scenes & Presets | `apps/web/src/features/presets/presets.test.tsx`, and the real browser: "red white" narrowed 74 to 12, and sorting by name reordered them. |
 | Brightness for all lights | Server and web tests, and the real browser: the slider sent 51% to all three test lights. The two online ones reported 51% and were confirmed. The offline one was named as not taking it. |
 | Everything together | `npm test` in the Node 26 container: 723 tests (server 460, web 192, shared 71). Type check, lint and build clean. Phone width: no sideways scrolling on Scenes & Presets. |
+| Local CI | `bash scripts/ci-local.sh --image` on `1dfd60e`: every check passed (723 tests, 0 vulnerabilities, image health, frontend, auth and setup code), then the script's last line failed with "Setup code was not logged". That was the script, not the app: the code was in the log, and `docker logs | grep -q` under `pipefail` fails about one run in eight (reproduced 1 of 8 by hand). The script is fixed in the next commit. The result on the final commit is in `docs/OPS_LOG.md`. |
 
 **None of this has been tried on real lights.** The browser runs used the mock.
 
@@ -91,7 +92,7 @@ Nothing else in this checkout. The white-LED fix is on the branch `fix/white-led
 
 ## Next steps, in order
 
-0. Get the owner's approval for one push of `claude/govee-light-recognition-b1a7e4` to `main`. Run `scripts/ci-local.sh --image` on the exact commit first. After the deploy, check the log shows `006_light_status.sql` applied and 19 built-in presets added, then watch one background check.
+0. Get the owner's approval for one push of `claude/govee-light-recognition-b1a7e4` to `main`. Run `bash scripts/ci-local.sh --image` on the exact commit first (the file is not executable, so it needs `bash`, or `npm run ci -- --image`). After the deploy, check the log shows `006_light_status.sql` applied and 19 built-in presets added, then watch one background check.
 1. Have the owner turn on alerts on a phone, using the final web address, and press Send a test.
 2. Check the first real Diwali run on 2026-11-08 at 5 PM Los Angeles time.
 3. Send a pattern to one real H805C string and check it, including the LED count, with `docs/acceptance-checklist.md`.
@@ -123,7 +124,7 @@ Then open <http://localhost:5187>. For real lights, see `README.md`.
 Before any push, run the CI on the exact commit. It never uses GitHub:
 
 ```bash
-scripts/ci-local.sh --image
+bash scripts/ci-local.sh --image
 ```
 
 ## Proposals not started
