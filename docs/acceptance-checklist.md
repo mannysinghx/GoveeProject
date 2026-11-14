@@ -47,6 +47,10 @@ These need your real lights:
 3. **Try a moving effect and a pattern,** such as Thanksgiving: Govee Effect and Veterans Day: Red, White & Blue. Check the colors look right.
 4. **Check Schedules.** New Year Fireworks should show its next run as 12:00 AM on January 1 in your time zone.
 
+## White LEDs
+
+Run **Check my lights** (**LEDs look wrong?** on the pattern page) and keep the report it gives you. If Test 1 is wrong, the problem isn't segment commands. If only Test 2 is wrong, it is. Test 3 shows how many LEDs one segment really covers.
+
 ## LED boxes and connection monitoring
 
 These need your real lights:

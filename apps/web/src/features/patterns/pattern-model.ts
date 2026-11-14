@@ -324,7 +324,18 @@ export function patternToActions(state: PatternState, strings: PatternString[], 
     });
 }
 
-/** The busiest light decides how long it takes, since lights change independently. */
+/**
+ * The busiest light decides how long it takes, since lights change independently. The
+ * server also sends a base color first, and pauses after turning a light on.
+ */
+export function estimatedSeconds(actions: PresetActionInput[]): number {
+  const commands = slowestStringCommands(actions);
+  if (commands === 0) return 0;
+  const hasSegments = actions.some((a) => a.action.type === 'segmentColor');
+  const hasPower = actions.some((a) => a.action.type === 'power' && a.action.on);
+  return commands + (hasSegments ? 1 : 0) + (hasPower ? 1 : 0);
+}
+
 export function slowestStringCommands(actions: PresetActionInput[]): number {
   const counts = new Map<string, number>();
   for (const { deviceId } of actions) counts.set(deviceId ?? '', (counts.get(deviceId ?? '') ?? 0) + 1);

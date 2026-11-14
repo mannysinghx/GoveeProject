@@ -34,6 +34,36 @@ export interface RunSource {
   noCatchUp?: boolean;
   /** Only notify if something goes wrong. */
   quiet?: boolean;
+  /** Send segment commands exactly as given, with no base color first. */
+  noBaseCoat?: boolean;
+}
+
+/** A light turned on needs a moment before it takes commands. Unmeasured, so kept generous. */
+const POWER_ON_SETTLE_MS = 1_000;
+
+/**
+ * Sets the whole string to the pattern's main color before its segments. Nothing reports
+ * segment colors back, so a segment command that gets lost can't be detected. With this,
+ * an LED it misses shows a color from the pattern instead of whatever it was before, such
+ * as white. Only for patterns that cover the whole string: a step meant for a few segments
+ * must leave the rest as they are.
+ */
+export function withBaseCoat(plan: DevicePlan): DevicePlan {
+  const { device, actions } = plan;
+  const segmentSteps = actions.flatMap((a) => (a.type === 'segmentColor' ? [a] : []));
+  if (segmentSteps.length === 0) return plan;
+  if (!device.capabilities.some((c) => c.kind === 'color')) return plan;
+  const capability = device.capabilities.find((c) => c.kind === 'segmentedColor');
+  if (capability?.kind !== 'segmentedColor') return plan;
+  const covered = new Set(segmentSteps.flatMap((s) => s.segments));
+  if (!capability.segments.every((segment) => covered.has(segment))) return plan;
+
+  const firstIndex = actions.findIndex((a) => a.type === 'segmentColor');
+  if (actions.slice(0, firstIndex).some((a) => a.type === 'color')) return plan;
+  const counts = new Map<string, number>();
+  for (const step of segmentSteps) counts.set(step.hex, (counts.get(step.hex) ?? 0) + step.segments.length);
+  const main = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] as string;
+  return { device, actions: [...actions.slice(0, firstIndex), { type: 'color', hex: main }, ...actions.slice(firstIndex)] };
 }
 
 export interface RunFinished {
@@ -124,7 +154,8 @@ export class ActionService {
       )
       .run(runId, source.type, source.id ?? null, source.name, startedAt);
 
-    const perDevice = await Promise.all(plans.map((plan) => this.runDevicePlan(plan, source, runId)));
+    const toSend = source.noBaseCoat ? plans : plans.map(withBaseCoat);
+    const perDevice = await Promise.all(toSend.map((plan) => this.runDevicePlan(plan, source, runId)));
     plans.forEach((plan, index) => {
       // Only a pattern is worth resending. A late "turn off" or "turn on" could be wrong by then.
       const isPattern = plan.actions.some((action) => action.type !== 'power');
@@ -186,7 +217,7 @@ export class ActionService {
     const outcomes: ActionOutcomeDto[] = [];
     let blocked = false;
 
-    for (const action of actions) {
+    for (const [index, action] of actions.entries()) {
       const summary = describeAction(action);
       const base = { deviceId: device.id, deviceName: device.name, actionType: action.type };
 
@@ -257,6 +288,9 @@ export class ActionService {
         errorCategory: result.errorCategory,
       });
       if (result.status !== 'accepted') blocked = true;
+      else if (action.type === 'power' && action.on && index < actions.length - 1) {
+        await this.clock.sleep(POWER_ON_SETTLE_MS);
+      }
     }
     return outcomes;
   }

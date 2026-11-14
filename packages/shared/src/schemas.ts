@@ -223,6 +223,8 @@ export const presetDraftApplySchema = z.object({
   name: nameSchema.default('Pattern preview'),
   target: targetSchema.optional(),
   actions: presetActionsSchema,
+  /** Send segment commands with no base color first. Used by tests of the segment command itself. */
+  plainSegments: z.boolean().optional(),
 });
 export type PresetDraftApply = z.infer<typeof presetDraftApplySchema>;
 

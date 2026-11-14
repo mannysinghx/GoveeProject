@@ -143,6 +143,10 @@ Reads through `GET /devices` come from the app's own cache and never call Govee.
 
 A device is shown as `stale` once its last report is older than a configurable age (default 5 minutes), and a report made while Govee says the device is offline is marked historical. Govee's own documentation says such values have no reference significance.
 
+## Pacing and base color
+
+Commands to one light are at least a second apart, with no burst, and a light gets an extra second after turning on. When a plan's segment commands cover a whole string, `withBaseCoat` in `action-service.ts` sends its main color to the whole string first. This is decided when a plan runs, so older presets get it too, and stored presets don't change. It's skipped for steps naming only some segments, which must leave the rest alone, and for the **Check my lights** tests (`plainSegments`).
+
 ## Built-in presets
 
 `packages/shared/src/festival-presets.ts` lists the festival presets. `apps/server/src/presets/builtin-presets.ts` writes them to the ordinary `presets` table, tied to the current strings in the owner's arrangement, marked with `builtin_key`. It runs at startup, after discovery, after a settings change and hourly, and writes nothing if nothing changed. Because they are rebuilt, they are read-only; a duplicate is an ordinary preset.

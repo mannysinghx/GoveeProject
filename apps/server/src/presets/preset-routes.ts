@@ -26,7 +26,7 @@ export function registerPresetRoutes(api: FastifyInstance, ctx: AppContext): voi
 
   api.post('/presets/apply-draft', async (request) => {
     const body = parseInput(presetDraftApplySchema, request.body);
-    return presets.applyDraft(body.name, body.target, body.actions, request.id);
+    return presets.applyDraft(body.name, body.target, body.actions, request.id, body.plainSegments ?? false);
   });
 
   api.get('/presets/:id', async (request) => {

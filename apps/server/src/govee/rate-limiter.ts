@@ -87,11 +87,10 @@ export class GoveeRateLimiter {
         ];
         if (deviceId) {
           buckets.push(
-            this.deviceBucket(
-              `control:${deviceId}`,
-              Math.max(1, Math.ceil(controlDevicePerSecond * 2)),
-              controlDevicePerSecond,
-            ),
+            // No burst for one light. A real string was sent commands 130 to 200 ms apart with a
+            // burst allowed. Each change must reach the light, and it reports nothing back, so a
+            // lost command can't be detected.
+            this.deviceBucket(`control:${deviceId}`, 1, controlDevicePerSecond),
           );
         }
         return buckets;

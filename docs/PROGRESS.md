@@ -7,7 +7,7 @@ Current state of the project, so anyone can pick it up without the original conv
 - **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
-- Deployed on Railway at <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). The owner has set the key and created the account. See `docs/deploy-railway.md`.
+- Deployed on Railway at <https://www.lightup.ink>, also <https://lightup.ink> and <https://glmserver-production.up.railway.app> (project `goveeproject`, service `@glm/server`). The owner has set the key and created the account. See `docs/deploy-railway.md`.
 
 ## Done and verified
 
@@ -22,12 +22,17 @@ Current state of the project, so anyone can pick it up without the original conv
 | Holiday calendar, Diwali show, notifications, Web Push | Real browser against the mock, production build, on desktop and at phone width: 21 shows listed soonest first with Diwali on 2026-11-08, Lights Check answers saved to Activity, offline string reported, service worker registered with no-cache headers. The real `web-push` library signed and encrypted a message in a test. The service worker's code was run against a stand-in for the browser. `scripts/ci-local.sh --image` passed on `10bb5c8`, and it is deployed: migration `004` applied, 16 more presets, 44 more schedules (49 in all), Diwali's next run is 2026-11-09T01:00Z with its 7 steps, the Fireworks effect is set on all 3 strings, the fireworks schedules are tagged, and push keys exist. `/sw.js` and the manifest are served on both addresses. **Not tried on a real phone, or on real lights: no device has turned on alerts yet.** |
 | Editing the holiday calendar | Real browser against the mock, production build, on desktop and at phone width: changed time, pattern and end, survived a reload, clashes refused, original settings restored. `scripts/ci-local.sh --image` passed on `2de021d`, and it is deployed. Not yet used on the real account. |
 | First real notification | Switch OFF on 2026-11-07 at 07:00:00.006 UTC, 6 ms after it was due: all accepted, and a Lights Check notification was created. No phone has alerts on yet. |
+| White-LED fixes and Check my lights | Unit tests, and a real browser against the mock, production build, at desktop and phone width. **Not deployed yet, and the physical cause isn't confirmed on real lights.** |
 | Railway deployment | Health, HTTPS redirect, HSTS, 401s, setup code, volume survives a restart (0 migrations on second boot), clean SIGTERM, real client address with forged headers ignored. The owner has signed in on it. |
 | Type check, lint, build, dependency audit, clean install on Linux | `scripts/ci-local.sh` |
 | Production image, hardened as in Compose | `scripts/ci-local.sh --image` |
 | Every screen, under the real CSP | Production build in a real browser, against `apps/server/scripts/mock-govee.ts`, on desktop and at phone width |
 | Scheduler in real time: live run, graceful stop, missed runs, catch-up, restart inside grace, no duplicates, backup and reset CLIs, no secrets in logs or database | A throwaway script against the production build |
 | Security and correctness review | Independent review found 12 defects, including a login bypass through percent-encoded paths. All were reproduced and fixed, with regression tests in `apps/server/tests/hardening.test.ts`. |
+
+## Marketing
+
+The deck is an artifact: <https://claude.ai/artifact/Bf4UZRaCtK94riR9jSjx54>. The video, screenshots and how they were made are in `marketing/` in the main checkout, not committed. They show the version at `10bb5c8`, with sample lights.
 
 ## In flight
 
@@ -66,7 +71,9 @@ How it works, for whoever picks this up:
 
 **AI Ask (Phase 1 of `docs/ai-features-plan.md`)** is built on the branch `claude/stoic-antonelli-c7ec73`, reviewed, fixed, and **passed local CI in full on `9c139c2`**. Ask is **deployed** (`9cb9eb3`, 10 November 2026, 07:14 UTC), and so are Describe a pattern and Describe a schedule (`69ae69d`, 14:03 UTC). No AI request has reached a provider yet. **Everything needed to carry on is in [ai-build-progress.md](ai-build-progress.md):** where it stopped, what is verified, the open findings, the next steps, and how to resume on any computer.
 
-Nothing else in this checkout. The white-LED fix is on the branch `fix/white-leds`, not deployed, and needs a rebase onto `origin/main`. The untracked `marketing/` folder is not part of this work.
+**White-LED fix merged (14 November 2026).** On 13 November the owner sent photos: one end of each of the three strings stays white under this app, while the Govee app colors the whole string. The fix from `fix/white-leds` (`f0b1b37`, 6 November) is merged into this branch. A pattern covering a whole string now sets the string to its main color with one whole-string command (`colorRgb`) before the segment commands, commands to one light go at least a second apart, and there is a pause after turning a light on. The merge kept the CI script from this branch. 759 tests pass (shared 71, server 473, web 215).
+
+**Likely cause, not confirmed:** Govee's API exposes 27 segments per string, and the app paints all 27, so the white end is probably LEDs those segments do not cover. A whole-string color should reach them, so they would show the pattern's main color, not the pattern itself. To confirm, set one string to a single color from its device page and see whether the white end changes. If the API really cannot address that end segment by segment, it cannot show the pattern there.
 
 ## Open findings and decisions
 
@@ -86,6 +93,8 @@ Nothing else in this checkout. The white-LED fix is on the branch `fix/white-led
 | Diwali dates come from one calendar for Los Angeles, and end at 2037 | `packages/shared/src/holidays.ts` | Low | Owner |
 | Many holidays have no official colors, so those are suggestions | `packages/shared/src/festival-presets.ts` | Low | Owner |
 | Lights Check says "1 string" when a schedule targets a Govee group, such as the owner's Switch OFF, because it counts targets | `apps/server/src/notifications/notification-service.ts` | Low | Fix with the next push |
+| One end of each string stays white (owner's photos, 13 November). Likely LEDs outside the 27 segments the API exposes; not confirmed. The base color fix makes them show the main color | `docs/govee-integration.md`, `apps/server/src/commands/action-service.ts` | High | Owner, by running Check my lights after deploying |
+| Reading LED colors would need Govee's private channel and account login, outside the official-API brief | `docs/govee-integration.md` | Decision | Owner |
 | License is MIT, copyright "mannysinghx" | `LICENSE` | Low | Owner can change it |
 | GitHub Actions: none exist, and CI runs locally by policy | `scripts/ci-local.sh` | None | Owner |
 | The global login limit could be used to block sign-in for 5 minutes at a time | `docs/security.md` | Low while off the public internet | Owner, if exposing it |

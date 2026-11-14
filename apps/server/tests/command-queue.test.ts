@@ -250,8 +250,9 @@ describe('command queue', () => {
       await Promise.all(Array.from({ length: 6 }, (_, i) => enqueue(full, i + 1).done));
       const times = transport.sent.map((s) => s.at);
       const elapsed = times.at(-1)! - times[0]!;
-      // Default is 1 per second with a burst of 2, so 6 commands take at least 4 seconds.
-      expect(elapsed).toBeGreaterThanOrEqual(3900);
+      // Default is 1 per second with no burst, so 6 commands take at least 5 seconds.
+      expect(elapsed).toBeGreaterThanOrEqual(4900);
+      for (let i = 1; i < times.length; i++) expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(990);
     });
 
     it('fails a command rather than holding it through a very long pause', async () => {

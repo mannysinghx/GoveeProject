@@ -20,7 +20,8 @@
 - **Repeat carries on onward by default.** It copies the painted sequence in the same order from where the pattern ends, to the end of the last string, and leaves the boxes before it alone. "Both ways" fills backwards as well. Blank boxes inside the pattern repeat as blanks.
 - **The LED count is calculated, not reported.** It comes from published specs for the model, and only the H805C is listed so far. Other models show one box per segment until you enter a count. See [LEDs per string](govee-integration.md#leds-per-string).
 - **Patterns change gradually.** Each color is a separate command, at about one a second per light with the default rate limit. A gradient across three strings of 27 segments takes about 27 seconds, with the strings changing at the same time.
-- **No read-back.** Govee does not report segment colors, so the app cannot show what the lights are displaying.
+- **No read-back.** Govee does not report segment or LED colors, so the app can't read what the lights are displaying or detect an LED that missed a command. **Check my lights** relies on you looking at them. See [Reading each LED](govee-integration.md#reading-each-led).
+- **Some LEDs may stay white.** The cause isn't confirmed on real lights yet. See [When LEDs stay white](govee-integration.md#when-leds-stay-white).
 - **Lights change independently.** Strings shown in series are still separate lights, so they do not change in step.
 - **Scheduling a pattern across strings** needs a target that includes them all, such as a group in this app. With a smaller target, the other strings' steps are skipped and reported.
 - **The string order is what you set.** The API does not say how lights are physically arranged. The first guess uses "left", "center" and "right" in their names.
@@ -42,7 +43,7 @@
 ## Limits of festival presets and the fireworks
 
 - **Govee decides how a moving effect looks.** The app can only start one. It cannot change its colors, speed or length.
-- **The fireworks are not a timed show.** Each string gets its commands separately, about one a second, so they start about 2 seconds after midnight and are not synchronized with each other.
+- **The fireworks are not a timed show.** Each string gets its commands separately, about one a second, so they start about 3 seconds after midnight and are not synchronized with each other.
 - **The server's clock and the default time zone decide "midnight".** The show uses the default time zone set when it was installed. If you change that setting later, change the schedule too.
 - **Other schedules still run.** A nightly "turn off" still runs on New Year's Eve, and the show turns the lights back on at midnight.
 - **Festival dates are not automatic.** Only the fireworks run by themselves. Other festival presets run when you apply or schedule them.
