@@ -200,12 +200,12 @@ Measured cost from the earlier plan: about 1.3 MB of memory per account after a 
 | # | Decision | Recommendation |
 |---|---|---|
 | P1 | How email leaves the server: A, B or C above | **Decided 21 November 2026: A, through `info@lightup.ink` on Namecheap Private Email.** See above |
-| P2 | Is the Railway account on Pro? Without Pro, no SMTP leaves Railway at all | Confirm in Railway → Workspace → Plan. If not Pro, upgrade, or accept an HTTP email service, which breaks the no-third-party rule |
-| P3 | Your own AI keys in the server variables: only for you, or shared with everyone? | **Only you.** Shared keys mean you pay for strangers' questions |
-| P4 | AI providers: fixed list, or any URL? | **Fixed list** (SSRF risk above) |
-| P5 | You sign in by email too? | **Yes.** Your address is added to your account during the cutover, and your password stays the same |
-| P6 | Launch caps | 50 new accounts a day, 500 in total, then review |
-| P7 | Govee's terms on hosting other people's keys are still unread and unanswered (multi-user plan, D2). Build now, or wait? | Your risk to take. If Govee says no later, accounts can export their data and the self-hosting route remains |
+| P2 | Is the Railway account on Pro? Without Pro, no SMTP leaves Railway at all | **Answered 21 November 2026: Pro (the owner's answer; not shown by the Railway tools).** A test send from Railway, once the client is built, confirms port 465 is open |
+| P3 | Your own AI keys in the server variables: only for you, or shared with everyone? | **Decided 21 November 2026: only the owner.** Everyone else adds their own key, or AI stays off for them |
+| P4 | AI providers: fixed list, or any URL? | **Decided 21 November 2026: fixed list** (DeepSeek, Gemini, GLM). More are added the same way, never as a typed-in URL |
+| P5 | You sign in by email too? | **Taken as recommended (not asked): yes.** Your address is added to your account during the cutover, and your password stays the same |
+| P6 | Launch caps | **Decided 21 November 2026: 50 new accounts a day, 500 in total**, adjustable from the admin screen |
+| P7 | Govee's terms on hosting other people's keys are still unread and unanswered (multi-user plan, D2). Build now, or wait? | **Decided 21 November 2026: build now.** Sign-up stays off in production until the owner switches it on. If Govee says no later, accounts can export their data and the self-hosting route remains |
 | P8 | Terms of service and a privacy policy, which a public site needs. The app holds emails, IP addresses, latitude and longitude, and home routines | Have them written or reviewed by someone qualified before launch. Not something this plan can settle |
 
 ## Build order
@@ -229,7 +229,7 @@ Stopping after any phase leaves a working site.
 
 ## Not verified
 
-- Whether the Railway account is on Pro, so whether SMTP can leave Railway at all
+- That SMTP really leaves Railway on port 465. The owner says the account is Pro, but nothing has been sent yet
 - DKIM under any selector other than `default`. MX and SPF were looked up, and DMARC is missing
 - Namecheap's hourly limit counts emails in its main article, but recipients on its newer MCP tools page. One recipient per message makes the two the same
 - Gmail's and Outlook's current requirements for senders were not re-checked today
