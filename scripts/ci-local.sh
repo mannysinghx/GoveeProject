@@ -148,7 +148,11 @@ if [ "$BUILD_IMAGE" = true ]; then
     echo "The pulled control database backup did not verify" >&2
     exit 1
   fi
-  grep "latest 001_control.sql" "$WORK/verify-control.txt" >/dev/null || { cat "$WORK/verify-control.txt" >&2; echo "The control backup was not checked against the control migrations" >&2; exit 1; }
+  # Checked against the control migrations, not the account ones: the latest name must be the
+  # newest file in migrations/control of this checkout.
+  LATEST_CONTROL="$(find "$WORK/migrations/control" -maxdepth 1 -name '[0-9]*_*.sql' -exec basename {} \; | sort | tail -1)"
+  [ -n "$LATEST_CONTROL" ] || { echo "No control migrations in the checkout" >&2; exit 1; }
+  grep "latest $LATEST_CONTROL" "$WORK/verify-control.txt" >/dev/null || { cat "$WORK/verify-control.txt" >&2; echo "The control backup was not checked against the control migrations ($LATEST_CONTROL)" >&2; exit 1; }
   LEFT="$(docker exec "$NAME" sh -c 'ls -A /data/backups 2>/dev/null || true')"
   [ -z "$LEFT" ] || { echo "Temporary backup files were left on the server: $LEFT" >&2; exit 1; }
   echo "    pulled both databases, hashes matched, each verified against its manifest and migrations, nothing left behind"
