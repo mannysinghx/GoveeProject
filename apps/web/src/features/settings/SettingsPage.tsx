@@ -4,7 +4,8 @@ import { Button, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, Se
 import { AiSettings } from '../ai/AiSettings';
 import { timeZoneOptions } from '../../lib/format';
 import { useDiagnostics, useSettings, useUpdateSettings } from '../../lib/queries';
-import { PASSWORD_MIN_LENGTH, useChangePassword } from '../auth/useSession';
+import { PASSWORD_MIN_LENGTH, useChangePassword, useSession } from '../auth/useSession';
+import { EmailSettings, SignupSettings } from './AccountSettings';
 
 function GeneralSettings({ settings }: { settings: AppSettings }) {
   const update = useUpdateSettings();
@@ -215,6 +216,7 @@ function ServerConfiguration() {
 
 export function SettingsPage() {
   const settings = useSettings();
+  const isOwner = useSession().data?.role === 'owner';
   return (
     <>
       <PageHeader title="Settings" />
@@ -224,7 +226,9 @@ export function SettingsPage() {
         {settings.data ? <GeneralSettings settings={settings.data} /> : null}
         <ServerConfiguration />
         <AiSettings />
+        <EmailSettings />
         <ChangePassword />
+        {isOwner ? <SignupSettings /> : null}
       </div>
     </>
   );

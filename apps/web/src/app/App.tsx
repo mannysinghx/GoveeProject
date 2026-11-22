@@ -2,6 +2,13 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { ErrorNotice, Loading } from '../components/ui';
+import {
+  ConfirmEmailPage,
+  ForgotPasswordPage,
+  RegisterPage,
+  ResetPasswordPage,
+  VerifyEmailPage,
+} from '../features/auth/EmailPages';
 import { LoginPage } from '../features/auth/LoginPage';
 import { SetupPage } from '../features/auth/SetupPage';
 import { useSession } from '../features/auth/useSession';
@@ -42,7 +49,24 @@ export function App() {
   }
 
   if (session.data.setupRequired) return <SetupPage setupCodeRequired={session.data.setupCodeRequired} />;
-  if (!session.data.authenticated) return <LoginPage />;
+
+  // Links from emails work whether or not this browser is signed in.
+  const linkRoutes = [
+    <Route key="verify" path="/verify" element={<VerifyEmailPage />} />,
+    <Route key="reset" path="/reset" element={<ResetPasswordPage />} />,
+    <Route key="confirm" path="/confirm-email" element={<ConfirmEmailPage />} />,
+  ];
+
+  if (!session.data.authenticated) {
+    return (
+      <Routes>
+        {linkRoutes}
+        <Route path="/register" element={session.data.signupOpen ? <RegisterPage /> : <Navigate to="/" replace />} />
+        <Route path="/forgot" element={<ForgotPasswordPage />} />
+        <Route path="*" element={<LoginPage signupOpen={session.data.signupOpen} />} />
+      </Routes>
+    );
+  }
 
   return (
     <AppShell username={session.data.username ?? ''}>
@@ -60,6 +84,7 @@ export function App() {
         <Route path="/connections" element={<ConnectionPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        {linkRoutes}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppShell>

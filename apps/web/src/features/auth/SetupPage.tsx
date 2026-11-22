@@ -98,8 +98,8 @@ function OwnerForm({ setupCodeRequired }: { setupCodeRequired: boolean }) {
     <>
       <h1 className="text-xl font-semibold">Create the owner account</h1>
       <p className="mt-2 text-sm text-ink-300">
-        This is the only account. It stays on this server and needs no email or outside sign-in. It can only be created
-        once.
+        The owner account runs this server. It needs no email to start: you can add one in Settings later, to sign in and
+        reset your password by email. It can only be created once.
       </p>
       <form onSubmit={submit} className="mt-5 space-y-4">
         {setupCodeRequired ? (

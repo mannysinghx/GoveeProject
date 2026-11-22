@@ -53,6 +53,9 @@ const session = (overrides: Partial<SessionDto> = {}): SessionDto => ({
   username: 'owner',
   csrfToken: 'csrf-abc',
   expiresAt: '2030-01-01T00:00:00.000Z',
+  signupOpen: false,
+  email: null,
+  role: 'owner',
   ...overrides,
 });
 
@@ -109,11 +112,11 @@ describe('authentication flow', () => {
       'GET /auth/session': { json: session({ authenticated: false, username: null, csrfToken: null }) },
       'POST /auth/login': {
         status: 401,
-        json: { error: { code: 'invalid_credentials', message: 'That username or password is not correct.' } },
+        json: { error: { code: 'invalid_credentials', message: 'That email, username or password is not correct.' } },
       },
     });
     renderApp(<App />);
-    await userEvent.type(await screen.findByLabelText('Username'), 'owner');
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'owner');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('not correct');
