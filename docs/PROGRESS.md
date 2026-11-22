@@ -4,6 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
+- **Newest work, 22 November 2026: Phase 1 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`, commit `0b04d18`. It adds verified backups, restore and a way to copy a backup off Railway. See "Public sign-up" under "In flight". Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
 - **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
@@ -35,6 +36,23 @@ Current state of the project, so anyone can pick it up without the original conv
 The deck is an artifact: <https://claude.ai/artifact/Bf4UZRaCtK94riR9jSjx54>. The video, screenshots and how they were made are in `marketing/` in the main checkout, not committed. They show the version at `10bb5c8`, with sample lights.
 
 ## In flight
+
+**Public sign-up (21 and 22 November 2026).** The owner asked to open the site to the public: email sign-up verified through the inbox, then a password, then sign-in; nothing third-party; and each person's own AI key, with AI off without one. The plan is [public-signup-plan.md](public-signup-plan.md). Decided: email goes through `info@lightup.ink` on Namecheap Private Email (P1); Railway is Pro (P2, the owner's word); the owner's AI keys are for the owner only (P3); a fixed list of AI providers (P4); launch caps of 50 a day and 500 in total (P6); build now, with sign-up off in production until switched on (P7). P5 (sign in by email) was taken as recommended, not asked. P8 (terms and privacy policy) is the owner's.
+
+Phase 1, the safety net, is done:
+
+| Piece | How it was checked |
+|---|---|
+| `backup.js` checks its copy (integrity, foreign keys), makes it one self-contained file, writes a manifest (SHA-256, size, migrations, row counts) and never overwrites anything | `apps/server/tests/backup-restore.test.ts`, 8 tests against the real app on a real file, backed up while running. One test fails if a check is broken on purpose (in-use detection, tried). The row-count check after a restore could not be made to fail with a good copy, so no test exercises it |
+| `verify-backup.js` (`npm run db:verify`) and `restore.js` (`npm run db:restore`): refuses an open database, a damaged copy or one from a newer build; moves the old file aside, never deletes it | Same tests. A restored copy starts with 0 migrations applied, keeps every row and next run time, and the same password signs in |
+| `scripts/pull-backup.sh` copies a backup from Railway, or `--docker` a container, checking hash and size on arrival | Against a container running the **deployed** backup command (`19166b3`'s, rebuilt), and the new one: copy arrived intact, integrity ok, nothing left on the server. A copy damaged in transit was refused and nothing saved (exit 1) |
+| Everything together | `bash scripts/ci-local.sh --image 0b04d18`: passed, 767 tests, 0 vulnerabilities, and the backup round trip out of the hardened image. See `docs/OPS_LOG.md` |
+
+**Not done:** no backup has been pulled from production. The permission check refused a database read on production over `railway ssh` on 13 November, so the owner runs `bash scripts/pull-backup.sh` themself, or approves Claude running it. How to restore **on Railway** is not worked out, because stopping the app also stops the container `railway ssh` reaches (`docs/deploy-railway.md`, "Backup").
+
+**Owner to do:** turn on DKIM in Private Email and add its DNS record; add a DMARC record (`v=DMARC1; p=none; rua=mailto:info@lightup.ink`); turn on SMTP access for `info@lightup.ink`. Later, when the email code exists, set `SMTP_PASSWORD` in Railway yourself.
+
+**Next:** Phase 2, splitting the app into a platform part and one part per account, with no visible change (`docs/public-signup-plan.md`, "Build order"). Then Phases 3 to 5 before one push, as the plan says.
 
 **Light status, daily color schemes, pattern search, one brightness (13 November 2026).** `459c84f` (light status) and `b2ee3c2` (the three features), with two test and CI fixes after them. **Deployed** on 14 November 2026 at 02:53 UTC as `19166b3`, with the owner's approval ("Yes, deploy"): Railway deployment `1f11c53f` succeeded, the log shows `006_light_status.sql` applied and no warnings or errors at startup, health is OK, the three new routes return 401 without a session, and the live bundle contains the new screens. Roll back by redeploying `adab10a` (deployment `458df907`) in Railway; the two new columns can stay. **Not yet seen after the deploy:** a background check's result, the 19 new built-in presets, or anything on real lights. The owner has not switched on the daily change, so no new schedule exists.
 
