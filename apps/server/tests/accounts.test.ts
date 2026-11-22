@@ -118,6 +118,19 @@ const ROUTES: [method: string, url: string, kind: 'public' | 'signed-in' | 'owne
   // The owner's list of accounts
   ['GET', '/api/v1/admin/accounts', 'owner'],
   ['PATCH', '/api/v1/admin/accounts/:id', 'owner'],
+  ['PUT', '/api/v1/account/display-name', 'signed-in'],
+  ['GET', '/api/v1/shared', 'signed-in'],
+  ['POST', '/api/v1/shared', 'signed-in'],
+  ['POST', '/api/v1/shared/share-all', 'owner'],
+  ['PUT', '/api/v1/shared/:id', 'signed-in'],
+  ['DELETE', '/api/v1/shared/:id', 'signed-in'],
+  ['POST', '/api/v1/shared/import/preview', 'signed-in'],
+  ['POST', '/api/v1/shared/import', 'signed-in'],
+  ['GET', '/api/v1/admin/shared', 'owner'],
+  ['PATCH', '/api/v1/admin/shared/:id', 'owner'],
+  ['DELETE', '/api/v1/admin/shared/:id', 'owner'],
+  ['PUT', '/api/v1/admin/accounts/:id/sharing', 'owner'],
+  ['DELETE', '/api/v1/admin/accounts/:id/display-name', 'owner'],
 ];
 
 describe('route census', () => {
@@ -134,9 +147,9 @@ describe('route census', () => {
       .sort();
     const expected = ROUTES.map(([method, url, kind]) => `${method} ${url} ${kind}`).sort();
     expect(actual).toEqual(expected);
-    expect(ROUTES).toHaveLength(96);
+    expect(ROUTES).toHaveLength(109);
     expect(ROUTES.filter(([, , kind]) => kind === 'public')).toHaveLength(12);
-    expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(4);
+    expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(10);
   });
 });
 

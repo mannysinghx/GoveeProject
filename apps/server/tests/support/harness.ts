@@ -149,6 +149,7 @@ export async function authedClient(app: FastifyInstance, password = 'correct-hor
     post: (url: string, payload?: object) =>
       app.inject({ method: 'POST', url, cookies, headers, ...(payload ? { payload } : {}) }),
     patch: (url: string, payload: object) => app.inject({ method: 'PATCH', url, cookies, headers, payload }),
+    put: (url: string, payload: object) => app.inject({ method: 'PUT', url, cookies, headers, payload }),
     delete: (url: string) => app.inject({ method: 'DELETE', url, cookies, headers }),
   };
 }

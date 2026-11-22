@@ -841,7 +841,7 @@ describe('activity and diagnostics', () => {
     const status = (await client.get('/api/v1/system/status')).json();
     expect(status).toMatchObject({
       backend: 'ok',
-      database: { status: 'ok', schemaVersion: '006_light_status.sql' },
+      database: { status: 'ok', schemaVersion: '007_imports.sql' },
       govee: { keyConfigured: true, usingLocalTestEndpoint: true },
       devices: { discovered: 1, noLongerDiscovered: 0 },
       queue: { pending: 0, pausedUntil: null },

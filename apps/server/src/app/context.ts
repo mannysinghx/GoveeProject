@@ -9,6 +9,7 @@ import { AiGate, AiService } from '../ai/ai-service.js';
 import { AskTools } from '../ai/ask-tools.js';
 import { AiLedger } from '../ai/ledger.js';
 import { AuthService } from '../auth/auth-service.js';
+import { SharingService } from '../sharing/sharing-service.js';
 import { accountFileFor, cutoverOwner, LegacyOwnerMirror, openControlDatabase, resolveAccountFile } from '../auth/control.js';
 import { SignupService } from '../auth/signup-service.js';
 import { ActionService } from '../commands/action-service.js';
@@ -109,6 +110,8 @@ export interface PlatformContext {
   pow: ProofOfWork;
   /** Keys, export, delete, and the owner's list of accounts. */
   account: AccountService;
+  /** The Shared space: display names, shares, imports and the owner's moderation. */
+  sharing: SharingService;
   /** Members' own keys, decrypted when first needed. */
   keys: PersonalKeys;
   /** Signed-in requests a minute, per member. */
@@ -583,6 +586,8 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     ...(overrides.aiFetch ? { aiFetch: overrides.aiFetch } : {}),
   });
 
+  const sharing = new SharingService({ control, accounts, auth, clock, logger });
+
   return {
     config,
     version: readVersion(),
@@ -597,6 +602,7 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     outbox,
     pow,
     account,
+    sharing,
     keys,
     requestRate: new RequestRate(MEMBER_LIMITS.requestsPerMinute),
     aiGate,

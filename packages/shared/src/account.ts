@@ -104,6 +104,10 @@ export interface AdminAccountDto {
   aiKeys: number;
   /** Lights in the account, or null if the account is not loaded. */
   devices: number | null;
+  /** The public name on what they share, if they chose one. */
+  displayName?: string | null;
+  /** The owner stopped this person sharing. */
+  sharingBlocked?: boolean;
 }
 
 export interface AdminAccountListDto {

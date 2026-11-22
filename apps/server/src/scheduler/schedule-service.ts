@@ -38,6 +38,7 @@ export interface ScheduleRow {
   updated_at: string;
   builtin_show: string | null;
   quiet: number;
+  imported_from?: string | null;
 }
 
 interface ExecutionRow {
@@ -128,6 +129,7 @@ export class ScheduleService {
       problem: targetInfo.problem ?? actionInfo.problem,
       builtinShow: row.builtin_show,
       quiet: row.quiet === 1,
+      importedFrom: row.imported_from ?? null,
       lastExecution: last ? executionToDto(last) : null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

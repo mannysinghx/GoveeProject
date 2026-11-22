@@ -22,6 +22,11 @@ const CAP_COUNTS = {
 
 const CAP_NAMES = { groups: 'groups', presets: 'presets', schedules: 'schedules' } as const;
 
+/** How many of one kind count against a member's caps, in this account. */
+export function capCount(db: AccountContext['db'], kind: keyof typeof CAP_COUNTS): number {
+  return (db.prepare(CAP_COUNTS[kind]).get() as { n: number }).n;
+}
+
 /**
  * Refuses to make one more of something when a member's account already has its share. The
  * owner has no caps. Called by the routes that create groups, presets and schedules.

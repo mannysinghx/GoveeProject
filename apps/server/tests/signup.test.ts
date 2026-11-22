@@ -475,6 +475,12 @@ describe('two accounts side by side', () => {
         'POST /api/v1/holidays/:key/enabled': { enabled: true },
         'POST /api/v1/holidays/:key/skip': { skip: true },
         'POST /api/v1/notifications/:id/respond': { action: 'looks_right' },
+        // Sharing the owner's preset by its id finds nothing in the member's account.
+        'POST /api/v1/shared': { kind: 'preset', sourceId: preset.id },
+        'PUT /api/v1/shared/:id': { title: 'Hijacked' },
+        'POST /api/v1/shared/import/preview': { itemIds: [preset.id] },
+        'POST /api/v1/shared/import': { itemIds: [preset.id], slots: {} },
+        'PUT /api/v1/account/display-name': { displayName: 'Member Name' },
       };
       const idFor = (url: string) => {
         if (url.startsWith('/api/v1/groups/')) return group.id;
@@ -510,6 +516,7 @@ describe('two accounts side by side', () => {
         }
       }
       expect(snapshot()).toBe(before);
+      expect(h.platform.control.prepare('SELECT COUNT(*) AS n FROM shared_items').get()).toEqual({ n: 0 });
       expect(h.mock.requests.filter((r) => r.headers['govee-api-key'] === TEST_API_KEY).length).toBeGreaterThan(0);
     } finally {
       await h.close();

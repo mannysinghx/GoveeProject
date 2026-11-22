@@ -288,6 +288,10 @@ export class AccountService {
           connectedKeys: this.deps.credentials.list(session.userId).map(({ kind, updatedAt }) => ({ kind, connectedAt: updatedAt })),
         },
         signInHistory: audit,
+        // What they shared with everyone, from the Shared space.
+        sharedItems: this.control
+          .prepare('SELECT kind, title, description, created_at AS createdAt, updated_at AS updatedAt, imports FROM shared_items WHERE user_id = ? ORDER BY created_at')
+          .all(session.userId),
         tables,
       },
       null,
@@ -347,7 +351,7 @@ export class AccountService {
   listAccounts(): AdminAccountDto[] {
     const rows = this.control
       .prepare(
-        `SELECT u.id, u.email, u.username, u.role, u.status, u.created_at,
+        `SELECT u.id, u.email, u.username, u.role, u.status, u.created_at, u.display_name, u.sharing_blocked,
                 (SELECT MAX(created_at) FROM audit_events a WHERE a.user_id = u.id AND a.event IN ('login', 'setup')) AS last_login
          FROM users u ORDER BY u.id`,
       )
@@ -358,6 +362,8 @@ export class AccountService {
       role: 'owner' | 'member';
       status: 'active' | 'suspended';
       created_at: string;
+      display_name: string | null;
+      sharing_blocked: number;
       last_login: string | null;
     }[];
     return rows.map((row) => {
@@ -373,6 +379,8 @@ export class AccountService {
         goveeConnected: row.role === 'owner' ? (loaded?.transport.isConfigured() ?? false) : kinds.includes('govee'),
         aiKeys: kinds.filter((kind) => kind.startsWith('ai:')).length,
         devices: loaded ? loaded.devices.repository.counts().present : null,
+        displayName: row.display_name,
+        sharingBlocked: row.sharing_blocked === 1,
       };
     });
   }

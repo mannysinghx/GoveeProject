@@ -357,6 +357,8 @@ export interface GroupDto {
   id: string;
   name: string;
   deviceIds: string[];
+  /** Who it was imported from, from the Shared space. */
+  importedFrom?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -379,6 +381,8 @@ export interface PresetDto {
   needsTarget: boolean;
   /** Set for presets that come with the app. These are read-only, and can be duplicated. */
   builtin: BuiltinPresetInfoDto | null;
+  /** Who it was imported from, from the Shared space. */
+  importedFrom?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -485,6 +489,8 @@ export interface ScheduleDto {
   builtinShow: string | null;
   /** Only notifies when something goes wrong. */
   quiet: boolean;
+  /** Who it was imported from, from the Shared space. */
+  importedFrom?: string | null;
   lastExecution: ScheduleExecutionDto | null;
   createdAt: string;
   updatedAt: string;

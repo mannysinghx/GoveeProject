@@ -13,6 +13,7 @@ import Fastify, {
 } from 'fastify';
 import type { ApiErrorBody } from '@glm/shared';
 import { registerAccountRoutes } from '../account/account-routes.js';
+import { registerSharingRoutes } from '../sharing/sharing-routes.js';
 import { registerActivityRoutes } from '../activity/activity-routes.js';
 import { registerAiRoutes } from '../ai/ai-routes.js';
 import { registerAdminRoutes } from '../auth/admin-routes.js';
@@ -217,6 +218,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
       registerNotificationRoutes(api, platform);
       registerAdminRoutes(api, platform);
       registerAccountRoutes(api, platform);
+      registerSharingRoutes(api, platform);
     },
     { prefix: '/api/v1' },
   );

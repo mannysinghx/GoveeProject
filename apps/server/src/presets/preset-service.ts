@@ -28,6 +28,7 @@ interface PresetRow {
   created_at: string;
   updated_at: string;
   builtin_key: string | null;
+  imported_from?: string | null;
 }
 
 interface ActionRow {
@@ -104,6 +105,7 @@ export class PresetService {
             ...(today ? { today: { key: today.key, name: today.name } } : {}),
           }
         : null,
+      importedFrom: row.imported_from ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

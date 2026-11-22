@@ -12,6 +12,7 @@ interface GroupRow {
   name: string;
   created_at: string;
   updated_at: string;
+  imported_from?: string | null;
 }
 
 /** Groups exist only in this app. No Govee group capability is used. */
@@ -32,6 +33,7 @@ export class GroupService {
       id: row.id,
       name: row.name,
       deviceIds: members.map((m) => m.device_id),
+      importedFrom: row.imported_from ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
