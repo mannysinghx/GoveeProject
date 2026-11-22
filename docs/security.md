@@ -94,9 +94,22 @@ node -e "console.log('1:' + require('crypto').randomBytes(32).toString('base64')
 - What this protects: a leaked database file, backup or dump. What it does not: someone with the Railway variables as well as the volume, or code running inside the app.
 - Rotating: add a new version in front (`2:<new>,1:<old>`) and restart. Old rows still read, and new ones use version 2. A command to re-encrypt old rows is not built yet, so keep version 1 until it is.
 
+## Email sign-up
+
+From Phase 4 of [public-signup-plan.md](public-signup-plan.md), people can make their own account by email, **only while the owner has sign-up switched on** (Settings, Sign-up). It is off until then, and cannot be turned on until mail is set up (see `docs/deploy-railway.md`, "Email and sign-up").
+
+- **Each person gets their own account file,** with no Govee key and no AI until they add their own. Nobody else's lights, schedules, history or keys are reachable from it. A test calls every signed-in route as a member with the owner's real ids.
+- **Same answer for every address.** Register and forgot-password answer the same whether or not an address has an account. Only the inbox learns which: a new address gets a link, an address with an account gets "you already have an account", and an unknown address asking for a reset gets nothing. The mail goes out afterwards from the outbox, so timing does not tell either.
+- **Links** carry a 32-byte random token in the URL fragment (`#t=`), which browsers never send to a server, so it stays out of request logs and `Referer` headers. Only its SHA-256 is stored. Each works once, for 30 minutes, and a new one replaces the old. **Opening a link changes nothing**, because mail scanners open links to check them; only the form it leads to uses it. The page takes the token out of the address bar.
+- **Setting the password makes the account and signs nobody in.** The person then signs in with the new email and password. Two submissions at once make one account.
+- **A reset** signs that person out everywhere, and no one else. **Changing the address** needs the current password, is confirmed from the new inbox, tells the old address, and makes reset links sent to the old address stop working.
+- **Abuse limits:** a proof-of-work puzzle the browser solves (about 2^`SIGNUP_POW_DIFFICULTY` hashes, in place of a third-party captcha), a hidden field bots fill in, at most one email a minute and five a day per address whoever asks, ten sign-up or reset requests an hour per network address, and caps of new accounts a day and in total (50 and 500 to start, changed in Settings).
+- **Mail** goes only to an `SMTP_HOST` on the allow list, over TLS with the certificate checked. `SMTP_PASSWORD` is scrubbed from logs. The text of each message, which can hold a link, is cleared from the database once sent.
+- **The owner** keeps signing in with their username, and can add an email address in Settings to sign in with it and reset by email.
+
 ## Account recovery
 
-There is no email reset yet. If you can run commands on the server, you own the data anyway, so recovery happens there. This signs out that user's sessions only, clears their sign-in lockouts and records the reset in the audit log, and in Activity for the owner. `--user <username or email>` picks someone other than the owner.
+People with an email address on their account reset their password by email, from "Forgot your password?" on the sign-in page. Without one, or if mail is not working: if you can run commands on the server, you own the data anyway, so recovery happens there. This signs out that user's sessions only, clears their sign-in lockouts and records the reset in the audit log, and in Activity for the owner. `--user <username or email>` picks someone other than the owner.
 
 Direct install, after `npm run build`:
 
@@ -208,7 +221,8 @@ Ask, on the Connections and Activity pages, answers questions using up to three 
 ## Known limitations
 
 - **Local encryption.** The key lives in plain text in `.env`, and the database is not encrypted. Anyone with read access to the server's files has both. Disk encryption and file permissions are your protection here.
-- **Single account.** There are no roles. Anyone signed in has full control.
+- **Accounts.** The owner and members. A member has full control of their own account only; only the owner can change the sign-up switch.
 - **Sign-in over HTTP.** Without HTTPS, credentials are unencrypted in transit. This is why the default is loopback.
 - **Login throttling** counts by address. Behind a proxy without the right `TRUST_PROXY` value, all clients can end up sharing one address.
-- **Lockout as nuisance.** The limit across all addresses means someone able to reach the sign-in page from many addresses could block sign-in for 5 minutes at a time. Sessions already signed in keep working, and schedules are unaffected. This is another reason to keep the app off the public internet.
+- **Lockout as nuisance.** Since Phase 3 there is no limit shared by every account. Someone guessing one account's password from many addresses can still lock that one account's sign-in for 5 minutes at a time. Sessions already signed in keep working.
+- **Members' wording.** Some screens still tell a member to set `GOVEE_API_KEY` on the server, which only the owner can do. Phase 5 replaces that with connecting their own key.

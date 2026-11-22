@@ -1,0 +1,24 @@
+import subprocess
+S='/app/apps/server/'
+p=S+'src/auth/signup-service.ts'
+orig=open(p).read()
+def run(name, edits, test, pattern):
+    s=orig
+    for old,new in edits:
+        assert s.count(old)==1, (name, old[:50], s.count(old))
+        s=s.replace(old,new)
+    open(p,'w').write(s)
+    try:
+        r=subprocess.run(['npx','vitest','run',test,'-t',pattern],cwd=S,capture_output=True,text=True)
+        out=r.stdout+r.stderr
+        print(('CAUGHT' if r.returncode!=0 and 'failed' in out else 'MISSED')+': '+name)
+    finally:
+        open(p,'w').write(orig)
+run('both reset guards removed',[
+  ("      // A reset link sent to the old address must not work any more.\n      this.control.prepare(\"DELETE FROM email_tokens WHERE purpose = 'reset' AND user_id = ? AND used_at IS NULL\").run(row.user_id);",""),
+  ("WHERE id = ? AND email = ? AND status = 'active'\")\n        .run(passwordHash, now, row.user_id, row.email)","WHERE id = ? AND status = 'active'\")\n        .run(passwordHash, now, row.user_id)"),
+],'tests/signup.test.ts','tells the old address')
+run('all three race guards removed',[
+  ("      const row = this.liveToken(token, 'signup');\n      if (!row || !this.useToken(row)) throw LINK_INVALID();","      const row = this.control.prepare('SELECT * FROM email_tokens WHERE token_hash = ?').get(hashToken(token)) as TokenRow;"),
+  ("      if (this.userByEmail(row.email)) {\n        throw new AppError(409, 'email_in_use'","      if (false) {\n        throw new AppError(409, 'email_in_use'"),
+],'tests/signup.test.ts','sent twice at once')

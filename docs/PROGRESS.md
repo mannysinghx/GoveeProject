@@ -4,7 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
-- **Newest work, 22 November 2026: Phases 1 to 3 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`: Phase 1 (`0b04d18`) adds verified backups, restore, and a way to copy a backup off Railway. Phase 2 (`d0c3cfe`) splits the server into a platform and one context per account. Phase 3 (`b4cd681`) moves sign-in to a control database, with per-account throttling and encrypted keys. Nothing visible changes yet. See "Public sign-up" under "In flight". Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
+- **Newest work, 22 November 2026: Phases 1 to 4 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`: Phase 1 (`0b04d18`) adds verified backups, restore, and a way to copy a backup off Railway. Phase 2 (`d0c3cfe`) splits the server into a platform and one context per account. Phase 3 (`b4cd681`) moves sign-in to a control database, with per-account throttling and encrypted keys. Phase 4 (`1ef9e69` server, `b1a1da6` web, `5b2241f` CI script) adds email sign-up, reset and address change with an in-house mail client, off until the owner turns it on. See "Public sign-up" under "In flight". Nothing is uncommitted. Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
 - **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
@@ -64,7 +64,7 @@ Phase 2, the split with no visible change, is done (`d0c3cfe`). How it works is 
 | The real server process | Built server against the Govee mock in Node 26: health, setup, discovery (3 lights), a group, a power command accepted, status, 401 when signed out, then SIGTERM: "Shutdown complete", exit 0, no error lines |
 | Everything together | `bash scripts/ci-local.sh --image d0c3cfe`: passed, 774 tests, 0 vulnerabilities. See `docs/OPS_LOG.md` |
 
-Known limits, by design for now: sign-in still lives in the owner's file (Phase 3 moves it). `/notification-actions` uses `accounts.sole()`, which throws once a second account exists (Phase 4). Log lines are not yet tagged with an account.
+Known limits, by design for now: sign-in still lives in the owner's file (Phase 3 moves it). `/notification-actions` uses `accounts.sole()`, which throws once a second account exists (Phase 4 replaced it). Log lines are not yet tagged with an account (members' are, since Phase 4).
 
 Phase 3, the control database and the owner's cutover, is done (`b4cd681`). How it works: `docs/security.md`, "Where accounts live" and "Encrypted keys", and `docs/deploy-railway.md`.
 
@@ -80,9 +80,31 @@ Phase 3, the control database and the owner's cutover, is done (`b4cd681`). How 
 | **Rehearsal with the deployed `19166b3`** on the same files | Old version set up and discovered 3 lights; this build kept that session signed in and stored the key encrypted (not readable in the file); password changed; rolled back: old version refused the old password and the signed-out session, took the new one, 3 lights intact; the old version changed the password; rolled forward: the newest password won; without `GOVEE_API_KEY`, discovery worked from the stored key. No error lines and no key in any log. Script and output: `docs/public-signup-evidence/` |
 | Everything together | `bash scripts/ci-local.sh --image b4cd681`: passed, 794 tests, 0 vulnerabilities. See `docs/OPS_LOG.md` |
 
-Still as before: `/notification-actions` uses `accounts.sole()` (Phase 4). The owner signs in with their username; email sign-in comes with the email flow in Phase 4. The old tables in the owner's file stay until a later, separate step. **To use encrypted storage in production, the owner sets `CREDENTIAL_KEYS` in Railway themself**, made as in `docs/security.md`, and keeps a copy in a password manager.
+The old tables in the owner's file stay until a later, separate step. **To use encrypted storage in production, the owner sets `CREDENTIAL_KEYS` in Railway themself**, made as in `docs/security.md`, and keeps a copy in a password manager.
 
-**Next:** Phase 4, email and sign-up: the in-house SMTP client through `info@lightup.ink`, the outbox, register, verify, set password, sign in, reset, proof of work and caps, with sign-up off in production (`docs/public-signup-plan.md`, "Build order"). Then Phase 5, and one push for Phases 1 to 5 with the owner's approval, after the owner has pulled a production backup.
+Phase 4, email and sign-up, is done (`1ef9e69`, `b1a1da6`, `5b2241f`). How it works: `docs/security.md`, "Email sign-up"; `docs/architecture.md`, "Email and sign-up"; `docs/deploy-railway.md`, "Email and sign-up". **Sign-up is off** until the owner turns it on in Settings, and cannot be turned on until mail is set up.
+
+| Piece | How it was checked |
+|---|---|
+| SMTP client: TLS on 465 and STARTTLS on 587 with certificates checked, PLAIN and LOGIN, no password over plain, replies slipped in before the handshake refused, 4xx, 5xx and refused sign-in told apart, timeouts | `apps/server/tests/mail.test.ts` against `tests/support/fake-smtp.ts`, a fake mail server using test-only certificates (`tests/support/smtp-tls/`) |
+| Message builder refuses line breaks in headers; quoted-printable; dot-stuffing | Same file |
+| Outbox: sends one at a time, retries with backoff, 300 an hour, drops expired links, clears the text once sent, pauses when the mailbox refuses the login, recovers after a crash | Same file |
+| `SMTP_HOST` only `mail.privateemail.com`, `smtp.privateemail.com` or loopback; plain only to loopback; `SMTP_PASSWORD` scrubbed | Same file |
+| Register, the link (opening it twice changes nothing), set password with no session, sign in by email | `apps/server/tests/signup.test.ts`, 25 tests, through the HTTP API with real mail to the fake server |
+| Same answer for new and known addresses; one email a minute and five a day per address; ten requests an hour per network address; proof of work single-use; hidden bot field; caps of a day and in total, also when the link is used; the switch, owner-only | Same file |
+| Two submissions at once make one account; links expire in 30 minutes and a new one replaces the old | Same file |
+| Reset signs out only that person; the owner adds an address, signs in with it, resets by email, and the old tables in the owner's file follow the new password; changing an address tells the old one and kills reset links sent there | Same file |
+| Members get their own file, no Govee key and no AI keys; every signed-in route called as a member with the owner's real ids returns nothing of the owner's and changes nothing; phone notification buttons reach only their own account; accounts reload after a restart | Same file. The isolation test was first found to stop at body validation on many routes; it now sends valid bodies, and every id route reaches its lookup and returns 404 or 422 |
+| Web pages: create an account, check your inbox, choose a password, sign in, forgot, reset, confirm address, Settings email card, owner's sign-up card | `apps/web/src/features/auth/email-pages.test.tsx`, 17 tests, including the browser's proof of work |
+| Breaking each guarantee on purpose | 22 mutations. 20 were caught on their own. The other 2 were each held by a second guard (the token re-read inside the transaction; the reset only applying while the address still matches), and were caught once both guards were removed |
+| The real built server in a browser | A local container with the mock Govee and the fake mail server: registered, the email arrived through the real SMTP client, the link opened the password page and left the address bar, the account was made with no sign-in, "Your account is ready" with the address filled in, signed in to an empty dashboard of its own, no Sign-up card in the member's Settings. No console errors, no error lines, no token or password in the server log |
+| Everything together | `bash scripts/ci-local.sh --image 5b2241f`: passed, 869 tests (shared 71, server 566, web 232), 0 vulnerabilities, image smoke test, backup round trip. The run before it, on `b1a1da6`, passed every check and then failed only on the CI script's own fixed expectation of `001_control.sql`, which `5b2241f` corrects. See `docs/OPS_LOG.md` |
+
+**Not verified:** no mail has left Railway yet. Whether port 465 is open from Railway is settled by the first send after deploy (add your own address in Settings). DKIM and DMARC for `lightup.ink` are still to be set up by the owner.
+
+**Owner to do for mail:** turn on SMTP access for `info@lightup.ink` (an app password is better), DKIM and DMARC as above, then set `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` in Railway yourself, after the push.
+
+**Next:** Phase 5, onboarding and personal keys: connect a Govee key from the browser, holiday shows opt-in, an AI key per person with its own lock, cap and resting state, delete and export, an admin screen, privacy and terms pages (`docs/public-signup-plan.md`, "Build order"). Then one push for Phases 1 to 5 with the owner's approval, after the owner has pulled a production backup.
 
 **Light status, daily color schemes, pattern search, one brightness (13 November 2026).** `459c84f` (light status) and `b2ee3c2` (the three features), with two test and CI fixes after them. **Deployed** on 14 November 2026 at 02:53 UTC as `19166b3`, with the owner's approval ("Yes, deploy"): Railway deployment `1f11c53f` succeeded, the log shows `006_light_status.sql` applied and no warnings or errors at startup, health is OK, the three new routes return 401 without a session, and the live bundle contains the new screens. Roll back by redeploying `adab10a` (deployment `458df907`) in Railway; the two new columns can stay. **Not yet seen after the deploy:** a background check's result, the 19 new built-in presets, or anything on real lights. The owner has not switched on the daily change, so no new schedule exists.
 
@@ -145,7 +167,13 @@ How it works, for whoever picks this up:
 | Reading LED colors would need Govee's private channel and account login, outside the official-API brief | `docs/govee-integration.md` | Decision | Owner |
 | License is MIT, copyright "mannysinghx" | `LICENSE` | Low | Owner can change it |
 | GitHub Actions: none exist, and CI runs locally by policy | `scripts/ci-local.sh` | None | Owner |
-| The global login limit could be used to block sign-in for 5 minutes at a time | `docs/security.md` | Low while off the public internet | Owner, if exposing it |
+| ~~The global login limit could be used to block sign-in for 5 minutes at a time~~ Removed in Phase 3: no counter is shared by every account | `docs/security.md` | Resolved | |
+| `scripts/pull-backup.sh` does not bring back members' account files (`backup.js` copies them on the server, into `<backup>.accounts/`) | `scripts/pull-backup.sh`, `docs/deploy-railway.md` | High before sign-up is on for anyone (Phase 6); none exist while it is off | Build in Phase 5 |
+| Members are told to set `GOVEE_API_KEY` on the server (dashboard banner, Settings' Govee card), which only the owner can do | `apps/web/src/features/dashboard/DashboardPage.tsx`, `apps/web/src/features/settings/SettingsPage.tsx` | Medium once sign-up is on | Phase 5 onboarding |
+| Not built yet from the plan's public-site list: delete my account, export my data, per-account request limits, caps on devices and schedules, a disposable-address list (optional) | `docs/public-signup-plan.md` | Medium before Phase 6 | Phase 5 |
+| Members' account files carry the old, unused `users`, `sessions` and `login_attempts` tables from `001_initial.sql` | `migrations/001_initial.sql` | Low, harmless | Later cleanup |
+| A fresh install of this version, rolled back to `19166b3`, would offer owner setup again, because the old `users` table is empty. Not the production case: the owner exists there | `apps/server/src/auth/control.ts` | Low | None needed for production |
+| No mail has been sent from Railway: port 465 from Railway, and DKIM and DMARC for `lightup.ink`, are unconfirmed | `docs/deploy-railway.md` | Medium | Owner, after the push |
 
 ## Next steps, in order
 
@@ -176,7 +204,23 @@ npm test
 npm run dev:mock
 ```
 
-Then open <http://localhost:5187>. For real lights, see `README.md`.
+Then open <http://localhost:5187>. For real lights, see `README.md`. `dev:mock` also starts a fake mail server on port 2525; links from sign-up and reset emails appear in its output (the `mail` lines). Sign-up is off until you turn it on in Settings, Sign-up, as the owner.
+
+Tests for this work ran in Linux, in a container with the repo at `/app`, because this Mac's Node 23 is outside the supported versions. From the repo:
+
+```bash
+docker run -d --name glm-dev-phase1 -w /app node:26-bookworm-slim sleep infinity
+```
+
+```bash
+git ls-files -co --exclude-standard | COPYFILE_DISABLE=1 tar --no-mac-metadata -cf - -T - | docker exec -i glm-dev-phase1 tar -xf - -C /app
+```
+
+```bash
+docker exec -w /app glm-dev-phase1 sh -c 'npm ci && npm test'
+```
+
+The Phase 4 mutation checks are in `docs/public-signup-evidence/`.
 
 Before any push, run the CI on the exact commit. It never uses GitHub:
 
@@ -186,6 +230,6 @@ bash scripts/ci-local.sh --image
 
 ## Proposals not started
 
-- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Written against `cca931a`, documents only, nothing built. It needs the per-account split from the multi-user plan first. Email decided (P1, 21 November): an in-house SMTP client sending through info@lightup.ink on Namecheap Private Email. P2 to P7 decided the same day: Railway is Pro (owner's answer), the owner's AI keys are for the owner only, a fixed list of AI providers, launch caps of 50 a day and 500 in total, and build now, with sign-up off in production until switched on. Still open: P8 (terms and privacy policy, the owner's). The owner must add DKIM and DMARC records for lightup.ink. Next: Phase 1 (safety net).
+- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Being built: Phases 1 to 4 are done, see "Public sign-up" under "In flight". Still open: P8 (terms and privacy policy, the owner's).
 - Letting other people sign up, invite-only: [the plan](multi-user-plan.md). On 9 November 2026 the owner said no sign-up was needed. The 21 November request above supersedes that, and reuses its design.
 - AI features for the owner's own account, free to use, with a monthly spending cap: [the plan](ai-features-plan.md). It is waiting on the decisions listed in it, and nothing is built.

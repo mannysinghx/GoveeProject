@@ -33,7 +33,9 @@ Current deployment: project `goveeproject`, service `@glm/server`, <https://glms
 
 `HOST`, `NODE_ENV` and `DATABASE_PATH` are already set in the `Dockerfile`.
 
-Optional, for Ask: any of `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` and `GLM_API_KEY`, plus `AI_MONTHLY_LIMIT_USD` if the default of $5 does not suit. Set keys yourself in the dashboard. Each change restarts the app.
+Optional, for Ask: any of `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` and `GLM_API_KEY`, plus `AI_MONTHLY_LIMIT_USD` if the default of $5 does not suit. Set keys yourself in the dashboard. Each change restarts the app. These keys are for the owner's account only; people who sign up do not get them.
+
+For email and sign-up, see "Email and sign-up" below.
 
 Claude sessions working on this project must not read variables with Railway's `list-variables`, because it returns their values, which would put keys in a transcript.
 
@@ -89,7 +91,32 @@ To store the Govee key encrypted, set `CREDENTIAL_KEYS` in the service's variabl
 
 **Rolling back** to a version before the control database is a redeploy. That version reads the old tables in the owner's file, which have been kept in step: the current password works, and signed-out sessions stay signed out. Sessions made after the upgrade are not in those tables, so the owner signs in again. `control.sqlite` stays on the volume, unused, and is picked up again when rolling forward.
 
+## Email and sign-up
+
+From the version with Phase 4 of `docs/public-signup-plan.md`, the app sends its own email through `info@lightup.ink` on Namecheap Private Email, for sign-up, password reset and address changes. **Sign-up stays off** until the owner turns it on in Settings, and it cannot be turned on until mail is set up.
+
+**Before setting the variables,** in Namecheap: turn on SMTP access ("Connect third-party apps") for `info@lightup.ink`, preferably with an app password; turn on DKIM and add its DNS record; add a DMARC record, starting with `v=DMARC1; p=none; rua=mailto:info@lightup.ink`.
+
+| Variable | Value | Why |
+|---|---|---|
+| `SMTP_HOST` | `mail.privateemail.com` | Only this, `smtp.privateemail.com` or loopback is accepted, so the password cannot be sent anywhere else |
+| `SMTP_PORT` | `465` (the default) | TLS from the start. `587` uses STARTTLS |
+| `SMTP_USER` | `info@lightup.ink` | |
+| `SMTP_PASSWORD` | The mailbox's app password | **Set it yourself in the Railway dashboard.** Never in a file or a chat. It is scrubbed from logs |
+| `MAIL_FROM` | `info@lightup.ink` (defaults to `SMTP_USER`) | Replies and bounces land there |
+| `PUBLIC_URL` | `https://lightup.ink` | Where links in emails point. Defaults to the first host in `ALLOWED_HOSTS` |
+
+Optional: `MAIL_HOURLY_LIMIT` (default 300, under Namecheap's 500 an hour) and `SIGNUP_POW_DIFFICULTY` (default 18).
+
+**Check it works** before turning sign-up on: in Settings, add your own email address under "Sign-in email". The confirmation email is the first test send from Railway. If it does not arrive, the Deploy Logs say why ("Could not send an email", "Gave up sending an email" or "The mail server refused the app's sign-in"). Whether Railway lets mail out on port 465 has not been confirmed yet.
+
+**Turning sign-up on:** Settings, Sign-up, "Turn sign-up on". The same card shows the caps (50 a day and 500 in total to start), accounts made, and mail waiting or not delivered. Turning it off stops new sign-ups at once; people who already have an account keep signing in and can still reset their password.
+
+**Member accounts' files** are in `/data/accounts/`, one per person. `backup.js` copies each of them into `<backup>.accounts/` next to the backup. **`scripts/pull-backup.sh` does not bring them back yet**: it copies the owner's file and the control database only. That must be added before sign-up is switched on for anyone.
+
 ## Password reset
+
+With an email address on the account, use "Forgot your password?" on the sign-in page. Otherwise, on the server:
 
 ```bash
 railway ssh node apps/server/dist/cli/reset-password.js

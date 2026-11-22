@@ -1,0 +1,108 @@
+"""Phase 4 mutation checks. Runs inside the dev container on /app. Each mutation breaks one
+guarantee, runs the test that should catch it, and restores the file. Prints CAUGHT or MISSED."""
+import subprocess, sys
+
+S = '/app/apps/server/'
+MUTATIONS = [
+    ('every session served from the owner account', 'src/app/build-app.ts',
+     "request.account = request.session ? platform.accounts.ensure(request.session.userId) : null;",
+     "request.account = request.session ? platform.accounts.ensure(1) : null;",
+     'tests/signup.test.ts', 'any route'),
+    ('member gets the owner Govee key', 'src/app/context.ts',
+     "      goveeKey: () => null,\n      aiProviders: [],",
+     "      goveeKey: goveeKey.get,\n      aiProviders: [],",
+     'tests/signup.test.ts', 'never the owner'),
+    ('member gets the owner AI keys', 'src/app/context.ts',
+     "      goveeKey: () => null,\n      aiProviders: [],",
+     "      goveeKey: () => null,\n      aiProviders: config.ai.providers,",
+     'tests/signup.test.ts', 'never the owner'),
+    ('token use not checked (race makes two accounts)', 'src/auth/signup-service.ts',
+     "if (!row || !this.useToken(row)) throw LINK_INVALID();\n      const closed",
+     "if (!row) throw LINK_INVALID();\n      this.useToken(row);\n      const closed",
+     'tests/signup.test.ts', 'sent twice at once'),
+    ('opening the link uses it up', 'src/auth/signup-service.ts',
+     "    if (!row) throw LINK_INVALID();\n    return { purpose: row.purpose, email: row.email };",
+     "    if (!row) throw LINK_INVALID();\n    this.useToken(row);\n    return { purpose: row.purpose, email: row.email };",
+     'tests/signup.test.ts', 'needs a separate sign-in'),
+    ('no per-address mail limit', 'src/auth/signup-service.ts',
+     "    return outbox.countToAddress(email, now - 60_000) < MAIL_LIMITS.perMinute",
+     "    return true || outbox.countToAddress(email, now - 60_000) < MAIL_LIMITS.perMinute",
+     'tests/signup.test.ts', 'one email a minute'),
+    ('known address answered differently', 'src/auth/signup-service.ts',
+     "      this.deps.auth.audit(existing.id, 'register_existing_address', ip);\n      return;",
+     "      this.deps.auth.audit(existing.id, 'register_existing_address', ip);\n      throw new AppError(409, 'exists', 'exists');",
+     'tests/signup.test.ts', 'answers the same for a new address'),
+    ('owner-only check removed', 'src/app/build-app.ts',
+     "if (request.routeOptions.config.owner && request.session.role !== 'owner') {",
+     "if (request.routeOptions.config.owner && request.session.role === 'nobody') {",
+     'tests/signup.test.ts', 'only the owner'),
+    ('notification token prefix ignored', 'src/notifications/notification-routes.ts',
+     "const userId = prefixed ? Number(prefixed[1]) : OWNER_USER_ID;",
+     "const userId = OWNER_USER_ID;",
+     'tests/signup.test.ts', 'phone notification'),
+    ('reset leaves sessions', 'src/auth/signup-service.ts',
+     "      this.control.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id);\n      this.control.prepare(\"DELETE FROM email_tokens WHERE purpose = 'reset'",
+     "      this.control.prepare(\"DELETE FROM email_tokens WHERE purpose = 'reset'",
+     'tests/signup.test.ts', 'signs out only that person'),
+    ('caps not rechecked when the link is used', 'src/auth/signup-service.ts',
+     "      const closed = this.closedReason();\n      if (closed) throw closed;\n      if (this.userByEmail(row.email)) {",
+     "      if (this.userByEmail(row.email)) {",
+     'tests/signup.test.ts', 'daily cap'),
+    ('reset link reusable after address change', 'src/auth/signup-service.ts',
+     "      // A reset link sent to the old address must not work any more.\n      this.control.prepare(\"DELETE FROM email_tokens WHERE purpose = 'reset' AND user_id = ? AND used_at IS NULL\").run(row.user_id);",
+     "",
+     'tests/signup.test.ts', 'tells the old address'),
+    ('honeypot ignored', 'src/auth/signup-service.ts',
+     "    if (input.website) {\n      this.deps.auth.audit(null, 'register_honeypot', ip);\n      return;\n    }",
+     "",
+     'tests/signup.test.ts', 'hidden field'),
+    ('proof of work not checked', 'src/auth/signup-service.ts',
+     "    if (!this.deps.pow.verify(challenge, nonce)) {",
+     "    if (false && !this.deps.pow.verify(challenge, nonce)) {",
+     'tests/signup.test.ts', 'hidden field'),
+    ('outbox keeps link text after sending', 'src/mail/outbox.ts',
+     "`UPDATE mail_outbox SET status = ?, text_body = NULL, html_body = NULL, last_error = ?",
+     "`UPDATE mail_outbox SET status = ?, last_error = ?",
+     'tests/mail.test.ts', 'clears the message text'),
+    ('STARTTLS injection accepted', 'src/mail/smtp-client.ts',
+     "    if (this.buffer.length > 0) {\n      throw new SmtpError('The mail server sent data before encryption started",
+     "    if (this.buffer.length > 999999) {\n      throw new SmtpError('The mail server sent data before encryption started",
+     'tests/mail.test.ts', 'slipped in'),
+    ('certificates not checked', 'src/mail/smtp-client.ts',
+     "    rejectUnauthorized: true,",
+     "    rejectUnauthorized: false,",
+     'tests/mail.test.ts', 'does not trust'),
+    ('header line breaks allowed', 'src/mail/message.ts',
+     "  if (/[\\r\\n\\0]/.test(value)) throw new MailFormatError(`${what} contains a line break.`);",
+     "",
+     'tests/mail.test.ts', 'line break in any header'),
+    ('SMTP host allow-list off', 'src/config/env.ts',
+     "  if (!loopback && !ALLOWED_SMTP_HOSTS.has(host)) {",
+     "  if (false && !loopback && !ALLOWED_SMTP_HOSTS.has(host)) {",
+     'tests/mail.test.ts', 'refuses any other mail server'),
+    ('account file may point outside its folder', 'src/auth/control.ts',
+     "  if (path.isAbsolute(accountFile) || !resolved.startsWith(base + path.sep)) {",
+     "  if (false) {",
+     'tests/signup.test.ts', 'outside the data folder'),
+]
+
+only = sys.argv[1:]
+results = []
+for name, rel, old, new, test, pattern in MUTATIONS:
+    if only and not any(o in name for o in only):
+        continue
+    path = S + rel
+    original = open(path).read()
+    if original.count(old) != 1:
+        results.append(f'NOT APPLIED ({original.count(old)} matches): {name}')
+        continue
+    open(path, 'w').write(original.replace(old, new))
+    try:
+        run = subprocess.run(['npx', 'vitest', 'run', test, '-t', pattern], cwd=S, capture_output=True, text=True, timeout=300)
+        out = run.stdout + run.stderr
+        ran = ' passed' in out or ' failed' in out
+        verdict = 'CAUGHT' if run.returncode != 0 and 'failed' in out else ('NO TESTS RAN' if not ran else 'MISSED')
+        results.append(f'{verdict}: {name}')
+    finally:
+        open(path, 'w').write(original)
+print('\n'.join(results))

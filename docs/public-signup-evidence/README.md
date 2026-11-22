@@ -9,3 +9,15 @@ bash rehearse-cutover.sh
 ```
 
 The `.txt` endings stop these being run or linted by accident.
+
+**Phase 4 mutation checks, 22 November 2026.** `phase4-mutations.py.txt` breaks one guarantee at a time (accounts kept apart, the owner's Govee and AI keys never given to a member, links single-use and unchanged by opening, the same answer for every address, the per-address mail limit, owner-only routes, notification buttons per account, reset signing out, caps rechecked, the bot trap, the proof of work, link text cleared, STARTTLS injection, certificate checks, header injection, the SMTP host allow-list, account file paths), runs the test that should notice, and puts the file back. Result: 20 of 22 caught. `phase4-mutations-paired.py.txt` removes the two that were held by a second guard together with that guard: both caught.
+
+To repeat, in the dev container with the repo at `/app` and dependencies installed:
+
+```bash
+python3 phase4-mutations.py.txt
+```
+
+```bash
+python3 phase4-mutations-paired.py.txt
+```

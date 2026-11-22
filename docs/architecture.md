@@ -36,19 +36,32 @@ Official Govee cloud API --> your Govee devices
 
 ## Platform and accounts
 
-The server is split into two kinds of context, in `apps/server/src/app/context.ts`. This is Phase 2 of [public-signup-plan.md](public-signup-plan.md), and today there is still exactly one account, the owner's.
+The server is split into two kinds of context, in `apps/server/src/app/context.ts`. This is Phase 2 of [public-signup-plan.md](public-signup-plan.md). Since Phase 4, people who sign up by email each get an account of their own, next to the owner's.
 
 | | `PlatformContext`, one per process | `AccountContext`, one per person |
 |---|---|---|
-| Holds | Config, logger, clock, `SecretRegistry`, sign-in (`auth`), `AccountRegistry` | Database, Govee transport and rate limiter, queue, devices, groups, presets, schedules and scheduler, monitor, notifications, AI, maintenance |
-| Today | Sign-in still uses the owner's database file. Phase 3 moves it to a control database | The owner's account uses the existing file at `DATABASE_PATH`, unchanged |
+| Holds | Config, logger, clock, `SecretRegistry`, the control database, sign-in (`auth`), sign-up (`signup`), the mail outbox, proof of work, `AccountRegistry` | Database, Govee transport and rate limiter, queue, devices, groups, presets, schedules and scheduler, monitor, notifications, AI, maintenance |
+| Files | `control.sqlite` | The owner's account uses the existing file at `DATABASE_PATH`, unchanged. Each member's is `accounts/<random>.sqlite` next to `control.sqlite`, with the same migrations |
 
 - **Routes are given only the platform.** Each handler gets the signed-in person's services from `accountOf(request)` (`app/request-account.ts`). Because the platform has no account services, a route that tries to capture them at startup does not compile.
-- **One place turns a session into an account:** the deny-by-default hook in `build-app.ts` calls `accounts.forUser(session.userId)`. A valid session whose account is not loaded gets 503 `account_unavailable`. It never falls back to another account.
-- **Public routes:** `/health` checks every account's database and reports the first scheduler that is not running. `/notification-actions` has no session, so it uses `accounts.sole()`, which throws once a second account exists. Phase 4 replaces that with a lookup from the token.
+- **One place turns a session into an account:** the deny-by-default hook in `build-app.ts` calls `accounts.ensure(session.userId)`, which loads a member's account on first use if it is not loaded yet. A valid session whose account cannot be loaded gets 503 `account_unavailable`. It never falls back to another account.
+- **Owner-only routes** carry `config: { owner: true }`, and the same hook answers anyone else with 404. Today that is `/admin/signup`.
+- **Members' accounts** are built by `loadMember` in `context.ts`: their own file, **no Govee key** (`goveeKey: () => null` until Phase 5 lets them connect one) and **no AI providers** (decision P3: the server's AI keys are the owner's). `goveeKey` and `aiProviders` have no defaults, so an account cannot inherit the owner's by leaving them out. All active members are loaded at startup; a new one is loaded and started when they finish signing up.
+- **Public routes:** `/health` checks every account's database and reports the first scheduler that is not running. `/notification-actions` has no session, so each button token starts with its account's user id (`2.<random>`), and the token is then checked only in that account's database. Tokens from before Phase 4 have no prefix and are the owner's.
 - **Secrets:** `SecretRegistry` (`shared/logger.ts`) holds every secret the process knows, and the logger, activity log and AI notes all scrub through it. A key connected later is hidden from then on, without a restart.
 - **Start and stop:** `AccountRegistry.startAll()` starts each account's timers in the original order. Shutdown runs `stopBackground()`, closes the HTTP server, then runs `stopCore()`. Accounts stop in parallel, each in the original order, so the 15-second limit does not grow with the number of accounts.
-- **Kept true by tests:** `apps/server/tests/accounts.test.ts` lists all 75 routes and the 5 public ones, so a new route fails until someone classifies it. It also checks the 503 rule, late secrets, and the registry's order and parallel stop.
+- **Kept true by tests:** `apps/server/tests/accounts.test.ts` lists all 85 routes, 12 public and 2 owner-only, so a new route fails until someone classifies it. It also checks the 503 rule, late secrets, and the registry's order, loading and parallel stop. `apps/server/tests/signup.test.ts` calls every signed-in route as a member with the owner's real ids, and checks that nothing of the owner's comes back or changes.
+
+## Email and sign-up
+
+Phase 4 of [public-signup-plan.md](public-signup-plan.md). Everything is in-house, with no new dependencies.
+
+- **`mail/smtp-client.ts`** speaks SMTP over `node:net` and `node:tls` to the one mail server allowed by `SMTP_HOST`: TLS from the start on 465, or STARTTLS on 587. Certificates are always checked, the password never goes over a plain connection, and anything the server sends before the TLS handshake is refused.
+- **`mail/message.ts`** builds each message, plain text and HTML, quoted-printable, refusing a line break in any header.
+- **`mail/outbox.ts`** keeps mail in the control database (`mail_outbox`) until a worker sends it, one at a time: retries at 1, 5, 15, 30 and 60 minutes, at most `MAIL_HOURLY_LIMIT` an hour, dropped once its link has expired, and its text cleared once sent or given up. No request waits on the mail server.
+- **`auth/signup-service.ts`** handles register, the link check, completing sign-up, forgot and reset, and changing the sign-in address. Links are single-use tokens stored as SHA-256 hashes (`email_tokens`), and only the form a link leads to uses one up.
+- **`security/proof-of-work.ts`** issues signed puzzles for the register and forgot forms. The browser solves them with WebCrypto (`apps/web/src/features/auth/proof-of-work.ts`).
+- **Limits** are counted in `request_limits` and `mail_outbox`. The sign-up switch and caps are in `platform_settings`.
 
 ## Command lifecycle
 
