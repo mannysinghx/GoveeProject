@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PASSWORD_MIN_LENGTH } from '@glm/shared';
 import { Button, Card, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
+import { LegalLinks } from '../legal/LegalPages';
 import {
   useCompleteSignup,
   useConfirmEmail,
@@ -94,6 +95,7 @@ function EmailRequestPage({
   sentTitle,
   sentBody,
   mutation,
+  legal,
 }: {
   title: string;
   intro: string;
@@ -101,6 +103,8 @@ function EmailRequestPage({
   sentTitle: string;
   sentBody: (email: string) => string;
   mutation: ReturnType<typeof useRegister>;
+  /** A line under the button, such as what creating an account agrees to. */
+  legal?: ReactNode;
 }) {
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -149,7 +153,9 @@ function EmailRequestPage({
           {mutation.isPending ? 'Checking this browser…' : submitLabel}
         </Button>
       </form>
+      {legal ? <p className="mt-3 text-xs text-ink-400">{legal}</p> : null}
       <BackToSignIn />
+      <LegalLinks />
     </AuthCard>
   );
 }
@@ -163,6 +169,19 @@ export function RegisterPage() {
       sentTitle="Check your inbox"
       sentBody={(email) => `If ${email} can be used for a new account, a link to finish signing up is on its way.`}
       mutation={useRegister()}
+      legal={
+        <>
+          By creating an account you agree to the{' '}
+          <Link to="/terms" className="underline underline-offset-2">
+            terms
+          </Link>
+          , and your data is handled as the{' '}
+          <Link to="/privacy" className="underline underline-offset-2">
+            privacy page
+          </Link>{' '}
+          says.
+        </>
+      }
     />
   );
 }

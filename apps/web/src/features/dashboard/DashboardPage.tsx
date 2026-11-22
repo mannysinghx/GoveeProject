@@ -30,22 +30,29 @@ function ConnectionBanner({ diagnostics }: { diagnostics: DiagnosticsDto }) {
     return (
       <Notice
         tone="warn"
-        title="No Govee API key is set on the server"
+        title="No Govee API key is connected"
         action={
           <Link to="/connect" className="text-sm whitespace-nowrap underline underline-offset-2">
-            Set up
+            Connect
           </Link>
         }
       >
-        Lights cannot be controlled until <code className="font-mono">GOVEE_API_KEY</code> is set and the app restarted.
+        Lights cannot be reached until a Govee API key is connected.
       </Notice>
     );
   }
   if (govee.lastErrorCategory === 'auth' && (govee.lastErrorAt ?? '') > (govee.lastSuccessfulConnectionAt ?? '')) {
     return (
-      <Notice tone="bad" title="Govee rejected the API key">
-        Check <code className="font-mono">GOVEE_API_KEY</code> on the server. Applying for a new key may have replaced the
-        old one.
+      <Notice
+        tone="bad"
+        title="Govee rejected the API key"
+        action={
+          <Link to="/settings" className="text-sm whitespace-nowrap underline underline-offset-2">
+            Settings
+          </Link>
+        }
+      >
+        Check the key in Settings, under Govee API key. Applying for a new key may have replaced the old one.
       </Notice>
     );
   }

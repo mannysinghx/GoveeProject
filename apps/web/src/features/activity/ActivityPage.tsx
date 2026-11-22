@@ -27,8 +27,8 @@ const OUTCOME_LABEL: Record<ActivityOutcome, string> = {
 };
 
 const TROUBLESHOOTING: Partial<Record<NonNullable<DiagnosticsDto['govee']['lastErrorCategory']>, string>> = {
-  auth: 'Govee rejected the key. Check GOVEE_API_KEY on the server. Applying for a new key may replace the old one.',
-  not_configured: 'Set GOVEE_API_KEY in the server environment and restart the app.',
+  auth: 'Govee rejected the key. Check it in Settings, under Govee API key. Applying for a new key may replace the old one.',
+  not_configured: 'Connect a Govee API key in Settings, under Govee API key.',
   network: "This server could not reach Govee. Check its internet connection and DNS.",
   timeout: 'Govee did not answer in time. This is often temporary. Try again shortly.',
   rate_limited: 'Too many requests. The app slows down by itself. Wait a minute before trying again.',

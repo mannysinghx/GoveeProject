@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { PASSWORD_MIN_LENGTH, type LinkCheckDto, type SessionDto } from '@glm/shared';
 import { api, setCsrfToken } from '../../lib/api';
 import { keys } from '../../lib/queries';
@@ -17,6 +17,30 @@ export function useSession() {
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });
+}
+
+/**
+ * After this browser's session has ended (sign-out, or the account was deleted): forget every
+ * cached answer and show the signed-out pages at once, then ask the server for the real state.
+ * Clearing the cache alone is not enough, because it also removes the session query that
+ * decides which pages to show, so nothing would ask again.
+ */
+export function showSignedOut(client: QueryClient): void {
+  setCsrfToken(null);
+  const previous = client.getQueryData<SessionDto>(keys.session);
+  client.removeQueries({ predicate: (query) => query.queryKey[0] !== keys.session[0] });
+  if (previous) {
+    client.setQueryData<SessionDto>(keys.session, {
+      ...previous,
+      authenticated: false,
+      username: null,
+      csrfToken: null,
+      expiresAt: null,
+      email: null,
+      role: null,
+    });
+  }
+  void client.invalidateQueries({ queryKey: keys.session });
 }
 
 function useSessionMutation<T>(path: string) {
@@ -100,10 +124,8 @@ export function useLogout() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: () => api<void>('/auth/logout', { method: 'POST' }),
-    onSettled: () => {
-      setCsrfToken(null);
-      client.clear();
-      void client.invalidateQueries({ queryKey: keys.session });
-    },
+    // Before 22 November 2026 this cleared the cache and asked again, which left the signed-in
+    // pages on screen after signing out: clearing removed the very query it then asked to refresh.
+    onSettled: () => showSignedOut(client),
   });
 }

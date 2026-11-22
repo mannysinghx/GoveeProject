@@ -10,6 +10,7 @@ import {
   VerifyEmailPage,
 } from '../features/auth/EmailPages';
 import { LoginPage } from '../features/auth/LoginPage';
+import { PrivacyPage, TermsPage } from '../features/legal/LegalPages';
 import { SetupPage } from '../features/auth/SetupPage';
 import { useSession } from '../features/auth/useSession';
 import { ActivityPage } from '../features/activity/ActivityPage';
@@ -50,11 +51,13 @@ export function App() {
 
   if (session.data.setupRequired) return <SetupPage setupCodeRequired={session.data.setupCodeRequired} />;
 
-  // Links from emails work whether or not this browser is signed in.
+  // Links from emails, and the privacy and terms pages, work whether or not this browser is signed in.
   const linkRoutes = [
     <Route key="verify" path="/verify" element={<VerifyEmailPage />} />,
     <Route key="reset" path="/reset" element={<ResetPasswordPage />} />,
     <Route key="confirm" path="/confirm-email" element={<ConfirmEmailPage />} />,
+    <Route key="privacy" path="/privacy" element={<PrivacyPage />} />,
+    <Route key="terms" path="/terms" element={<TermsPage />} />,
   ];
 
   if (!session.data.authenticated) {

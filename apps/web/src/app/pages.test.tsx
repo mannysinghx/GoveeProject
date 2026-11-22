@@ -70,7 +70,7 @@ describe('authentication flow', () => {
       'href',
       'https://developer.govee.com/reference/apply-you-govee-api-key',
     );
-    expect(screen.getByText(/You never paste the key/)).toBeInTheDocument();
+    expect(screen.getByText(/or connect it after setup on the Connect page/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
   });
 
@@ -193,7 +193,8 @@ describe('dashboard', () => {
       'GET /devices': { json: { devices: [] } },
     });
     renderApp(<DashboardPage />);
-    expect(await screen.findByText('No Govee API key is set on the server')).toBeInTheDocument();
+    expect(await screen.findByText('No Govee API key is connected')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Connect' })).toHaveAttribute('href', '/connect');
   });
 
   it('never presents stale data as live, and flags offline values as historical', async () => {

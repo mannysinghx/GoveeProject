@@ -3,7 +3,10 @@ import type { AppSettings } from '@glm/shared';
 import { Button, ErrorNotice, Field, inputClass, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
 import { AiSettings } from '../ai/AiSettings';
 import { timeZoneOptions } from '../../lib/format';
-import { useDiagnostics, useSettings, useUpdateSettings } from '../../lib/queries';
+import { Link } from 'react-router-dom';
+import { useSettings, useUpdateSettings } from '../../lib/queries';
+import { AccountData, AdminAccounts } from '../account/AccountData';
+import { GoveeKeySettings } from '../account/GoveeKey';
 import { PASSWORD_MIN_LENGTH, useChangePassword, useSession } from '../auth/useSession';
 import { EmailSettings, SignupSettings } from './AccountSettings';
 
@@ -194,26 +197,6 @@ function ChangePassword() {
   );
 }
 
-function ServerConfiguration() {
-  const diagnostics = useDiagnostics();
-  return (
-    <SectionCard title="Govee API key">
-      {diagnostics.data ? (
-        diagnostics.data.govee.keyConfigured ? (
-          <Notice tone="good">A key is configured on the server. It is never shown here or sent to this browser.</Notice>
-        ) : (
-          <Notice tone="warn">No key is configured.</Notice>
-        )
-      ) : null}
-      <p className="mt-3 text-sm text-ink-300">
-        To change the key, edit <code className="font-mono text-ink-100">GOVEE_API_KEY</code> in the server's{' '}
-        <code className="font-mono text-ink-100">.env</code> file and restart the app. Applying for a new key in the Govee
-        app may invalidate the old one, along with anything else using it.
-      </p>
-    </SectionCard>
-  );
-}
-
 export function SettingsPage() {
   const settings = useSettings();
   const isOwner = useSession().data?.role === 'owner';
@@ -224,11 +207,22 @@ export function SettingsPage() {
       {settings.isError ? <ErrorNotice error={settings.error} /> : null}
       <div className="max-w-3xl space-y-5">
         {settings.data ? <GeneralSettings settings={settings.data} /> : null}
-        <ServerConfiguration />
+        <GoveeKeySettings />
         <AiSettings />
         <EmailSettings />
         <ChangePassword />
+        <AccountData canDelete={!isOwner} />
         {isOwner ? <SignupSettings /> : null}
+        {isOwner ? <AdminAccounts /> : null}
+        <p className="text-sm text-ink-400">
+          <Link to="/privacy" className="underline underline-offset-2">
+            Privacy
+          </Link>{' '}
+          ·{' '}
+          <Link to="/terms" className="underline underline-offset-2">
+            Terms
+          </Link>
+        </p>
       </div>
     </>
   );

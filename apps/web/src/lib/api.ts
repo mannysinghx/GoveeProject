@@ -29,7 +29,7 @@ export function setUnauthenticatedHandler(handler: (() => void) | null): void {
 const NETWORK_MESSAGE = 'Could not reach the app server. Check that it is running.';
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   signal?: AbortSignal;
 }
@@ -75,6 +75,38 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     );
   }
   return payload as T;
+}
+
+/**
+ * A POST whose answer is a file to save, such as the account export. Returns the file and the
+ * name the server gave it. Errors are read the same way as api().
+ */
+export async function apiDownload(path: string, body: unknown): Promise<{ blob: Blob; filename: string }> {
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (csrfToken) headers['x-csrf-token'] = csrfToken;
+  let response: Response;
+  try {
+    response = await fetch(`/api/v1${path}`, { method: 'POST', headers, credentials: 'same-origin', body: JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, 'network_error', NETWORK_MESSAGE);
+  }
+  if (!response.ok) {
+    let error: ApiErrorBody['error'] | undefined;
+    try {
+      error = ((await response.json()) as ApiErrorBody).error;
+    } catch {
+      // A generic message below.
+    }
+    if (response.status === 401 && error?.code === 'unauthenticated') onUnauthenticated?.();
+    throw new ApiError(
+      response.status,
+      error?.code ?? 'unexpected_response',
+      error?.message ?? `The server returned an unexpected response (${response.status}).`,
+      error?.requestId,
+    );
+  }
+  const match = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '');
+  return { blob: await response.blob(), filename: match?.[1] ?? 'download.json' };
 }
 
 export function errorMessage(error: unknown): string {

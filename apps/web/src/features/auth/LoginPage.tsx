@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button, ErrorNotice, Field, inputClass, Notice } from '../../components/ui';
+import { LegalLinks } from '../legal/LegalPages';
 import { AuthCard, type LoginNotice } from './EmailPages';
 import { useLogin } from './useSession';
 
@@ -81,6 +82,7 @@ export function LoginPage({ signupOpen }: { signupOpen: boolean }) {
         If your account has no email address yet, reset the password on the server with{' '}
         <code className="font-mono">npm run reset-password</code>. See docs/security.md.
       </p>
+      <LegalLinks />
     </AuthCard>
   );
 }
