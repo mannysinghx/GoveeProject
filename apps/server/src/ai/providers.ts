@@ -85,6 +85,14 @@ export function knownPrice(model: string): boolean {
   return PRICES[model.toLowerCase()] !== undefined;
 }
 
+/**
+ * The models a person may pick with their own key: those with a listed price, so what they
+ * spend is always counted against their cap at a known rate.
+ */
+export function modelsFor(id: AiProviderId): string[] {
+  return Object.keys(PRICES).filter((model) => model.startsWith(`${id}-`));
+}
+
 /** A rough token count for text, at about 3 characters a token. */
 export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);

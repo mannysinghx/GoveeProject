@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import { buildApp } from '../src/app/build-app.js';
 import { configSecrets, createPlatform } from '../src/app/context.js';
 import { resolveAccountFile } from '../src/auth/control.js';
 import type { PushSender } from '../src/notifications/push-sender.js';
-import { solveChallenge } from '../src/security/proof-of-work.js';
+import { leadingZeroBits, solveChallenge } from '../src/security/proof-of-work.js';
 import { createLogger, SecretRegistry } from '../src/shared/logger.js';
 import { FakeSmtp, linkIn, tokenIn, type ReceivedMail } from './support/fake-smtp.js';
 import { authedClient, createHarness, FakeClock, testConfig, type Harness } from './support/harness.js';
@@ -155,7 +156,7 @@ describe('email sign-up', () => {
     expect(status.govee.keyConfigured).toBe(false);
     expect(status.database.path).toBeNull();
     expect((await owner.get('/api/v1/system/status')).json().database.path).toBe(':memory:');
-    expect((await member.get('/api/v1/ai/status')).json()).toMatchObject({ enabled: false, reason: 'no_providers', providers: [] });
+    expect((await member.get('/api/v1/ai/status')).json()).toMatchObject({ enabled: false, reason: 'no_key', providers: [] });
     expect((await owner.get('/api/v1/ai/status')).json()).toMatchObject({ enabled: true });
     expect((await member.post('/api/v1/ai/ask', { question: 'Which lights are on?' })).statusCode).toBeGreaterThanOrEqual(400);
 
@@ -225,8 +226,11 @@ describe('email sign-up', () => {
   });
 
   it('needs a solved, unused puzzle, and quietly ignores the hidden field bots fill in', async () => {
-    const { challenge } = (await h.app.inject({ method: 'GET', url: '/api/v1/auth/challenge' })).json() as ChallengeDto;
-    const bad = await post(h.app, '/auth/register', { email: 'bot@example.com', challenge, nonce: '1' });
+    const { challenge, difficulty } = (await h.app.inject({ method: 'GET', url: '/api/v1/auth/challenge' })).json() as ChallengeDto;
+    // A nonce that is certainly wrong. A fixed one such as '1' solves an easy puzzle about 1 time in 16.
+    let wrong = 0;
+    while (leadingZeroBits(crypto.createHash('sha256').update(`${challenge}:${wrong}`).digest()) >= difficulty) wrong += 1;
+    const bad = await post(h.app, '/auth/register', { email: 'bot@example.com', challenge, nonce: String(wrong) });
     expect([bad.statusCode, bad.json().error.code]).toEqual([400, 'challenge_failed']);
 
     const answer = await proof(h.app);

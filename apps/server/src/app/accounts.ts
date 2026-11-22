@@ -52,6 +52,26 @@ export class AccountRegistry {
     return [...this.byUser.values()];
   }
 
+  /**
+   * Stops one account and closes its database, as shutdown does, and forgets it. Used when an
+   * account is suspended or deleted. Its sign-in must already be stopped, or the next request
+   * would load it again.
+   */
+  async unload(userId: number): Promise<void> {
+    const account = this.byUser.get(userId);
+    if (!account) return;
+    this.byUser.delete(userId);
+    account.maintenance.stop();
+    await account.connection.stop();
+    await account.builtins.stop();
+    await account.notifications.stop();
+    account.devices.stop();
+    await account.queue.stop();
+    await account.scheduler.stop();
+    account.db.close();
+    this.logger?.info({ userId }, 'Account unloaded');
+  }
+
   /** Marks commands left in flight by a crash, before anything new is sent. */
   recoverInterrupted(): void {
     for (const account of this.all()) account.queue.recoverInterrupted();

@@ -60,6 +60,12 @@ export class BuiltinPresets {
     private readonly isConfigured: () => boolean,
     private readonly logger: Logger,
     private readonly clock: Clock,
+    /**
+     * Whether holiday shows and the New Year show are set up switched on. The owner's are, as
+     * they always have been. Everyone else's start off, so nobody's lights change for a holiday
+     * they did not choose; they turn on the ones they want in Schedules.
+     */
+    private readonly showsStartEnabled = true,
   ) {}
 
   start(): void {
@@ -249,7 +255,8 @@ export class BuiltinPresets {
       }
     }
     if (added > 0) {
-      this.activity.record({ eventType: 'schedule', outcome: 'info', message: `Set up ${added} holiday show(s). See Schedules.` });
+      const state = this.showsStartEnabled ? '' : ', switched off until you turn them on';
+      this.activity.record({ eventType: 'schedule', outcome: 'info', message: `Set up ${added} holiday show(s)${state}. See Schedules.` });
     }
   }
 
@@ -267,7 +274,7 @@ export class BuiltinPresets {
       this.schedules.create(
         {
           name: index === 0 ? holiday.name : `${builtinPresetByKey(step.presetKey)?.name ?? holiday.name} (${time})`,
-          enabled: true,
+          enabled: this.showsStartEnabled,
           timeZone,
           recurrence: { kind: 'holiday', holiday: holiday.key, time },
           target,
@@ -281,7 +288,7 @@ export class BuiltinPresets {
     this.schedules.create(
       {
         name: `${holiday.name}: end`,
-        enabled: true,
+        enabled: this.showsStartEnabled,
         timeZone,
         recurrence: { kind: 'holiday', holiday: holiday.key, time: holiday.endTime },
         target,
@@ -314,7 +321,7 @@ export class BuiltinPresets {
     const target = { type: 'group' as const, groupId: group.id };
     const show = this.schedules.create({
       name: FIREWORKS_PRESET.name,
-      enabled: true,
+      enabled: this.showsStartEnabled,
       timeZone,
       recurrence: { kind: 'yearly', month: 1, day: 1, time: '00:00' },
       target,
@@ -324,7 +331,7 @@ export class BuiltinPresets {
     });
     this.schedules.create({
       name: `${FIREWORKS_PRESET.name}: end`,
-      enabled: true,
+      enabled: this.showsStartEnabled,
       timeZone,
       recurrence: { kind: 'yearly', month: 1, day: 1, time: FIREWORKS_END_TIME },
       target,
@@ -336,7 +343,7 @@ export class BuiltinPresets {
     this.activity.record({
       eventType: 'schedule',
       outcome: 'info',
-      message: `Set up "${FIREWORKS_PRESET.name}" for 12:00 AM on January 1, ending at 12:30 AM (${timeZone}).`,
+      message: `Set up "${FIREWORKS_PRESET.name}" for 12:00 AM on January 1, ending at 12:30 AM (${timeZone})${this.showsStartEnabled ? '' : ', switched off until you turn it on'}.`,
     });
   }
 }

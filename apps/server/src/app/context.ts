@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { MEMBER_LIMITS } from '@glm/shared';
 import { ActivityService } from '../activity/activity-service.js';
-import { AiService } from '../ai/ai-service.js';
+import { AccountService, readAiLimit } from '../account/account-service.js';
+import { PersonalKeys } from '../account/personal-keys.js';
+import { AiGate, AiService } from '../ai/ai-service.js';
 import { AskTools } from '../ai/ask-tools.js';
 import { AiLedger } from '../ai/ledger.js';
 import { AuthService } from '../auth/auth-service.js';
@@ -14,7 +17,7 @@ import { CommandStore } from '../commands/command-store.js';
 import { MailOutbox, type MailSender } from '../mail/outbox.js';
 import { sendSmtp } from '../mail/smtp-client.js';
 import { APP_NAME } from '../mail/templates.js';
-import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
+import { isLoopbackHost, PROJECT_ROOT, type AiProviderConfig, type AppConfig } from '../config/env.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { webPushSender, type PushSender } from '../notifications/push-sender.js';
 import { BuiltinPresets } from '../presets/builtin-presets.js';
@@ -34,6 +37,7 @@ import { PresetService } from '../presets/preset-service.js';
 import { ScheduleService } from '../scheduler/schedule-service.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import { CredentialStore } from '../security/credentials.js';
+import { RequestRate } from '../security/limits.js';
 import { ProofOfWork } from '../security/proof-of-work.js';
 import { systemClock, type Clock } from '../shared/clock.js';
 import { createLogger, SecretRegistry, type Logger } from '../shared/logger.js';
@@ -103,6 +107,14 @@ export interface PlatformContext {
   signup: SignupService;
   outbox: MailOutbox;
   pow: ProofOfWork;
+  /** Keys, export, delete, and the owner's list of accounts. */
+  account: AccountService;
+  /** Members' own keys, decrypted when first needed. */
+  keys: PersonalKeys;
+  /** Signed-in requests a minute, per member. */
+  requestRate: RequestRate;
+  /** AI requests running at once, across every account. */
+  aiGate: AiGate;
   /** Set when setup needs a code and the code was generated rather than configured. */
   generatedSetupCode: string | null;
   accounts: AccountRegistry;
@@ -125,6 +137,8 @@ export interface ContextOverrides {
   smtpCa?: string | Buffer;
   /** Tests only: replaces the SMTP client. */
   mailSender?: MailSender;
+  /** Tests only: replaces the Govee request that checks a key someone connects. */
+  checkGoveeKey?: (apiKey: string) => Promise<void>;
 }
 
 /** The owner's account belongs to user 1. Everyone else is a member with their own file. */
@@ -174,8 +188,17 @@ interface AccountDeps {
    * end up using the owner's GOVEE_API_KEY by leaving it out.
    */
   goveeKey: () => string | null;
-  /** The AI providers this account may use. Only the owner's account gets the server's keys. */
-  aiProviders: AppConfig['ai']['providers'];
+  /**
+   * The AI providers this account may use, asked for on each request. Only the owner's account
+   * gets the server's keys. Everyone else's are their own.
+   */
+  aiProviders: () => AiProviderConfig[];
+  /** True for an account whose AI keys and cap are its own, not the server's. */
+  personalAi: boolean;
+  /** Shared by every account: how many AI requests may run at once on the server. */
+  aiGate: AiGate;
+  /** Whether holiday shows are set up switched on. Only the owner's are. */
+  holidayShowsStartEnabled: boolean;
   logger: Logger;
   clock: Clock;
   secrets: SecretRegistry;
@@ -300,6 +323,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
     () => transport.isConfigured(),
     logger,
     clock,
+    deps.holidayShowsStartEnabled,
   );
 
   const ai = new AiService(
@@ -310,7 +334,10 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
     logger,
     clock,
     {
-      config: { ...config.ai, providers: deps.aiProviders },
+      config: config.ai,
+      providers: deps.aiProviders,
+      ...(deps.personalAi ? { monthlyLimitUsd: () => readAiLimit(db), missingReason: 'no_key' as const } : {}),
+      gate: deps.aiGate,
       drafts: { devices, groups, presets },
       ...(deps.aiFetch ? { fetchImpl: deps.aiFetch } : {}),
     },
@@ -434,6 +461,8 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
   const credentials = new CredentialStore(control, config.credentialKeys, clock);
 
   const goveeKey = new OwnerGoveeKey(config, credentials, secrets, control, logger, clock);
+  const keys = new PersonalKeys(credentials, secrets, logger);
+  const aiGate = new AiGate(8);
 
   // Sessions are in the control database, and the owner's maintenance prunes them hourly.
   let auth: AuthService | null = null;
@@ -451,7 +480,10 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     pruneSessions,
     goveeKey: goveeKey.get,
     // Decided 21 November 2026 (P3): the server's AI keys are for the owner only.
-    aiProviders: config.ai.providers,
+    aiProviders: () => config.ai.providers,
+    personalAi: false,
+    aiGate,
+    holidayShowsStartEnabled: true,
     ...(overrides.db ? { db: overrides.db } : {}),
     ...(overrides.transport ? { transport: overrides.transport } : {}),
     ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
@@ -463,8 +495,8 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
   goveeKey.sync();
 
   /**
-   * A member's account: their own file, no Govee key until they connect one (Phase 5), and no
-   * AI until they add their own key. Nothing here comes from the owner's configuration.
+   * A member's account: their own file, the Govee key they connect, and AI only with their own
+   * key. Nothing here comes from the owner's configuration.
    */
   const loadMember = (userId: number): AccountContext | null => {
     const row = control.prepare("SELECT account_file FROM users WHERE id = ? AND role = 'member' AND status = 'active'").get(userId) as
@@ -479,9 +511,13 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
       secrets,
       // Only the owner's account prunes the control database's sessions.
       pruneSessions: () => 0,
-      goveeKey: () => null,
-      aiProviders: [],
+      goveeKey: () => keys.govee(userId),
+      aiProviders: () => keys.ai(userId),
+      personalAi: true,
+      aiGate,
+      holidayShowsStartEnabled: false,
       ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
+      ...(overrides.aiFetch ? { aiFetch: overrides.aiFetch } : {}),
     });
   };
 
@@ -526,6 +562,27 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     },
   });
 
+  const checkGoveeKey =
+    overrides.checkGoveeKey ??
+    (async (apiKey: string) => {
+      const probe = new GoveeCloudTransport({ apiKey, baseUrl: config.govee.baseUrl, timeoutMs: config.govee.timeoutMs });
+      await probe.discoverDevices();
+    });
+  const account = new AccountService({
+    config,
+    control,
+    credentials,
+    secrets,
+    keys,
+    auth,
+    accounts,
+    clock,
+    logger,
+    ownerGoveeChanged: () => goveeKey.sync(),
+    checkGoveeKey,
+    ...(overrides.aiFetch ? { aiFetch: overrides.aiFetch } : {}),
+  });
+
   return {
     config,
     version: readVersion(),
@@ -539,6 +596,10 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     signup,
     outbox,
     pow,
+    account,
+    keys,
+    requestRate: new RequestRate(MEMBER_LIMITS.requestsPerMinute),
+    aiGate,
     generatedSetupCode: setup.generated ? setup.code : null,
     accounts,
   };

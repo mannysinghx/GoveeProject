@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { Logger } from 'pino';
 import type {
   AiAnswerDto,
@@ -71,11 +72,52 @@ interface QuestionBudget {
   deadlineMs: number;
 }
 
+/**
+ * AI requests running at once across every account. Each can hold a connection for up to two
+ * minutes, so this keeps many people asking at once from tying up the server.
+ */
+export class AiGate {
+  private active = 0;
+
+  constructor(readonly max = 8) {}
+
+  tryEnter(): boolean {
+    if (this.active >= this.max) return false;
+    this.active += 1;
+    return true;
+  }
+
+  leave(): void {
+    this.active = Math.max(0, this.active - 1);
+  }
+
+  get running(): number {
+    return this.active;
+  }
+}
+
 export interface AiServiceOptions {
+  /** `providers` here is the owner's, from the server's variables. Members pass `providers` below. */
   config: AppConfig['ai'];
+  /**
+   * The providers this account may use right now, asked for on every request, so a key added or
+   * removed takes effect at once. Defaults to config.providers.
+   */
+  providers?: () => AiProviderConfig[];
+  /** This account's monthly cap. Defaults to config.monthlyLimitUsd. */
+  monthlyLimitUsd?: () => number;
+  /** Which reason to give when there is no provider: the owner's server variables, or the person's own key. */
+  missingReason?: 'no_providers' | 'no_key';
+  /** Shared by every account. */
+  gate?: AiGate;
   /** What schedule drafts may refer to: lights, groups and presets, by name and id. */
   drafts?: ScheduleContext;
   fetchImpl?: typeof fetch;
+}
+
+/** A short, one-way tag of a key, so state can follow a key without holding a copy of it. */
+function keyTag(apiKey: string): string {
+  return crypto.createHash('sha256').update(apiKey).digest('hex').slice(0, 16);
 }
 
 function systemPrompt(nowIso: string, timeZone: string): string {
@@ -103,7 +145,9 @@ function systemPrompt(nowIso: string, timeZone: string): string {
 
 /** AI features. For now only Ask, which reads the app's records and never changes anything. */
 export class AiService {
-  private readonly providers: ProviderState[];
+  /** Resting state, kept per provider and key, so replacing a refused key starts afresh. */
+  private readonly states = new Map<string, ProviderState>();
+  private providers: ProviderState[] = [];
   private cursor = 0;
   private busy = false;
   private recent: number[] = [];
@@ -117,29 +161,57 @@ export class AiService {
     private readonly clock: Clock,
     private readonly options: AiServiceOptions,
   ) {
-    this.providers = options.config.providers.map((config) => ({ config, unavailableUntilMs: 0, restReason: null, note: null }));
-    for (const provider of options.config.providers) {
-      if (!knownPrice(provider.model)) {
+    this.refreshProviders();
+    for (const provider of this.providers) {
+      if (!knownPrice(provider.config.model)) {
         logger.warn(
-          { provider: provider.id, model: provider.model },
+          { provider: provider.config.id, model: provider.config.model },
           'No price is listed for this AI model, so it is counted at a high price against the monthly cap',
         );
       }
     }
   }
 
+  /** Brings the list up to date with the keys this account has now. Returns it. */
+  private refreshProviders(): ProviderState[] {
+    const configs = this.options.providers ? this.options.providers() : this.options.config.providers;
+    const next: ProviderState[] = [];
+    const seen = new Set<string>();
+    for (const config of configs) {
+      const id = `${config.id}:${config.model}:${keyTag(config.apiKey)}`;
+      seen.add(id);
+      let state = this.states.get(id);
+      if (!state) {
+        state = { config, unavailableUntilMs: 0, restReason: null, note: null };
+        this.states.set(id, state);
+      }
+      next.push(state);
+    }
+    for (const id of [...this.states.keys()]) if (!seen.has(id)) this.states.delete(id);
+    // The rotation keeps its place when the list is the same length; otherwise it starts again.
+    if (next.length !== this.providers.length) this.cursor = 0;
+    this.providers = next;
+    return next;
+  }
+
+  private monthlyLimitUsd(): number {
+    return this.options.monthlyLimitUsd ? this.options.monthlyLimitUsd() : this.options.config.monthlyLimitUsd;
+  }
+
   status(): AiStatusDto {
     const now = this.clock.nowMs();
     const spent = this.ledger.monthSpentUsd();
-    const { enabled, monthlyLimitUsd } = this.options.config;
+    const { enabled } = this.options.config;
+    const monthlyLimitUsd = this.monthlyLimitUsd();
+    const providers = this.refreshProviders();
     let reason: AiStatusDto['reason'] = null;
     if (!enabled) reason = 'disabled';
-    else if (this.providers.length === 0) reason = 'no_providers';
+    else if (providers.length === 0) reason = this.options.missingReason ?? 'no_providers';
     else if (spent >= monthlyLimitUsd) reason = 'limit_reached';
     return {
       enabled: reason === null,
       reason,
-      providers: this.providers.map((p) => ({
+      providers: providers.map((p) => ({
         id: p.config.id,
         label: providerLabel(p.config.id),
         model: p.config.model,
@@ -160,6 +232,9 @@ export class AiService {
     if (status.reason === 'disabled') throw new AppError(503, 'ai_disabled', 'AI features are turned off on this server.');
     if (status.reason === 'no_providers') {
       throw new AppError(503, 'ai_not_configured', 'No AI provider is set up. Add a DeepSeek, Gemini or GLM key on the server.');
+    }
+    if (status.reason === 'no_key') {
+      throw new AppError(503, 'ai_no_key', 'Add your own DeepSeek, Gemini or GLM key in Settings to use AI.');
     }
     if (status.reason === 'limit_reached') {
       throw new AppError(
@@ -212,12 +287,17 @@ export class AiService {
     if (this.recent.length >= MAX_PER_MINUTE) {
       throw new AppError(429, 'ai_rate_limited', 'Too many AI requests in the last minute. Try again shortly.', undefined, 60);
     }
+    const gate = this.options.gate;
+    if (gate && !gate.tryEnter()) {
+      throw new AppError(503, 'ai_server_busy', 'The server is answering many AI requests right now. Try again in a minute.', undefined, 30);
+    }
     this.recent.push(now);
     this.busy = true;
     try {
       return await work(now + QUESTION_BUDGET_MS);
     } finally {
       this.busy = false;
+      gate?.leave();
     }
   }
 
@@ -331,7 +411,7 @@ export class AiService {
     options: { tools: ToolDefinition[]; jsonOutput: boolean },
   ): Promise<ChatResult> {
     // Checked before every request, so a long request cannot run far past the cap.
-    if (this.ledger.monthSpentUsd() >= this.options.config.monthlyLimitUsd) {
+    if (this.ledger.monthSpentUsd() >= this.monthlyLimitUsd()) {
       throw new AppError(429, 'ai_limit_reached', "This month's AI spending limit was reached while answering.");
     }
     const remainingMs = budget.deadlineMs - this.clock.nowMs();

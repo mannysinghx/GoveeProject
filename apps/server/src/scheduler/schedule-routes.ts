@@ -9,7 +9,7 @@ import {
   schedulePreviewRequestSchema,
   scheduleUpdateSchema,
 } from '@glm/shared';
-import { accountOf } from '../app/request-account.js';
+import { accountOf, assertRoomFor } from '../app/request-account.js';
 import { parseInput } from '../shared/validation.js';
 
 const limitQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(500).default(50) });
@@ -43,6 +43,7 @@ export function registerScheduleRoutes(api: FastifyInstance): void {
   api.post('/schedules', async (request, reply) => {
     const { schedules } = accountOf(request);
     const body = parseInput(scheduleCreateSchema, request.body);
+    assertRoomFor(request, 'schedules');
     return reply.status(201).send(schedules.create(body));
   });
 

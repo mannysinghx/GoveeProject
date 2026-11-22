@@ -120,7 +120,7 @@ export function parseRateLimitInfo(headers: Headers): RateLimitInfo | null {
 
 function categoryForCode(status: number): { category: TransportError['category']; message: string } {
   if (status === 401 || status === 403) {
-    return { category: 'auth', message: 'Govee rejected the API key. Check GOVEE_API_KEY on the server.' };
+    return { category: 'auth', message: 'Govee rejected the API key. Check it in Settings, under Govee API key.' };
   }
   if (status === 429) {
     return { category: 'rate_limited', message: 'Govee rate limit reached. The app will slow down and retry.' };
@@ -248,7 +248,7 @@ export class GoveeCloudTransport implements LightTransport {
     if (!apiKey) {
       throw new TransportError(
         'not_configured',
-        'No Govee API key is configured. Set GOVEE_API_KEY on the server and restart.',
+        'No Govee API key is connected. Connect one in Settings, under Govee API key.',
       );
     }
 

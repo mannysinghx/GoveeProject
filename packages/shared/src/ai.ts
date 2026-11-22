@@ -53,8 +53,11 @@ export interface AiProviderStatusDto {
 export interface AiStatusDto {
   /** True when AI features can be used right now. */
   enabled: boolean;
-  /** Why not, when they cannot. */
-  reason: 'disabled' | 'no_providers' | 'limit_reached' | null;
+  /**
+   * Why not, when they cannot. "no_providers" is the owner's: no key on the server. "no_key" is
+   * everyone else's: they have not added a key of their own.
+   */
+  reason: 'disabled' | 'no_providers' | 'no_key' | 'limit_reached' | null;
   providers: AiProviderStatusDto[];
   monthSpentUsd: number;
   monthlyLimitUsd: number;

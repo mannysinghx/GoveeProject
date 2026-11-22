@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import type { AiProviderId } from '@glm/shared';
 import type { CredentialKeys } from '../config/env.js';
 import type { Db } from '../database/database.js';
 import type { Clock } from '../shared/clock.js';
@@ -12,8 +13,16 @@ import { AppError } from '../shared/errors.js';
  * with both the Railway variables and the volume, or code running inside the live process.
  */
 
-export type CredentialKind = 'govee';
+/** A Govee key, or a person's own key for one AI provider. */
+export type CredentialKind = 'govee' | `ai:${AiProviderId}`;
 export type CredentialStatus = 'active' | 'rejected' | 'needs_reentry';
+
+export interface CredentialInfo {
+  kind: CredentialKind;
+  status: CredentialStatus;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface CredentialRow {
   user_id: number;
@@ -53,8 +62,12 @@ export class CredentialStore {
     return crypto.createHmac('sha256', this.fingerprintKey).update(`${kind}:${secret}`).digest('hex');
   }
 
-  /** Stores or replaces a user's secret of this kind. One secret can belong to one user only. */
-  put(userId: number, kind: CredentialKind, secret: string): void {
+  /**
+   * Stores or replaces a user's secret of this kind. One secret can belong to one user only.
+   * `identity` is what makes two secrets the same, when the stored text holds more than the key
+   * itself, such as an AI key stored with its model.
+   */
+  put(userId: number, kind: CredentialKind, secret: string, identity: string = secret): void {
     if (!this.keys) throw new AppError(503, 'credentials_unavailable', 'Keys cannot be stored on this server yet.');
     const version = this.keys.current;
     const iv = crypto.randomBytes(12);
@@ -62,7 +75,7 @@ export class CredentialStore {
     cipher.setAAD(additionalData(userId, kind));
     const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
-    const fingerprint = this.fingerprint(kind, secret);
+    const fingerprint = this.fingerprint(kind, identity);
     const now = this.clock.nowIso();
 
     const owner = this.db.prepare('SELECT user_id FROM credentials WHERE kind = ? AND fingerprint = ?').get(kind, fingerprint) as
@@ -111,5 +124,13 @@ export class CredentialStore {
 
   remove(userId: number, kind: CredentialKind): void {
     this.db.prepare('DELETE FROM credentials WHERE user_id = ? AND kind = ?').run(userId, kind);
+  }
+
+  /** What a user has connected, without decrypting anything. */
+  list(userId: number): CredentialInfo[] {
+    const rows = this.db
+      .prepare('SELECT kind, status, created_at, updated_at FROM credentials WHERE user_id = ? ORDER BY kind')
+      .all(userId) as { kind: CredentialKind; status: CredentialStatus; created_at: string; updated_at: string }[];
+    return rows.map((row) => ({ kind: row.kind, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at }));
   }
 }

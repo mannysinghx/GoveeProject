@@ -12,6 +12,7 @@ import Fastify, {
   type FastifyRequest,
 } from 'fastify';
 import type { ApiErrorBody } from '@glm/shared';
+import { registerAccountRoutes } from '../account/account-routes.js';
 import { registerActivityRoutes } from '../activity/activity-routes.js';
 import { registerAiRoutes } from '../ai/ai-routes.js';
 import { registerAdminRoutes } from '../auth/admin-routes.js';
@@ -190,6 +191,11 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
         if (!request.account) {
           throw new AppError(503, 'account_unavailable', 'Your account is not available right now. Try again in a minute.');
         }
+        // One member cannot hog the server. The owner has no limit, as before.
+        if (request.session.role === 'member') {
+          const wait = platform.requestRate.hit(request.session.userId, platform.clock.nowMs());
+          if (wait > 0) throw new AppError(429, 'too_many_requests', 'Too many requests. Slow down and try again shortly.', undefined, wait);
+        }
         if (MUTATING_METHODS.has(request.method)) {
           const header = request.headers['x-csrf-token'];
           if (typeof header !== 'string' || !constantTimeEqual(header, request.session.csrfToken)) {
@@ -210,6 +216,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
       registerAiRoutes(api);
       registerNotificationRoutes(api, platform);
       registerAdminRoutes(api, platform);
+      registerAccountRoutes(api, platform);
     },
     { prefix: '/api/v1' },
   );

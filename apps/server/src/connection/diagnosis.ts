@@ -29,7 +29,7 @@ export function diagnose(devices: DeviceHealthDto[], global: Set<IncidentKind>):
       severity: 'problem',
       title: 'No Govee API key is set',
       explanation: 'Without a key, the app cannot reach Govee, so it cannot check or control any light.',
-      steps: ['Set GOVEE_API_KEY in the server settings, then restart the app.'],
+      steps: ['Connect your Govee API key in Settings, under Govee API key.'],
     });
     return advice;
   }
@@ -40,7 +40,7 @@ export function diagnose(devices: DeviceHealthDto[], global: Set<IncidentKind>):
       title: 'Govee rejected the API key',
       explanation: 'Every request is being refused, so nothing can be checked or controlled. This is not a problem with your lights.',
       steps: [
-        'Check GOVEE_API_KEY in the server settings for typos or extra spaces.',
+        'Check the key in Settings, under Govee API key, for typos or extra spaces, and connect it again.',
         'If you recently applied for a new key in the Govee Home app, use the newest one.',
       ],
     });

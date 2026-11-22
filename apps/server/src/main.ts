@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   );
 
   if (!owner.transport.isConfigured()) {
-    logger.warn('GOVEE_API_KEY is not set. The app will start, but it cannot reach Govee until the key is set.');
+    logger.warn("The owner has no Govee key yet. Set GOVEE_API_KEY, or connect one in the app's Settings. The app starts anyway.");
   }
   if (config.govee.usingLocalTestEndpoint) {
     logger.warn({ baseUrl: config.govee.baseUrl }, 'Using a local test endpoint instead of the official Govee API');

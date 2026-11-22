@@ -7,7 +7,7 @@ import {
   presetDraftApplySchema,
   presetUpdateSchema,
 } from '@glm/shared';
-import { accountOf } from '../app/request-account.js';
+import { accountOf, assertRoomFor } from '../app/request-account.js';
 import { parseInput } from '../shared/validation.js';
 
 export function registerPresetRoutes(api: FastifyInstance): void {
@@ -22,6 +22,7 @@ export function registerPresetRoutes(api: FastifyInstance): void {
   api.post('/presets', async (request, reply) => {
     const { presets } = accountOf(request);
     const body = parseInput(presetCreateSchema, request.body);
+    assertRoomFor(request, 'presets');
     return reply.status(201).send(presets.create(body));
   });
 
@@ -53,6 +54,7 @@ export function registerPresetRoutes(api: FastifyInstance): void {
   api.post('/presets/:id/duplicate', async (request, reply) => {
     const { presets } = accountOf(request);
     const { id } = parseInput(idParamSchema, request.params);
+    assertRoomFor(request, 'presets');
     return reply.status(201).send(presets.duplicate(id));
   });
 

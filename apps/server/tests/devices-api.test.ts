@@ -103,7 +103,7 @@ describe('devices API', () => {
       const response = await client.post('/api/v1/devices/discover');
       expect(response.statusCode).toBe(502);
       expect(response.json().error.code).toBe('govee_auth');
-      expect(response.json().error.message).toContain('GOVEE_API_KEY');
+      expect(response.json().error.message).toContain('Govee rejected the API key. Check it in Settings');
     });
 
     it('reports a missing key without calling Govee', async () => {

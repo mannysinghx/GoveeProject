@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { groupActionRequestSchema, groupCreateSchema, groupUpdateSchema, idParamSchema } from '@glm/shared';
-import { accountOf } from '../app/request-account.js';
+import { accountOf, assertRoomFor } from '../app/request-account.js';
 import { parseInput } from '../shared/validation.js';
 
 export function registerGroupRoutes(api: FastifyInstance): void {
@@ -9,6 +9,7 @@ export function registerGroupRoutes(api: FastifyInstance): void {
   api.post('/groups', async (request, reply) => {
     const { groups } = accountOf(request);
     const body = parseInput(groupCreateSchema, request.body);
+    assertRoomFor(request, 'groups');
     return reply.status(201).send(groups.create(body));
   });
 

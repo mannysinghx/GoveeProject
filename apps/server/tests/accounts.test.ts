@@ -105,6 +105,19 @@ const ROUTES: [method: string, url: string, kind: 'public' | 'signed-in' | 'owne
   ['DELETE', '/api/v1/notifications/push/:id', 'signed-in'],
   ['POST', '/api/v1/notifications/:id/respond', 'signed-in'],
   ['POST', '/api/v1/notification-actions', 'public'],
+  // The person's own account: keys, export, delete. None takes a user id from the request.
+  ['GET', '/api/v1/account/govee', 'signed-in'],
+  ['PUT', '/api/v1/account/govee', 'signed-in'],
+  ['DELETE', '/api/v1/account/govee', 'signed-in'],
+  ['GET', '/api/v1/account/ai', 'signed-in'],
+  ['PATCH', '/api/v1/account/ai', 'signed-in'],
+  ['PUT', '/api/v1/account/ai/keys/:provider', 'signed-in'],
+  ['DELETE', '/api/v1/account/ai/keys/:provider', 'signed-in'],
+  ['POST', '/api/v1/account/export', 'signed-in'],
+  ['POST', '/api/v1/account/delete', 'signed-in'],
+  // The owner's list of accounts
+  ['GET', '/api/v1/admin/accounts', 'owner'],
+  ['PATCH', '/api/v1/admin/accounts/:id', 'owner'],
 ];
 
 describe('route census', () => {
@@ -121,9 +134,9 @@ describe('route census', () => {
       .sort();
     const expected = ROUTES.map(([method, url, kind]) => `${method} ${url} ${kind}`).sort();
     expect(actual).toEqual(expected);
-    expect(ROUTES).toHaveLength(85);
+    expect(ROUTES).toHaveLength(96);
     expect(ROUTES.filter(([, , kind]) => kind === 'public')).toHaveLength(12);
-    expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(2);
+    expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(4);
   });
 });
 
