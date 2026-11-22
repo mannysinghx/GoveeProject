@@ -107,6 +107,8 @@ After you create the account, the app takes you to **Connect to Govee**. Choose 
 
 **Daylight saving.** A time that does not exist because clocks went forward runs later by the size of the change, so 02:30 runs at 03:30. A time that happens twice because clocks went back runs once, the first time. The schedule screen tells you when this applies.
 
+**Look and feel.** The screen is lit by your lights: the glow behind the app takes the colour your lights are showing, when Govee has reported one. The theme is **Auto** (follows your device), **Day** or **Night**: use the sun and moon button at the top, **More** on a phone, or **Settings**, **Appearance**, where the glow can also be set to steady warm or switched off. Both choices stay on that device. Press **Ctrl+K** (**Command+K** on a Mac), or **/**, to jump to a page, apply a scene or run an action from the keyboard; on a phone, use the search button at the top. The previous interface is saved: see [docs/ui-snapshots](docs/ui-snapshots/README.md), and [docs/ui-design.md](docs/ui-design.md) for how the new one is built.
+
 ## Why some features may be missing
 
 Govee lists the H805C as supported, but that does not guarantee every feature is available through the public API. This app shows only what your device reports, and does not use unofficial APIs.

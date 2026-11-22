@@ -13,11 +13,11 @@ import { ApplyPresetDialog } from '../features/presets/ApplyPresetDialog';
 import { useDevices, useNotifications } from '../lib/queries';
 import { dockItems, moreItems, NAV, type NavItem } from './nav';
 
-function UnreadCount({ count, className = '' }: { count: number; className?: string }) {
+function UnreadCount({ count, className = '', compact = false }: { count: number; className?: string; compact?: boolean }) {
   if (count === 0) return null;
   return (
     <span
-      className={`min-w-5 rounded-full bg-accent px-1.5 text-center text-xs font-semibold text-on-accent tabular-nums ${className}`}
+      className={`min-w-5 rounded-full bg-accent text-center font-semibold text-on-accent tabular-nums ${compact ? 'px-1 text-[11px]' : 'px-1.5 text-xs'} ${className}`}
     >
       {count > 99 ? '99+' : count}
     </span>
@@ -261,7 +261,7 @@ export function AppShell({ username, children }: { username: string; children: R
           >
             <Bell className="size-5" aria-hidden />
             {unread > 0 ? (
-              <UnreadCount count={unread} className="absolute -top-1 -right-1 !min-w-5 !px-1 text-[11px]" />
+              <UnreadCount count={unread} compact className="absolute -top-1 -right-1" />
             ) : null}
           </NavLink>
         </div>
