@@ -1,26 +1,28 @@
 import { buildApp } from './app/build-app.js';
-import { createContext } from './app/context.js';
+import { createPlatform } from './app/context.js';
 import { ConfigError, isLoopbackHost, loadConfig, loadDotEnv } from './config/env.js';
 
 async function main(): Promise<void> {
   loadDotEnv();
   const config = loadConfig();
-  const ctx = createContext(config);
-  const { logger, queue, scheduler, maintenance, devices, db, connection, builtins, notifications } = ctx;
+  const platform = createPlatform(config);
+  const { logger, accounts } = platform;
+  const owner = accounts.sole();
 
   logger.info(
     {
-      version: ctx.version,
+      version: platform.version,
       node: process.version,
       env: config.env,
-      goveeKeyConfigured: ctx.transport.isConfigured(),
+      goveeKeyConfigured: owner.transport.isConfigured(),
       aiProviders: config.ai.enabled ? config.ai.providers.map((p) => `${p.id}:${p.model}`) : 'disabled',
       database: config.databasePath,
+      accounts: accounts.all().length,
     },
     'Starting Govee Light Manager',
   );
 
-  if (!ctx.transport.isConfigured()) {
+  if (!owner.transport.isConfigured()) {
     logger.warn('GOVEE_API_KEY is not set. The app will start, but it cannot reach Govee until the key is set.');
   }
   if (config.govee.usingLocalTestEndpoint) {
@@ -31,25 +33,21 @@ async function main(): Promise<void> {
     logger.warn('Listening beyond loopback with no ALLOWED_HOSTS, so any Host header is accepted. See docs/security.md.');
   }
 
-  queue.recoverInterrupted();
+  accounts.recoverInterrupted();
 
-  const app = await buildApp(ctx);
+  const app = await buildApp(platform);
   await app.listen({ host: config.host, port: config.port });
 
-  if (ctx.generatedSetupCode && ctx.auth.setupRequired()) {
+  if (platform.generatedSetupCode && platform.auth.setupRequired()) {
     // A one-time value for this process only, needed by whoever is setting up the app.
     // It stops working the moment an owner exists, and it is regenerated on restart.
     logger.warn(
-      { setupCodeForFirstRun: ctx.generatedSetupCode },
+      { setupCodeForFirstRun: platform.generatedSetupCode },
       'First-run setup may be reachable from other computers. Enter this code on the setup screen.',
     );
   }
 
-  scheduler.start();
-  maintenance.start();
-  connection.start();
-  builtins.start();
-  notifications.start();
+  accounts.startAll();
 
   // Background work handles its own errors. Anything reaching here is a bug, so restart clean.
   process.on('unhandledRejection', (reason) => {
@@ -68,15 +66,10 @@ async function main(): Promise<void> {
     }, 15_000);
     forced.unref();
     try {
-      maintenance.stop();
-      await connection.stop();
-      await builtins.stop();
-      await notifications.stop();
-      devices.stop();
+      // The same order as always, for each account, with accounts stopping side by side.
+      await accounts.stopBackground();
       await app.close();
-      await queue.stop();
-      await scheduler.stop();
-      db.close();
+      await accounts.stopCore();
       logger.info('Shutdown complete');
       process.exit(0);
     } catch (error) {

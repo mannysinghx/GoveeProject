@@ -22,6 +22,8 @@ const THROTTLE = {
 
 export interface SessionInfo {
   tokenHash: string;
+  /** Whose session this is. Requests are served from this user's account. */
+  userId: number;
   username: string;
   csrfToken: string;
   expiresAt: string;
@@ -146,7 +148,7 @@ export class AuthService {
         'INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at, created_at) VALUES (?, 1, ?, ?, ?)',
       )
       .run(tokenHash, csrfToken, expiresAt, new Date(now).toISOString());
-    return { token, session: { tokenHash, username, csrfToken, expiresAt } };
+    return { token, session: { tokenHash, userId: 1, username, csrfToken, expiresAt } };
   }
 
   validateSession(token: string | undefined): SessionInfo | null {
@@ -154,19 +156,25 @@ export class AuthService {
     const tokenHash = hashToken(token);
     const row = this.db
       .prepare(
-        `SELECT s.token_hash, s.csrf_token, s.expires_at, u.username
+        `SELECT s.token_hash, s.user_id, s.csrf_token, s.expires_at, u.username
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = ?`,
       )
       .get(tokenHash) as
-      | { token_hash: string; csrf_token: string; expires_at: string; username: string }
+      | { token_hash: string; user_id: number; csrf_token: string; expires_at: string; username: string }
       | undefined;
     if (!row) return null;
     if (Date.parse(row.expires_at) <= this.clock.nowMs()) {
       this.db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
       return null;
     }
-    return { tokenHash: row.token_hash, username: row.username, csrfToken: row.csrf_token, expiresAt: row.expires_at };
+    return {
+      tokenHash: row.token_hash,
+      userId: row.user_id,
+      username: row.username,
+      csrfToken: row.csrf_token,
+      expiresAt: row.expires_at,
+    };
   }
 
   logout(tokenHash: string): void {

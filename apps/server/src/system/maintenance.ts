@@ -1,6 +1,5 @@
 import type { Logger } from 'pino';
 import type { ActivityService } from '../activity/activity-service.js';
-import type { AuthService } from '../auth/auth-service.js';
 import type { CommandStore } from '../commands/command-store.js';
 import type { Db } from '../database/database.js';
 import type { DeviceService } from '../devices/device-service.js';
@@ -15,7 +14,8 @@ export class Maintenance {
 
   constructor(
     private readonly db: Db,
-    private readonly auth: AuthService,
+    /** Removes expired sign-in sessions. Only the account that holds sessions does anything. */
+    private readonly pruneSessions: () => number,
     private readonly activity: ActivityService,
     private readonly commands: CommandStore,
     private readonly devices: DeviceService,
@@ -57,7 +57,7 @@ export class Maintenance {
 
   prune(): void {
     const cutoff = new Date(this.clock.nowMs() - this.config.historyRetentionDays * 24 * HOUR_MS).toISOString();
-    this.auth.pruneExpiredSessions();
+    this.pruneSessions();
     const events = this.activity.prune(cutoff);
     const commands = this.commands.prune(cutoff);
     this.db.prepare(`DELETE FROM execution_runs WHERE started_at < ? AND status != 'running'`).run(cutoff);

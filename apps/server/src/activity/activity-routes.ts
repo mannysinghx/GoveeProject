@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { activityQuerySchema } from '@glm/shared';
-import type { AppContext } from '../app/context.js';
+import { accountOf } from '../app/request-account.js';
 import { parseInput } from '../shared/validation.js';
 
-export function registerActivityRoutes(api: FastifyInstance, ctx: AppContext): void {
+export function registerActivityRoutes(api: FastifyInstance): void {
   api.get('/activity', async (request) => {
-    return ctx.activity.list(parseInput(activityQuerySchema, request.query));
+    return accountOf(request).activity.list(parseInput(activityQuerySchema, request.query));
   });
 }

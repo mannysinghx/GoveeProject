@@ -26,11 +26,17 @@ import { registerPresetRoutes } from '../presets/preset-routes.js';
 import { registerScheduleRoutes } from '../scheduler/schedule-routes.js';
 import { AppError } from '../shared/errors.js';
 import { registerSystemRoutes } from '../system/system-routes.js';
-import type { AppContext } from './context.js';
+import type { AccountContext, PlatformContext } from './context.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
     session: SessionInfo | null;
+    /** The signed-in person's account. Read it with accountOf(request). */
+    account: AccountContext | null;
+  }
+  interface FastifyInstance {
+    /** Every route registered, as the route census test checks them. */
+    routeTable: RouteEntry[];
   }
   interface FastifyContextConfig {
     /** Routes without this flag require a signed-in session. Secure by default. */
@@ -40,13 +46,19 @@ declare module 'fastify' {
   }
 }
 
+export interface RouteEntry {
+  method: string;
+  url: string;
+  public: boolean;
+}
+
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const SAFE_REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** Loopback binds accept only loopback host names, which blocks DNS-rebinding attacks. */
-function allowedHostSet(ctx: AppContext): Set<string> | null {
-  if (ctx.config.allowedHosts) return new Set(ctx.config.allowedHosts);
-  if (isLoopbackHost(ctx.config.host)) return new Set(['localhost', '127.0.0.1', '[::1]']);
+function allowedHostSet(platform: PlatformContext): Set<string> | null {
+  if (platform.config.allowedHosts) return new Set(platform.config.allowedHosts);
+  if (isLoopbackHost(platform.config.host)) return new Set(['localhost', '127.0.0.1', '[::1]']);
   return null;
 }
 
@@ -70,8 +82,8 @@ function errorBody(request: FastifyRequest, code: string, message: string, detai
   return { error: { code, message, requestId: request.id, ...(details === undefined ? {} : { details }) } };
 }
 
-export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
-  const { config, logger } = ctx;
+export async function buildApp(platform: PlatformContext): Promise<FastifyInstance> {
+  const { config, logger } = platform;
 
   const app = Fastify({
     loggerInstance: logger as unknown as FastifyBaseLogger,
@@ -86,8 +98,19 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
   });
 
   app.decorateRequest('session', null);
+  app.decorateRequest('account', null);
 
-  const allowedHosts = allowedHostSet(ctx);
+  const routeTable: RouteEntry[] = [];
+  app.decorate('routeTable', routeTable);
+  app.addHook('onRoute', (route) => {
+    const methods = Array.isArray(route.method) ? route.method : [route.method];
+    for (const method of methods) {
+      if (method === 'HEAD') continue;
+      routeTable.push({ method, url: route.url, public: route.config?.public === true });
+    }
+  });
+
+  const allowedHosts = allowedHostSet(platform);
   app.addHook('onRequest', async (request, reply) => {
     reply.header('x-request-id', request.id);
     if (request.routeOptions.config.anyHost) return;
@@ -147,10 +170,15 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
       // Default deny. This hook is attached to the routes in this plugin rather than
       // matching the URL text, so no spelling of a path (such as /%61pi/) can skip it.
       api.addHook('onRequest', async (request) => {
-        request.session = ctx.auth.validateSession(request.cookies[SESSION_COOKIE]);
+        request.session = platform.auth.validateSession(request.cookies[SESSION_COOKIE]);
+        // The one place a session becomes an account. Public routes get one too when signed in.
+        request.account = request.session ? platform.accounts.forUser(request.session.userId) : null;
         if (request.routeOptions.config.public) return;
         if (!request.session) {
           throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
+        }
+        if (!request.account) {
+          throw new AppError(503, 'account_unavailable', 'Your account is not available right now. Try again in a minute.');
         }
         if (MUTATING_METHODS.has(request.method)) {
           const header = request.headers['x-csrf-token'];
@@ -160,27 +188,28 @@ export async function buildApp(ctx: AppContext): Promise<FastifyInstance> {
         }
       });
 
-      registerAuthRoutes(api, ctx);
-      registerSystemRoutes(api, ctx);
-      registerDeviceRoutes(api, ctx);
-      registerGroupRoutes(api, ctx);
-      registerPresetRoutes(api, ctx);
-      registerScheduleRoutes(api, ctx);
-      registerActivityRoutes(api, ctx);
-      registerConnectionRoutes(api, ctx);
-      registerAiRoutes(api, ctx);
-      registerNotificationRoutes(api, ctx);
+      // Each is given only the platform. Account services come from accountOf(request).
+      registerAuthRoutes(api, platform);
+      registerSystemRoutes(api, platform);
+      registerDeviceRoutes(api);
+      registerGroupRoutes(api);
+      registerPresetRoutes(api);
+      registerScheduleRoutes(api);
+      registerActivityRoutes(api);
+      registerConnectionRoutes(api);
+      registerAiRoutes(api);
+      registerNotificationRoutes(api, platform);
     },
     { prefix: '/api/v1' },
   );
 
-  await registerFrontend(app, ctx);
+  await registerFrontend(app, platform);
   return app;
 }
 
 /** Serves the built React app, so production runs on one origin with no CORS at all. */
-async function registerFrontend(app: FastifyInstance, ctx: AppContext): Promise<void> {
-  const root = ctx.config.webDistDir;
+async function registerFrontend(app: FastifyInstance, platform: PlatformContext): Promise<void> {
+  const root = platform.config.webDistDir;
   const indexPath = path.join(root, 'index.html');
   const hasFrontend = fs.existsSync(indexPath);
 
@@ -198,7 +227,7 @@ async function registerFrontend(app: FastifyInstance, ctx: AppContext): Promise<
   app.setNotFoundHandler((request, reply) => {
     if (isApiPath(request.url)) {
       // Signed-out callers cannot use this to find out which endpoints exist.
-      if (!ctx.auth.validateSession(request.cookies[SESSION_COOKIE])) {
+      if (!platform.auth.validateSession(request.cookies[SESSION_COOKIE])) {
         return reply.status(401).send(errorBody(request, 'unauthenticated', 'Sign in to continue.'));
       }
       return reply.status(404).send(errorBody(request, 'not_found', 'That endpoint does not exist.'));

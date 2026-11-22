@@ -29,18 +29,26 @@ import { PresetService } from '../presets/preset-service.js';
 import { ScheduleService } from '../scheduler/schedule-service.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import { systemClock, type Clock } from '../shared/clock.js';
-import { createLogger, createSecretScrubber, type Logger } from '../shared/logger.js';
+import { createLogger, SecretRegistry, type Logger } from '../shared/logger.js';
 import { Maintenance } from '../system/maintenance.js';
 import { SettingsService } from '../system/settings-service.js';
 import { SystemState } from '../system/system-state.js';
+import { AccountRegistry } from './accounts.js';
 
-export interface AppContext {
+/**
+ * One person's part of the app: their database, their Govee connection, and every service
+ * and background timer that works on their lights. Nothing in here is shared with another
+ * account. Routes never hold one of these: they look it up for each request, through
+ * `accountOf` in request-account.ts.
+ */
+export interface AccountContext {
+  /** The user this account belongs to. */
+  userId: number;
   config: AppConfig;
-  version: string;
-  startedAt: number;
   logger: Logger;
   clock: Clock;
   db: Db;
+  /** Hides every secret the process knows, including ones added after startup. */
   scrub: (text: string) => string;
   transport: LightTransport;
   limiter: GoveeRateLimiter;
@@ -48,9 +56,6 @@ export interface AppContext {
   system: SystemState;
   activity: ActivityService;
   settings: SettingsService;
-  auth: AuthService;
-  /** Set when setup needs a code and the code was generated rather than configured. */
-  generatedSetupCode: string | null;
   commands: CommandStore;
   queue: CommandQueue;
   scenes: SceneStore;
@@ -70,15 +75,43 @@ export interface AppContext {
   ai: AiService;
 }
 
+/**
+ * What exists once per process. It deliberately has no light, schedule or notification
+ * services, so a route given only this cannot reach anyone's data without asking for the
+ * signed-in person's account.
+ */
+export interface PlatformContext {
+  config: AppConfig;
+  version: string;
+  startedAt: number;
+  logger: Logger;
+  clock: Clock;
+  secrets: SecretRegistry;
+  /**
+   * Sign-in and sessions. For now these live in the owner's database file, as they always
+   * have. Phase 3 of docs/public-signup-plan.md moves them to a control database.
+   */
+  auth: AuthService;
+  /** Set when setup needs a code and the code was generated rather than configured. */
+  generatedSetupCode: string | null;
+  accounts: AccountRegistry;
+}
+
 export interface ContextOverrides {
   logger?: Logger;
   clock?: Clock;
+  /** The registry the logger scrubs with. Tests pass the one their logger was built with. */
+  secrets?: SecretRegistry;
+  /** These apply to the owner's account. */
   transport?: LightTransport;
   db?: Db;
   pushSender?: PushSender;
   /** Stands in for the AI providers in tests. */
   aiFetch?: typeof fetch;
 }
+
+/** The owner's account belongs to user 1, the only user the database allows today. */
+export const OWNER_USER_ID = 1;
 
 export function readVersion(): string {
   try {
@@ -104,32 +137,38 @@ function resolveSetupCode(config: AppConfig): { code: string | null; generated: 
   return { code: crypto.randomBytes(9).toString('base64url'), generated: true };
 }
 
-/** Every secret the app holds, so none can reach a log line or activity record. */
+/** Every secret the server's own configuration holds, so none can reach a log line or activity record. */
 export function configSecrets(config: AppConfig): (string | null)[] {
   return [config.govee.apiKey, config.setupToken, ...config.ai.providers.map((p) => p.apiKey)];
 }
 
-/** Wires every service together. Tests pass overrides for the clock and transport. */
-export function createContext(config: AppConfig, overrides: ContextOverrides = {}): AppContext {
-  const secrets = configSecrets(config);
-  const logger = overrides.logger ?? createLogger({ level: config.logLevel, secrets });
-  const clock = overrides.clock ?? systemClock;
-  const scrub = createSecretScrubber(secrets);
+interface AccountDeps {
+  userId: number;
+  logger: Logger;
+  clock: Clock;
+  secrets: SecretRegistry;
+  /** Removes expired sign-in sessions. Only the account that holds sessions does anything. */
+  pruneSessions: () => number;
+  db?: Db;
+  transport?: LightTransport;
+  pushSender?: PushSender;
+  aiFetch?: typeof fetch;
+}
 
-  const db = overrides.db ?? openDatabase(config.databasePath);
+/** Wires one account's services together, exactly as the single-account app always has. */
+export function createAccountContext(config: AppConfig, deps: AccountDeps): AccountContext {
+  const { userId, logger, clock } = deps;
+  const scrub = deps.secrets.scrub;
+
+  const db = deps.db ?? openDatabase(config.databasePath);
   runMigrations(db, config.migrationsDir, logger);
 
   const system = new SystemState(db, clock);
   const activity = new ActivityService(db, clock, scrub);
   const settings = new SettingsService(db, activity, clock);
-  const setup = resolveSetupCode(config);
-  const auth = new AuthService(db, activity, logger, clock, {
-    sessionTtlHours: config.sessionTtlHours,
-    setupCode: setup.code,
-  });
 
   const transport =
-    overrides.transport ??
+    deps.transport ??
     new GoveeCloudTransport({
       apiKey: config.govee.apiKey,
       baseUrl: config.govee.baseUrl,
@@ -176,7 +215,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     clock,
     config.scheduler,
   );
-  const maintenance = new Maintenance(db, auth, activity, commands, devices, system, logger, clock, {
+  const maintenance = new Maintenance(db, deps.pruneSessions, activity, commands, devices, system, logger, clock, {
     historyRetentionDays: config.historyRetentionDays,
     discoveryRefreshHours: config.discoveryRefreshHours,
     apiKeyConfigured: transport.isConfigured(),
@@ -205,7 +244,7 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     db,
     activity,
     () => settings.get(),
-    overrides.pushSender ?? webPushSender,
+    deps.pushSender ?? webPushSender,
     pushSubject,
     logger,
     clock,
@@ -237,13 +276,12 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     scrub,
     logger,
     clock,
-    { config: config.ai, drafts: { devices, groups, presets }, ...(overrides.aiFetch ? { fetchImpl: overrides.aiFetch } : {}) },
+    { config: config.ai, drafts: { devices, groups, presets }, ...(deps.aiFetch ? { fetchImpl: deps.aiFetch } : {}) },
   );
 
   return {
+    userId,
     config,
-    version: readVersion(),
-    startedAt: clock.nowMs(),
     logger,
     clock,
     db,
@@ -254,8 +292,6 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     system,
     activity,
     settings,
-    auth,
-    generatedSetupCode: setup.generated ? setup.code : null,
     commands,
     queue,
     scenes,
@@ -273,5 +309,51 @@ export function createContext(config: AppConfig, overrides: ContextOverrides = {
     dailyScheme,
     notifications,
     ai,
+  };
+}
+
+/**
+ * Builds the platform and the owner's account, which uses the existing database file at
+ * DATABASE_PATH, unchanged. Tests pass overrides for the clock, transport and database.
+ */
+export function createPlatform(config: AppConfig, overrides: ContextOverrides = {}): PlatformContext {
+  const secrets = overrides.secrets ?? new SecretRegistry();
+  for (const secret of configSecrets(config)) secrets.add(secret);
+  const logger = overrides.logger ?? createLogger({ level: config.logLevel, secrets });
+  const clock = overrides.clock ?? systemClock;
+  const setup = resolveSetupCode(config);
+
+  // Sessions sit in the owner's file for now, so the owner's maintenance prunes them. The
+  // service is created just after the account, because it records to the account's activity.
+  let auth: AuthService | null = null;
+  const owner = createAccountContext(config, {
+    userId: OWNER_USER_ID,
+    logger,
+    clock,
+    secrets,
+    pruneSessions: () => auth?.pruneExpiredSessions() ?? 0,
+    ...(overrides.db ? { db: overrides.db } : {}),
+    ...(overrides.transport ? { transport: overrides.transport } : {}),
+    ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
+    ...(overrides.aiFetch ? { aiFetch: overrides.aiFetch } : {}),
+  });
+  auth = new AuthService(owner.db, owner.activity, logger, clock, {
+    sessionTtlHours: config.sessionTtlHours,
+    setupCode: setup.code,
+  });
+
+  const accounts = new AccountRegistry();
+  accounts.add(owner);
+
+  return {
+    config,
+    version: readVersion(),
+    startedAt: clock.nowMs(),
+    logger,
+    clock,
+    secrets,
+    auth,
+    generatedSetupCode: setup.generated ? setup.code : null,
+    accounts,
   };
 }

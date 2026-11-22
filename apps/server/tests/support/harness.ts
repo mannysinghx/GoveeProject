@@ -2,10 +2,16 @@ import { Writable } from 'node:stream';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/app/build-app.js';
-import { configSecrets, createContext, type AppContext, type ContextOverrides } from '../../src/app/context.js';
+import {
+  configSecrets,
+  createPlatform,
+  type AccountContext,
+  type ContextOverrides,
+  type PlatformContext,
+} from '../../src/app/context.js';
 import { loadConfig, PROJECT_ROOT, type AppConfig } from '../../src/config/env.js';
 import type { Clock } from '../../src/shared/clock.js';
-import { createLogger } from '../../src/shared/logger.js';
+import { createLogger, SecretRegistry } from '../../src/shared/logger.js';
 import { MockGovee, TEST_API_KEY } from './mock-govee.js';
 
 /** Time only moves when told to. sleep() advances it, so nothing waits on real time. */
@@ -55,8 +61,15 @@ export function testConfig(overrides: NodeJS.ProcessEnv = {}): AppConfig {
   });
 }
 
+/**
+ * The owner's account, plus the platform's sign-in pieces, as one object. Tests written before
+ * the platform and account split read everything from here, and still can.
+ */
+export type TestContext = AccountContext & Pick<PlatformContext, 'auth' | 'generatedSetupCode' | 'version' | 'startedAt'>;
+
 export interface Harness {
-  ctx: AppContext;
+  ctx: TestContext;
+  platform: PlatformContext;
   app: FastifyInstance;
   mock: MockGovee;
   clock: FakeClock;
@@ -83,17 +96,23 @@ export async function createHarness(
     ...options.env,
   });
   const clock = new FakeClock();
-  const logger = createLogger({
-    level: config.logLevel,
-    secrets: configSecrets(config),
-    destination,
-  });
-  const ctx = createContext(config, { clock, logger, ...options.overrides });
-  const app = await buildApp(ctx);
+  const secrets = new SecretRegistry(configSecrets(config));
+  const logger = createLogger({ level: config.logLevel, secrets, destination });
+  const platform = createPlatform(config, { clock, logger, secrets, ...options.overrides });
+  const owner = platform.accounts.sole();
+  const ctx: TestContext = {
+    ...owner,
+    auth: platform.auth,
+    generatedSetupCode: platform.generatedSetupCode,
+    version: platform.version,
+    startedAt: platform.startedAt,
+  };
+  const app = await buildApp(platform);
   await app.ready();
 
   return {
     ctx,
+    platform,
     app,
     mock,
     clock,
