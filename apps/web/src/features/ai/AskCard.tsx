@@ -36,7 +36,7 @@ export function AnswerText({ answer }: { answer: AiAnswerDto }) {
           key={`${ref.ref}-${index}`}
           to={ref.href}
           title={ref.label}
-          className="mx-0.5 inline-block max-w-56 truncate rounded bg-ink-800 px-1.5 align-baseline text-xs text-amber-soft hover:underline"
+          className="mx-0.5 inline-block max-w-56 truncate rounded bg-raised px-1.5 align-baseline text-xs text-accent-text hover:underline"
         >
           {ref.label}
         </Link>,
@@ -45,12 +45,12 @@ export function AnswerText({ answer }: { answer: AiAnswerDto }) {
     last = index + match[0].length;
   }
   if (last < answer.answer.length) parts.push(answer.answer.slice(last));
-  return <p className="whitespace-pre-line text-sm leading-relaxed text-ink-100">{parts}</p>;
+  return <p className="whitespace-pre-line text-sm leading-relaxed text-fg">{parts}</p>;
 }
 
 function AnswerMeta({ answer, provider }: { answer: AiAnswerDto; provider: string }) {
   return (
-    <p className="mt-2 text-xs text-ink-400">
+    <p className="mt-2 text-xs text-fg-4">
       Answered by {provider} ({answer.model}) · {answer.costUsd > 0 ? `about $${answer.costUsd.toFixed(4)}` : 'no charge'} ·{' '}
       {timeAgo(answer.createdAt)}
     </p>
@@ -113,7 +113,7 @@ export function AskCard() {
               <button
                 key={s}
                 type="button"
-                className="rounded-full border border-ink-700 px-3 py-1 text-xs text-ink-300 hover:border-ink-500 hover:text-ink-100"
+                className="rounded-full border border-line px-3 py-1 text-xs text-fg-3 hover:border-fg-4 hover:text-fg"
                 onClick={() => submit(undefined, s)}
                 disabled={ask.isPending}
               >
@@ -125,15 +125,15 @@ export function AskCard() {
       )}
 
       <div aria-live="polite">
-        {ask.isPending ? <p className="mt-3 text-sm text-ink-300">Looking through the records…</p> : null}
+        {ask.isPending ? <p className="mt-3 text-sm text-fg-3">Looking through the records…</p> : null}
         {ask.isError ? (
           <div className="mt-3">
             <ErrorNotice error={ask.error} title="No answer this time" />
           </div>
         ) : null}
         {latest ? (
-          <div className="mt-4 rounded-lg bg-ink-850 p-3">
-            <p className="mb-1 text-xs font-medium text-ink-300">{latest.question}</p>
+          <div className="mt-4 rounded-lg bg-inset p-3">
+            <p className="mb-1 text-xs font-medium text-fg-3">{latest.question}</p>
             <AnswerText answer={latest} />
             <AnswerMeta answer={latest} provider={providerLabel(latest.provider)} />
           </div>
@@ -142,11 +142,11 @@ export function AskCard() {
 
       {earlier.length > 0 ? (
         <details className="mt-4">
-          <summary className="cursor-pointer text-sm text-ink-300">Earlier questions</summary>
+          <summary className="cursor-pointer text-sm text-fg-3">Earlier questions</summary>
           <ul className="mt-2 space-y-3">
             {earlier.map((q) => (
-              <li key={q.id} className="rounded-lg bg-ink-850 p-3">
-                <p className="mb-1 text-xs font-medium text-ink-300">{q.question}</p>
+              <li key={q.id} className="rounded-lg bg-inset p-3">
+                <p className="mb-1 text-xs font-medium text-fg-3">{q.question}</p>
                 <AnswerText answer={q} />
                 <AnswerMeta answer={q} provider={providerLabel(q.provider)} />
               </li>

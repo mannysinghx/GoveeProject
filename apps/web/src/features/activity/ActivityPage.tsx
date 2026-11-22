@@ -103,14 +103,14 @@ function EventRow({ event }: { event: ActivityEventDto }) {
     <li className="py-3 first:pt-0">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone={OUTCOME_TONE[event.outcome]}>{OUTCOME_LABEL[event.outcome]}</Badge>
-        <span className="text-xs text-ink-400">{event.eventType.replace('_', ' ')}</span>
-        {event.deviceName ? <span className="text-xs text-ink-300">{event.deviceName}</span> : null}
-        <time className="ml-auto text-xs text-ink-400" dateTime={event.createdAt} title={dateTime(event.createdAt)}>
+        <span className="text-xs text-fg-4">{event.eventType.replace('_', ' ')}</span>
+        {event.deviceName ? <span className="text-xs text-fg-3">{event.deviceName}</span> : null}
+        <time className="ml-auto text-xs text-fg-4" dateTime={event.createdAt} title={dateTime(event.createdAt)}>
           {dateTime(event.createdAt)}
         </time>
       </div>
-      <p className="mt-1 text-sm break-words text-ink-200">{event.message}</p>
-      {event.correlationId ? <p className="mt-0.5 font-mono text-xs break-all text-ink-400">Ref: {event.correlationId}</p> : null}
+      <p className="mt-1 text-sm break-words text-fg-2">{event.message}</p>
+      {event.correlationId ? <p className="mt-0.5 font-mono text-xs break-all text-fg-4">Ref: {event.correlationId}</p> : null}
     </li>
   );
 }
@@ -205,9 +205,9 @@ export function ActivityPage() {
 
           {activity.isPending ? <Loading label="Loading activity" /> : null}
           {activity.isError ? <ErrorNotice error={activity.error} /> : null}
-          {activity.data?.events.length === 0 ? <p className="text-sm text-ink-300">Nothing matches these filters.</p> : null}
+          {activity.data?.events.length === 0 ? <p className="text-sm text-fg-3">Nothing matches these filters.</p> : null}
           {activity.data && activity.data.events.length > 0 ? (
-            <ul className="divide-y divide-ink-700/60">
+            <ul className="divide-y divide-line">
               {activity.data.events.map((event) => (
                 <EventRow key={event.id} event={event} />
               ))}

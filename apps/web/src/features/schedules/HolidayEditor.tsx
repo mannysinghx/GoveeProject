@@ -95,14 +95,14 @@ export function HolidayEditor({ holiday, onClose }: { holiday: HolidayDto; onClo
   return (
     <Dialog title={`Edit ${holiday.name}`} open onClose={onClose}>
       <form className="space-y-4" onSubmit={submit}>
-        <p className="text-sm text-ink-300">
+        <p className="text-sm text-fg-3">
           These changes apply every year, in {holiday.timeZone}. The date is worked out for each year.
         </p>
 
         <fieldset className="space-y-2">
-          <legend className="mb-1 text-sm font-medium text-ink-200">What it shows, and when</legend>
+          <legend className="mb-1 text-sm font-medium text-fg-2">What it shows, and when</legend>
           {steps.map((step, index) => (
-            <div key={step.id} className="flex flex-wrap items-end gap-2 rounded-lg bg-ink-850 p-2.5">
+            <div key={step.id} className="flex flex-wrap items-end gap-2 rounded-lg bg-inset p-2.5">
               <div className="w-32">
                 <Field label={index === 0 ? 'Starts at' : `Step ${index + 1} at`}>
                   {(props) => (
@@ -133,10 +133,10 @@ export function HolidayEditor({ holiday, onClose }: { holiday: HolidayDto; onClo
           <Button size="sm" icon={<Plus className="size-4" aria-hidden />} disabled={steps.length >= 12} onClick={addStep}>
             Add a step
           </Button>
-          <p className="text-xs text-ink-400">Add steps to change what the lights show during the evening. They run in time order.</p>
+          <p className="text-xs text-fg-4">Add steps to change what the lights show during the evening. They run in time order.</p>
         </fieldset>
 
-        <div className="rounded-lg bg-ink-850 p-2.5">
+        <div className="rounded-lg bg-inset p-2.5">
           <label className="flex min-h-9 items-center gap-2 text-sm">
             <input type="checkbox" className="size-4" checked={hasEnd} onChange={(e) => setHasEnd(e.target.checked)} />
             Turn the lights off afterward
@@ -148,7 +148,7 @@ export function HolidayEditor({ holiday, onClose }: { holiday: HolidayDto; onClo
               </Field>
             </div>
           ) : (
-            <p className="text-xs text-ink-400">The lights stay on until something else turns them off, such as your own schedule.</p>
+            <p className="text-xs text-fg-4">The lights stay on until something else turns them off, such as your own schedule.</p>
           )}
         </div>
 
@@ -159,7 +159,7 @@ export function HolidayEditor({ holiday, onClose }: { holiday: HolidayDto; onClo
             </select>
           )}
         </Field>
-        <p className="text-xs text-ink-400">A preset made for specific strings only changes those strings, even if you choose more lights here.</p>
+        <p className="text-xs text-fg-4">A preset made for specific strings only changes those strings, even if you choose more lights here.</p>
 
         {problem ? <Notice tone="warn">{problem}</Notice> : null}
         {presets.isError ? <ErrorNotice error={presets.error} title="Could not load your presets" /> : null}

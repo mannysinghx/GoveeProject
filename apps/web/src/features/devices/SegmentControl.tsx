@@ -83,7 +83,7 @@ export function SegmentControl({
       action={
         <Link
           to="/patterns/new"
-          className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-ink-700 bg-ink-800 px-3 text-sm text-ink-100 hover:bg-ink-700"
+          className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-line bg-raised px-3 text-sm text-fg hover:bg-line-strong"
         >
           <Brush className="size-4" aria-hidden />
           Paint a pattern
@@ -92,7 +92,7 @@ export function SegmentControl({
     >
       <div className="space-y-4">
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-ink-200">
+          <legend className="mb-2 text-sm font-medium text-fg-2">
             Select segments ({selected.length} of {allSegments.length})
           </legend>
           <div className="flex flex-wrap gap-1.5">
@@ -108,8 +108,8 @@ export function SegmentControl({
                   onClick={() => toggle(index)}
                   className={`relative size-11 rounded-lg border text-sm tabular-nums transition-colors ${
                     isSelected
-                      ? 'border-amber-glow bg-amber-wash font-semibold text-amber-soft'
-                      : 'border-ink-700 bg-ink-850 text-ink-200 hover:bg-ink-800'
+                      ? 'border-accent-ui bg-accent-wash font-semibold text-accent-text'
+                      : 'border-line bg-inset text-fg-2 hover:bg-raised'
                   }`}
                 >
                   {index}
@@ -142,7 +142,7 @@ export function SegmentControl({
                   <input
                     type="color"
                     aria-label="Segment colour"
-                    className="h-11 w-14 cursor-pointer rounded-lg border border-ink-700 bg-ink-850 p-1"
+                    className="h-11 w-14 cursor-pointer rounded-lg border border-line bg-inset p-1"
                     value={isHexColor(hex) ? hex : '#000000'}
                     onChange={(e) => setHex(e.target.value)}
                   />
@@ -220,13 +220,13 @@ export function SegmentControl({
 
         {steps.length > 0 ? (
           <div>
-            <p className="mb-2 text-sm font-medium text-ink-200">Arrangement</p>
+            <p className="mb-2 text-sm font-medium text-fg-2">Arrangement</p>
             <ol className="space-y-1.5">
               {steps.map((step, index) => (
-                <li key={index} className="flex items-center justify-between gap-2 rounded-lg bg-ink-850 p-2.5 text-sm">
+                <li key={index} className="flex items-center justify-between gap-2 rounded-lg bg-inset p-2.5 text-sm">
                   <span className="flex min-w-0 items-center gap-2">
                     {step.hex ? (
-                      <span aria-hidden className="size-4 shrink-0 rounded border border-ink-600" style={{ backgroundColor: step.hex }} />
+                      <span aria-hidden className="size-4 shrink-0 rounded border border-line-strong" style={{ backgroundColor: step.hex }} />
                     ) : null}
                     <span className="min-w-0 break-words">
                       Segments {formatSegmentList(step.segments)}
@@ -244,7 +244,7 @@ export function SegmentControl({
                 </li>
               ))}
             </ol>
-            <p className="mt-2 text-xs text-ink-400">
+            <p className="mt-2 text-xs text-fg-4">
               Steps are sent one at a time through the command queue, so a pattern appears gradually, not all at once.
             </p>
           </div>

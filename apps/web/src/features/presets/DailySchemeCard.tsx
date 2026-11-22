@@ -2,20 +2,11 @@ import { CalendarSync, Play } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DailySchemeDayDto, PresetDto } from '@glm/shared';
+import { Spectrum } from '../../components/light';
 import { Button, ErrorNotice, SectionCard } from '../../components/ui';
 import { useDailyScheme, useSetDailyScheme } from '../../lib/queries';
 
 const SHORT_LIST = 7;
-
-function Swatches({ colors }: { colors: string[] }) {
-  return (
-    <div aria-hidden className="flex h-5 gap-px overflow-hidden rounded border border-ink-600">
-      {colors.map((color, index) => (
-        <span key={index} className="min-w-0 flex-1" style={{ backgroundColor: color }} />
-      ))}
-    </div>
-  );
-}
 
 /** "Sat, Nov 14", from a plain date, without shifting it into another time zone. */
 function dayLabel(date: string): string {
@@ -24,12 +15,10 @@ function dayLabel(date: string): string {
 
 function DayRow({ day }: { day: DailySchemeDayDto }) {
   return (
-    <li className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1 rounded-lg bg-ink-850 p-2.5 sm:grid-cols-[6.5rem_minmax(0,1fr)_9rem]">
-      <span className="text-xs text-ink-400 tabular-nums">{dayLabel(day.date)}</span>
-      <span className="min-w-0 text-sm break-words">{day.name}</span>
-      <div className="col-span-2 sm:col-span-1">
-        <Swatches colors={day.colors} />
-      </div>
+    <li className="flex flex-col gap-2 rounded-2xl bg-inset p-3.5">
+      <span className="text-xs font-medium text-fg-4 tabular-nums">{dayLabel(day.date)}</span>
+      <span className="min-w-0 text-sm font-medium break-words">{day.name}</span>
+      <Spectrum colors={day.colors} height="h-3" className="mt-auto" />
     </li>
   );
 }
@@ -57,12 +46,12 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
       description="A different still color scheme every day in November and December. Fixed colors, no movement."
     >
       <div className="space-y-4">
-        <div className="rounded-lg bg-ink-850 p-3">
+        <div className="rounded-3xl bg-inset p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-ink-400">Today, {dayLabel(today.date)}</p>
-              <p className="font-semibold break-words">{today.name}</p>
-              <p className="mt-0.5 text-sm text-ink-300">{today.description}</p>
+              <p className="text-xs font-semibold tracking-[0.12em] text-accent-text uppercase">Today, {dayLabel(today.date)}</p>
+              <p className="mt-1 font-display text-2xl font-semibold tracking-tight break-words">{today.name}</p>
+              <p className="mt-1 text-sm text-fg-3">{today.description}</p>
             </div>
             {todaysPreset ? (
               <Button
@@ -76,8 +65,8 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
               </Button>
             ) : null}
           </div>
-          <div className="mt-2">
-            <Swatches colors={today.colors} />
+          <div className="mt-5 mb-3">
+            <Spectrum colors={today.colors} height="h-14" />
           </div>
         </div>
 
@@ -86,19 +75,19 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
             <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
-                className="size-4"
+                className="size-5"
                 checked={autoChange.enabled}
                 disabled={set.isPending || presetId === null}
                 onChange={(event) => set.mutate({ enabled: event.target.checked, time })}
               />
               Change automatically every day
             </label>
-            <label className="flex items-center gap-2 text-sm text-ink-300">
+            <label className="flex items-center gap-2 text-sm text-fg-3">
               at
               <input
                 type="time"
                 aria-label="Time the color scheme changes each day"
-                className="min-h-9 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                className="min-h-9 rounded-xl border border-line-strong bg-inset px-2.5 text-fg"
                 value={time}
                 disabled={set.isPending || presetId === null}
                 onChange={(event) => setDraftTime(event.target.value)}
@@ -111,7 +100,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
               />
             </label>
           </div>
-          <p className="text-xs text-ink-400" role="status">
+          <p className="text-xs text-fg-4" role="status">
             {presetId === null
               ? 'This becomes available once your lights have been found.'
               : autoChange.enabled
@@ -128,7 +117,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
             ) : null}
           </p>
           {autoChange.enabled ? (
-            <p className="text-xs text-ink-400">
+            <p className="text-xs text-fg-4">
               If another schedule changes the lights later the same day, that one shows instead. Holiday shows still run at
               their own times.
             </p>
@@ -138,11 +127,11 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
 
         {upcoming.length > 0 ? (
           <div>
-            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-ink-200">
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-fg-2">
               <CalendarSync className="size-4" aria-hidden />
               Coming up
             </h3>
-            <ol className="space-y-1.5">
+            <ol className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {shown.map((day) => (
                 <DayRow key={day.date} day={day} />
               ))}
@@ -154,7 +143,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
             ) : null}
           </div>
         ) : (
-          <p className="text-xs text-ink-400">
+          <p className="text-xs text-fg-4">
             There is a scheme for every day in November and December. In other months this shows a plain warm white.
           </p>
         )}

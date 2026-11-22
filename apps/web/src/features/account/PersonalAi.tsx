@@ -134,10 +134,10 @@ export function PersonalAiKeys() {
       {data.keys.length > 0 ? (
         <ul className="space-y-2">
           {data.keys.map((key) => (
-            <li key={key.provider} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-2.5 text-sm">
-              <span className="font-medium text-ink-100">{key.label}</span>
-              <span className="font-mono text-xs text-ink-300">{key.model}</span>
-              <span className="text-xs text-ink-400">added {dateTime(key.connectedAt)}</span>
+            <li key={key.provider} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-2.5 text-sm">
+              <span className="font-medium text-fg">{key.label}</span>
+              <span className="font-mono text-xs text-fg-3">{key.model}</span>
+              <span className="text-xs text-fg-4">added {dateTime(key.connectedAt)}</span>
               <Button size="sm" variant="danger" className="ml-auto" busy={remove.isPending} onClick={() => remove.mutate(key.provider)}>
                 Remove
               </Button>
@@ -149,8 +149,8 @@ export function PersonalAiKeys() {
       )}
       {remove.isError ? <ErrorNotice error={remove.error} /> : null}
       {data.canAddKeys ? (
-        <details className="text-sm text-ink-300">
-          <summary className="cursor-pointer select-none font-medium text-ink-100">Where to get a key, and which model to pick</summary>
+        <details className="text-sm text-fg-3">
+          <summary className="cursor-pointer select-none font-medium text-fg">Where to get a key, and which model to pick</summary>
           <div className="pt-2">
             <AiKeyGuideList signedIn />
           </div>

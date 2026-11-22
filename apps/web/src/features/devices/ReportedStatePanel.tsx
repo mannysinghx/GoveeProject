@@ -26,7 +26,7 @@ export function ReportedStatePanel({ device }: { device: DeviceDto }) {
       description="Requested, accepted and reported values are shown separately. A value is only called confirmed when a later report from Govee matches it."
     >
       {rows.length === 0 && notReported.length === 0 ? (
-        <p className="text-sm text-ink-300">
+        <p className="text-sm text-fg-3">
           Unknown. No report yet and no commands sent. Use Refresh status to ask Govee.
         </p>
       ) : (
@@ -37,7 +37,7 @@ export function ReportedStatePanel({ device }: { device: DeviceDto }) {
         </ul>
       )}
       {notReported.length > 0 ? (
-        <p className="mt-3 text-sm text-ink-300">
+        <p className="mt-3 text-sm text-fg-3">
           Not reported by Govee: {notReported.map((s) => instanceLabel(s.instance)).join(', ')}.
         </p>
       ) : null}
@@ -47,45 +47,45 @@ export function ReportedStatePanel({ device }: { device: DeviceDto }) {
 
 function StateRow({ state }: { state: CapabilityStateDto }) {
   return (
-    <li className="rounded-lg bg-ink-850 p-3">
+    <li className="rounded-lg bg-inset p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-medium">{instanceLabel(state.instance)}</span>
         <VerificationBadge verification={state.verification} />
       </div>
       <dl className="mt-2 grid gap-1.5 text-sm sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-ink-400">Requested</dt>
+          <dt className="text-xs text-fg-4">Requested</dt>
           <dd>
             {state.requested ? (
               <>
                 {formatStateValue(state.instance, state.requested.value)}{' '}
-                <span className="text-xs text-ink-400">{timeAgo(state.requested.at)}</span>
+                <span className="text-xs text-fg-4">{timeAgo(state.requested.at)}</span>
               </>
             ) : (
-              <span className="text-ink-400">None</span>
+              <span className="text-fg-4">None</span>
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-ink-400">Accepted by Govee</dt>
+          <dt className="text-xs text-fg-4">Accepted by Govee</dt>
           <dd>
             {state.accepted ? (
               <>
                 {formatStateValue(state.instance, state.accepted.value)}{' '}
-                <span className="text-xs text-ink-400">{timeAgo(state.accepted.at)}</span>
+                <span className="text-xs text-fg-4">{timeAgo(state.accepted.at)}</span>
               </>
             ) : (
-              <span className="text-ink-400">None</span>
+              <span className="text-fg-4">None</span>
             )}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-ink-400">Reported by Govee</dt>
+          <dt className="text-xs text-fg-4">Reported by Govee</dt>
           <dd>
             {state.reported ? (
               <>
                 {formatStateValue(state.instance, state.reported.value)}{' '}
-                <span className="text-xs text-ink-400">{timeAgo(state.reported.at)}</span>
+                <span className="text-xs text-fg-4">{timeAgo(state.reported.at)}</span>
                 {state.reported.historical ? (
                   <span className="ml-1 inline-block">
                     <Badge tone="warn">Historical</Badge>
@@ -93,9 +93,9 @@ function StateRow({ state }: { state: CapabilityStateDto }) {
                 ) : null}
               </>
             ) : state.notQueryable ? (
-              <span className="text-ink-400">Not reported by Govee</span>
+              <span className="text-fg-4">Not reported by Govee</span>
             ) : (
-              <span className="text-ink-400">Unknown</span>
+              <span className="text-fg-4">Unknown</span>
             )}
           </dd>
         </div>

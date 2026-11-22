@@ -2,6 +2,7 @@ import { Brush, Copy, Pencil, Play, Plus, Search, Sparkles, Trash2, X } from 'lu
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { DeviceDto, PresetDto } from '@glm/shared';
+import { Spectrum } from '../../components/light';
 import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader, SectionCard } from '../../components/ui';
 import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
 import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../../lib/queries';
@@ -17,16 +18,16 @@ import { filterAndSort, isFiltering, NO_FILTER, PRESET_SORTS, type PresetFilter,
 /** Search, order and type for every pattern on the page: the ready-made ones and the owner's own. */
 function PatternFinder({ filter, onChange, shown, total }: { filter: PresetFilter; onChange: (next: PresetFilter) => void; shown: number; total: number }) {
   return (
-    <Card className="p-4">
+    <Card className="p-4 sm:p-5">
       <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
         <Field label="Search patterns">
           {(props) => (
             <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-fg-4" aria-hidden />
               <input
                 {...props}
                 type="search"
-                className={`${inputClass} pl-9 pr-10`}
+                className={`${inputClass} rounded-full pl-10 pr-10`}
                 placeholder="Name, occasion or color, such as gold or Christmas"
                 value={filter.query}
                 onChange={(event) => onChange({ ...filter, query: event.target.value })}
@@ -35,7 +36,7 @@ function PatternFinder({ filter, onChange, shown, total }: { filter: PresetFilte
                 <button
                   type="button"
                   aria-label="Clear the search"
-                  className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-ink-300 hover:text-ink-100"
+                  className="absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-fg-3 hover:text-fg"
                   onClick={() => onChange({ ...filter, query: '' })}
                 >
                   <X className="size-4" aria-hidden />
@@ -65,7 +66,7 @@ function PatternFinder({ filter, onChange, shown, total }: { filter: PresetFilte
           )}
         </Field>
       </div>
-      <p className="mt-2 text-xs text-ink-400" role="status">
+      <p className="mt-3 text-xs text-fg-4" role="status">
         {isFiltering(filter) ? `Showing ${shown} of ${total} patterns and presets.` : `${total} patterns and presets.`}
         {filter.sort === 'calendar' ? ' Ready-made looks are in calendar order, and your own are by name.' : ''}
       </p>
@@ -86,24 +87,30 @@ function PresetCard({
   const remove = useDeletePreset();
   const [confirming, setConfirming] = useState(false);
 
+  const colors = preset.actions.flatMap((step) => ('hex' in step.action ? [step.action.hex] : []));
   return (
-    <Card className="flex flex-col gap-3 p-4">
+    <article className="tile flex flex-col gap-3 rounded-3xl p-5">
+      {colors.length > 0 ? (
+        <div className="pb-2">
+          <Spectrum colors={colors} height="h-9" />
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="font-semibold">{preset.name}</h3>
+        <h3 className="font-display text-lg font-semibold tracking-tight">{preset.name}</h3>
         <Badge tone="amber">App preset</Badge>
       </div>
       <ImportedBadge from={preset.importedFrom} />
-      {preset.description ? <p className="text-sm text-ink-300">{preset.description}</p> : null}
-      <ol className="space-y-1 text-sm text-ink-300">
+      {preset.description ? <p className="text-sm text-fg-3">{preset.description}</p> : null}
+      <ol className="space-y-1 text-sm text-fg-3">
         {preset.actions.map((action, index) => (
           <li key={action.id} className="flex items-center gap-2">
-            <span className="text-ink-400 tabular-nums">{index + 1}.</span>
+            <span className="text-fg-4 tabular-nums">{index + 1}.</span>
             {'hex' in action.action ? (
-              <span aria-hidden className="size-3 shrink-0 rounded border border-ink-600" style={{ backgroundColor: action.action.hex }} />
+              <span aria-hidden className="size-3 shrink-0 rounded-full border border-line-strong" style={{ backgroundColor: action.action.hex }} />
             ) : null}
             <span className="min-w-0 break-words">
               {action.summary}
-              {action.deviceName ? <span className="text-ink-400"> · {action.deviceName}</span> : null}
+              {action.deviceName ? <span className="text-fg-4"> · {action.deviceName}</span> : null}
             </span>
           </li>
         ))}
@@ -134,7 +141,7 @@ function PresetCard({
       </div>
       {duplicate.isError ? <ErrorNotice error={duplicate.error} /> : null}
       {remove.isError ? <ErrorNotice error={remove.error} /> : null}
-    </Card>
+    </article>
   );
 }
 
@@ -201,42 +208,45 @@ export function PresetsPage() {
         }
       />
 
-      <div className="mb-6 grid gap-3 md:grid-cols-3">
-        <Card className="p-4">
-          <Badge tone="amber">App preset</Badge>
-          <p className="mt-2 text-sm text-ink-300">
-            Saved in this app. A list of steps it sends one at a time. It keeps working with any device that supports the
-            steps.
-          </p>
-        </Card>
-        <Card className="p-4">
-          <Badge tone="info">Govee scene</Badge>
-          <p className="mt-2 text-sm text-ink-300">
-            Provided by Govee and stored on Govee's side. The app can activate those the API exposes, not change them.
-          </p>
-        </Card>
-        <Card className="p-4">
-          <Badge tone="info">Govee DIY scene</Badge>
-          <p className="mt-2 text-sm text-ink-300">
-            Made by you in the Govee Home app. The app can activate those the API exposes. It cannot create or edit them.
-          </p>
-        </Card>
+      <div className="mb-8 grid gap-2 md:grid-cols-3">
+        {[
+          {
+            tone: 'amber' as const,
+            name: 'App preset',
+            text: 'Saved in this app. A list of steps it sends one at a time. It keeps working with any device that supports the steps.',
+          },
+          {
+            tone: 'info' as const,
+            name: 'Govee scene',
+            text: "Provided by Govee and stored on Govee's side. The app can activate those the API exposes, not change them.",
+          },
+          {
+            tone: 'info' as const,
+            name: 'Govee DIY scene',
+            text: 'Made by you in the Govee Home app. The app can activate those the API exposes. It cannot create or edit them.',
+          },
+        ].map((kind) => (
+          <div key={kind.name} className="rounded-3xl border border-line bg-inset/60 p-4">
+            <Badge tone={kind.tone}>{kind.name}</Badge>
+            <p className="mt-2 text-xs leading-relaxed text-fg-3">{kind.text}</p>
+          </div>
+        ))}
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {devices.data ? <MasterBrightness devices={devices.data} /> : null}
         {presets.data?.some((preset) => preset.builtin) ? <DailySchemeCard presets={presets.data} onApply={setApplying} /> : null}
         {presets.data && presets.data.length > 0 ? <PatternFinder filter={filter} onChange={setFilter} shown={shown} total={total} /> : null}
         {presets.data ? <FestivalPresets presets={presets.data} filter={filter} onApply={setApplying} /> : null}
 
         <section aria-labelledby="presets-heading">
-          <h2 id="presets-heading" className="mb-3 text-lg font-semibold">
+          <h2 id="presets-heading" className="mb-4 font-display text-2xl font-semibold tracking-tight">
             App presets
           </h2>
           {presets.isPending ? <Loading label="Loading presets" /> : null}
           {presets.isError ? <ErrorNotice error={presets.error} /> : null}
           {allYours && allYours.length > 0 && yourPresets?.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-ink-700 p-4 text-sm text-ink-300" role="status">
+            <p className="rounded-3xl border border-dashed border-line-strong p-5 text-sm text-fg-3" role="status">
               None of your {allYours.length} preset{allYours.length === 1 ? '' : 's'} match. Try fewer words, or clear the search.
             </p>
           ) : null}
@@ -273,7 +283,7 @@ export function PresetsPage() {
               <GoveeScenes devices={devices.data} />
             ) : (
               <SectionCard title="No devices yet">
-                <p className="text-sm text-ink-300">
+                <p className="text-sm text-fg-3">
                   <Link to="/connect" className="underline underline-offset-2">
                     Connect to Govee
                   </Link>{' '}

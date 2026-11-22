@@ -15,7 +15,7 @@ function Swatches({ colors }: { colors: string[] }) {
   return (
     <div className="flex flex-wrap gap-1" aria-label={`Colours: ${colors.join(', ')}`}>
       {colors.map((hex) => (
-        <span key={hex} aria-hidden className="size-5 rounded border border-ink-600" style={{ backgroundColor: hex }} />
+        <span key={hex} aria-hidden className="size-5 rounded border border-line-strong" style={{ backgroundColor: hex }} />
       ))}
     </div>
   );
@@ -43,7 +43,7 @@ function SharedCard({ item, onImport }: { item: SharedItemDto; onImport: () => v
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-semibold break-words">{item.title}</h3>
-          <p className="text-xs text-ink-400">
+          <p className="text-xs text-fg-4">
             {KIND_LABEL[item.kind]} by {item.by}
             {item.imports > 0 ? ` · imported ${item.imports} time${item.imports === 1 ? '' : 's'}` : ''}
           </p>
@@ -54,9 +54,9 @@ function SharedCard({ item, onImport }: { item: SharedItemDto; onImport: () => v
           {item.hidden ? <Badge tone="warn">Hidden by the owner</Badge> : null}
         </div>
       </div>
-      {item.description ? <p className="text-sm whitespace-pre-line text-ink-300">{item.description}</p> : null}
+      {item.description ? <p className="text-sm whitespace-pre-line text-fg-3">{item.description}</p> : null}
       <Swatches colors={item.colors} />
-      <p className="text-sm text-ink-300">{summaryLine(item)}</p>
+      <p className="text-sm text-fg-3">{summaryLine(item)}</p>
       <div className="mt-auto flex flex-wrap gap-2 pt-1">
         <Button size="sm" variant="primary" icon={<Download className="size-4" aria-hidden />} onClick={onImport}>
           {item.importedByMe ? 'Import again' : 'Import'}
@@ -92,7 +92,7 @@ function SceneChoice({
   }, [hasSame, value, onChange]);
   if (deviceId === null) return null;
   if (scenes.isPending) return <Loading label="Loading scenes" />;
-  if (hasSame) return <p className="text-sm text-ink-300">"{scene.presetName}" uses {scene.sceneName}, which this light has.</p>;
+  if (hasSame) return <p className="text-sm text-fg-3">"{scene.presetName}" uses {scene.sceneName}, which this light has.</p>;
   return (
     <Field label={`Scene for "${scene.presetName}"`} hint={`${scene.sceneName} is not on this light${scene.portable ? '' : ' (made in someone else’s Govee app)'}. Choose one of its scenes.`}>
       {(props) => (
@@ -138,13 +138,13 @@ function ImportDialog({ items, onClose }: { items: SharedItemDto[]; onClose: () 
             They are yours: change or delete them freely. Schedules start switched off, so nothing runs until you turn one on.
           </Notice>
           <div className="flex flex-wrap gap-2">
-            <Link to="/presets" className="text-sm text-amber-soft underline underline-offset-2">
+            <Link to="/presets" className="text-sm text-accent-text underline underline-offset-2">
               Presets
             </Link>
-            <Link to="/schedules" className="text-sm text-amber-soft underline underline-offset-2">
+            <Link to="/schedules" className="text-sm text-accent-text underline underline-offset-2">
               Schedules
             </Link>
-            <Link to="/groups" className="text-sm text-amber-soft underline underline-offset-2">
+            <Link to="/groups" className="text-sm text-accent-text underline underline-offset-2">
               Groups
             </Link>
           </div>
@@ -158,7 +158,7 @@ function ImportDialog({ items, onClose }: { items: SharedItemDto[]; onClose: () 
             run.mutate({ itemIds, slots, scenes });
           }}
         >
-          <p className="text-sm text-ink-300">
+          <p className="text-sm text-fg-3">
             This makes {data.create.presets} preset(s), {data.create.groups} group(s) and {data.create.schedules} schedule(s) in your account, as copies. Nothing
             changes on anyone else&apos;s lights, and schedules start switched off.
           </p>
@@ -183,7 +183,7 @@ function ImportDialog({ items, onClose }: { items: SharedItemDto[]; onClose: () 
           ) : null}
           {data.slots.length > 0 ? (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold text-ink-100">Which of your lights?</h3>
+              <h3 className="text-sm font-semibold text-fg">Which of your lights?</h3>
               {data.slots.map((slot) => (
                 <Field
                   key={slot.key}
@@ -213,7 +213,7 @@ function ImportDialog({ items, onClose }: { items: SharedItemDto[]; onClose: () 
           ) : null}
           {data.scenes.length > 0 ? (
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold text-ink-100">Scenes</h3>
+              <h3 className="text-sm font-semibold text-fg">Scenes</h3>
               {data.scenes.map((scene) => (
                 <SceneChoice
                   key={scene.choiceKey}
@@ -298,7 +298,7 @@ export function SharedPage() {
           >
             {data.canShare ? <DisplayNameForm key={data.displayName ?? ''} current={data.displayName} /> : <Notice tone="warn">Sharing is turned off for your account.</Notice>}
             {data.shareLimit !== null ? (
-              <p className="mt-3 text-xs text-ink-400">
+              <p className="mt-3 text-xs text-fg-4">
                 You share {data.sharedCount} of up to {data.shareLimit} items. Share from the Presets, Groups or Schedules pages.
               </p>
             ) : null}
@@ -308,7 +308,7 @@ export function SharedPage() {
         <div className="flex flex-wrap gap-3">
           <label className="relative min-w-56 flex-1">
             <span className="sr-only">Search shared items</span>
-            <Search className="pointer-events-none absolute top-3 left-3 size-4 text-ink-400" aria-hidden />
+            <Search className="pointer-events-none absolute top-3 left-3 size-4 text-fg-4" aria-hidden />
             <input className={`${inputClass} pl-9`} placeholder="Search" value={filter} onChange={(e) => setFilter(e.target.value)} />
           </label>
           <label>

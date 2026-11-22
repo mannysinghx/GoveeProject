@@ -42,7 +42,7 @@ function latestKnown(device: DeviceDto, instance: string): { value: unknown; lab
 function KnownValue({ device, instance }: { device: DeviceDto; instance: string }) {
   const known = latestKnown(device, instance);
   return (
-    <p className="text-xs text-ink-400">
+    <p className="text-xs text-fg-4">
       {known ? `${formatStateValue(instance, known.value)}. ${known.label}.` : 'Current value: unknown.'}
     </p>
   );
@@ -53,7 +53,7 @@ function ControlFeedback({
 }: {
   control: ReturnType<typeof useDeviceControl>;
 }) {
-  if (control.isPending) return <p className="text-sm text-ink-300" role="status">Sending to Govee...</p>;
+  if (control.isPending) return <p className="text-sm text-fg-3" role="status">Sending to Govee...</p>;
   if (control.isError) return <ErrorNotice error={control.error} />;
   if (control.data) return <CommandResultLine command={control.data.command} />;
   return null;
@@ -172,8 +172,8 @@ function ColorControl({ device, capability }: { device: DeviceDto; capability: C
         <div className="space-y-4">
           <div className="flex items-center gap-3">
             <div
-              className="size-14 shrink-0 rounded-lg border border-ink-600"
-              style={{ backgroundColor: hex }}
+              className="size-16 shrink-0 rounded-2xl border border-line-strong"
+              style={{ backgroundColor: hex, boxShadow: `0 8px 30px -6px ${hex}` }}
               role="img"
               aria-label={`Preview of ${hex}`}
             />
@@ -215,14 +215,14 @@ function ColorControl({ device, capability }: { device: DeviceDto; capability: C
 
           {recent.length > 0 ? (
             <div>
-              <p className="mb-1.5 text-xs text-ink-400">Recent colours</p>
+              <p className="mb-1.5 text-xs text-fg-4">Recent colours</p>
               <ul className="flex flex-wrap gap-1.5">
                 {recent.map((color) => (
                   <li key={color}>
                     <button
                       type="button"
                       aria-label={`Use recent colour ${color}`}
-                      className="size-9 rounded-md border border-ink-600"
+                      className="size-9 rounded-full border border-line-strong transition-transform hover:scale-110"
                       style={{ backgroundColor: color }}
                       onClick={() => {
                         setHex(color);
@@ -271,7 +271,7 @@ function UnavailableList({ items }: { items: ReactNode[] }) {
   if (items.length === 0) return null;
   return (
     <SectionCard title="Not available on this device">
-      <ul className="list-inside list-disc space-y-1 text-sm text-ink-300">
+      <ul className="list-inside list-disc space-y-1 text-sm text-fg-3">
         {items.map((item, index) => (
           <li key={index}>{item}</li>
         ))}
@@ -304,8 +304,8 @@ export function DeviceControls({ device }: { device: DeviceDto }) {
   if (!hasScenes) unavailable.push('Scenes are not exposed by this device through the official API.');
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-2">
+    <div className="space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2">
         {power ? <PowerControl device={device} capability={power} /> : null}
         {brightness ? <BrightnessControl device={device} capability={brightness} /> : null}
       </div>

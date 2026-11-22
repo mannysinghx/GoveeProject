@@ -28,11 +28,14 @@ import { SharedPage } from '../features/sharing/SharedPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { setUnauthenticatedHandler } from '../lib/api';
 import { keys } from '../lib/queries';
+import { useTheme } from '../lib/theme';
 import { AppShell } from './AppShell';
 
 export function App() {
   const session = useSession();
   const client = useQueryClient();
+  // Keeps the page and the browser's own colours on the chosen theme, signed in or not.
+  useTheme();
 
   useEffect(() => {
     setUnauthenticatedHandler(() => {
@@ -44,7 +47,7 @@ export function App() {
   if (session.isPending) return <Loading label="Starting" />;
   if (session.isError || !session.data) {
     return (
-      <main className="mx-auto max-w-lg p-6">
+      <main className="mx-auto max-w-lg p-6 pt-16">
         <ErrorNotice error={session.error} title="Could not connect" />
       </main>
     );

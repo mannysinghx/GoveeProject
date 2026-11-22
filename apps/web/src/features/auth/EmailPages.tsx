@@ -1,8 +1,9 @@
-import { Lightbulb, MailCheck } from 'lucide-react';
+import { MailCheck } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PASSWORD_MIN_LENGTH } from '@glm/shared';
-import { Button, Card, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
+import { AuthLayout } from '../../components/AuthLayout';
+import { Button, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
 import { WhatYouNeed } from '../account/KeyGuide';
 import { LegalLinks } from '../legal/LegalPages';
 import {
@@ -22,15 +23,10 @@ export interface LoginNotice {
 
 export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main className="flex min-h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-sm p-6">
-        <div className="mb-5 flex items-center gap-2">
-          <Lightbulb className="size-5 text-amber-glow" aria-hidden />
-          <h1 className="text-lg font-semibold">{title}</h1>
-        </div>
-        {children}
-      </Card>
-    </main>
+    <AuthLayout>
+      <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight">{title}</h1>
+      {children}
+    </AuthLayout>
   );
 }
 
@@ -80,8 +76,8 @@ function useCountdown(seconds: number, running: boolean): number {
 
 function BackToSignIn() {
   return (
-    <p className="mt-4 text-center text-sm text-ink-400">
-      <Link to="/" className="text-amber-soft underline underline-offset-2">
+    <p className="mt-4 text-center text-sm text-fg-4">
+      <Link to="/" className="text-accent-text underline underline-offset-2">
         Back to sign in
       </Link>
     </p>
@@ -133,10 +129,10 @@ function EmailRequestPage({
     return (
       <AuthCard title={sentTitle}>
         <div className="flex gap-3">
-          <MailCheck className="mt-0.5 size-5 shrink-0 text-amber-glow" aria-hidden />
-          <p className="text-sm text-ink-300">{sentBody(sentTo)}</p>
+          <MailCheck className="mt-0.5 size-5 shrink-0 text-accent-ui" aria-hidden />
+          <p className="text-sm text-fg-3">{sentBody(sentTo)}</p>
         </div>
-        <p className="mt-4 text-sm text-ink-400">The link works for 30 minutes. Check your spam folder if it does not arrive.</p>
+        <p className="mt-4 text-sm text-fg-4">The link works for 30 minutes. Check your spam folder if it does not arrive.</p>
         {mutation.isError ? <ErrorNotice error={mutation.error} /> : null}
         <Button className="mt-4 w-full" onClick={() => send()} busy={mutation.isPending} disabled={wait > 0}>
           {wait > 0 ? `Send again in ${wait}s` : 'Send again'}
@@ -148,7 +144,7 @@ function EmailRequestPage({
 
   return (
     <AuthCard title={title}>
-      <p className="mb-4 text-sm text-ink-300">{intro}</p>
+      <p className="mb-4 text-sm text-fg-3">{intro}</p>
       <form onSubmit={send} className="space-y-4">
         <EmailField value={email} onChange={setEmail} />
         <Honeypot value={website} onChange={setWebsite} />
@@ -157,7 +153,7 @@ function EmailRequestPage({
           {mutation.isPending ? 'Checking this browser…' : submitLabel}
         </Button>
       </form>
-      {legal ? <p className="mt-3 text-xs text-ink-400">{legal}</p> : null}
+      {legal ? <p className="mt-3 text-xs text-fg-4">{legal}</p> : null}
       {help}
       <BackToSignIn />
       <LegalLinks />
@@ -223,13 +219,13 @@ function LinkProblem({ error }: { error?: unknown }) {
   return (
     <AuthCard title="This link cannot be used">
       {error ? <ErrorNotice error={error} /> : <Notice tone="warn">This link is not complete. Open it from the email again.</Notice>}
-      <p className="mt-4 text-sm text-ink-300">
+      <p className="mt-4 text-sm text-fg-3">
         Links work once, for 30 minutes. You can ask for a new one from the{' '}
-        <Link to="/register" className="text-amber-soft underline underline-offset-2">
+        <Link to="/register" className="text-accent-text underline underline-offset-2">
           sign-up
         </Link>{' '}
         or{' '}
-        <Link to="/forgot" className="text-amber-soft underline underline-offset-2">
+        <Link to="/forgot" className="text-accent-text underline underline-offset-2">
           reset
         </Link>{' '}
         page.
@@ -268,8 +264,8 @@ function NewPasswordForm({
     <form onSubmit={submit} className="space-y-4">
       {/* Lets password managers save the new password under the right address. */}
       <input type="email" autoComplete="username" value={email} readOnly hidden />
-      <p className="text-sm text-ink-300">
-        For <span className="font-medium text-ink-100">{email}</span>
+      <p className="text-sm text-fg-3">
+        For <span className="font-medium text-fg">{email}</span>
       </p>
       <Field label="Password" hint={`At least ${PASSWORD_MIN_LENGTH} characters.`}>
         {(field) => (
@@ -377,8 +373,8 @@ export function ConfirmEmailPage() {
           </>
         ) : (
           <>
-            <p className="text-sm text-ink-300">
-              Sign in with <span className="font-medium text-ink-100">{email}</span> from now on?
+            <p className="text-sm text-fg-3">
+              Sign in with <span className="font-medium text-fg">{email}</span> from now on?
             </p>
             {confirm.isError ? <ErrorNotice error={confirm.error} /> : null}
             <Button variant="primary" className="mt-4 w-full" busy={confirm.isPending} onClick={() => confirm.mutate({ token })}>

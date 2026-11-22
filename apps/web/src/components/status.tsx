@@ -174,7 +174,7 @@ export function CommandResultLine({ command: initial }: { command: CommandDto })
   const command = data ?? initial;
   return (
     <div className="flex flex-wrap items-center gap-2 text-sm" role="status">
-      <span className="text-ink-200">{command.summary}</span>
+      <span className="text-fg-2">{command.summary}</span>
       <CommandStatusBadge status={command.status} />
       {command.status === 'accepted' ? <VerificationBadge verification={command.verification} /> : null}
       {command.errorMessage ? <span className="text-xs text-bad">{command.errorMessage}</span> : null}
@@ -199,13 +199,13 @@ export function RunStatusBadge({ status }: { status: RunStatus | ExecutionStatus
 
 function OutcomeRow({ outcome }: { outcome: ActionOutcomeDto }) {
   return (
-    <li className="rounded-lg bg-ink-850 p-3">
+    <li className="rounded-lg bg-inset p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-sm font-medium text-ink-100">{outcome.deviceName}</span>
+        <span className="text-sm font-medium text-fg">{outcome.deviceName}</span>
         <CommandStatusBadge status={outcome.status} />
       </div>
-      <p className="mt-1 text-sm text-ink-300">{outcome.summary}</p>
-      {outcome.reason ? <p className="mt-1 text-xs text-ink-400">{outcome.reason}</p> : null}
+      <p className="mt-1 text-sm text-fg-3">{outcome.summary}</p>
+      {outcome.reason ? <p className="mt-1 text-xs text-fg-4">{outcome.reason}</p> : null}
     </li>
   );
 }
@@ -217,12 +217,12 @@ export function RunResults({ run }: { run: RunResultDto }) {
     <div className="space-y-3" role="status">
       <div className="flex flex-wrap items-center gap-2">
         <RunStatusBadge status={run.status} />
-        <span className="text-sm text-ink-300">
+        <span className="text-sm text-fg-3">
           {accepted} of {run.outcomes.length} action{run.outcomes.length === 1 ? '' : 's'} accepted by Govee
         </span>
       </div>
       {accepted > 0 ? (
-        <p className="text-xs text-ink-400">
+        <p className="text-xs text-fg-4">
           Accepted means Govee took the request. It does not prove the lights changed. Devices are updated one after
           another, not in sync.
         </p>
@@ -234,7 +234,7 @@ export function RunResults({ run }: { run: RunResultDto }) {
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-ink-300">There was nothing to send.</p>
+        <p className="text-sm text-fg-3">There was nothing to send.</p>
       )}
     </div>
   );

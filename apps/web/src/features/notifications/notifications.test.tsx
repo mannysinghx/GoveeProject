@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type HolidayDto, type NotificationDto, type ScheduleDto } from '@glm/shared';
@@ -157,7 +157,7 @@ describe('the bell', () => {
     for (const link of links) expect(link).toHaveAttribute('href', '/notifications');
   });
 
-  it('keeps the phone bar at seven items, with the bell apart from it', async () => {
+  it('keeps the phone dock to four places and a More button, with the bell apart from it', async () => {
     mockApi(routes([]));
     renderApp(
       <AppShell username="owner">
@@ -165,11 +165,35 @@ describe('the bell', () => {
       </AppShell>,
     );
     const bars = screen.getAllByRole('navigation', { name: 'Main' });
-    expect(bars.at(-1)?.querySelectorAll('a')).toHaveLength(7);
-    // Shared is on the phone bar; Activity is in the sidebar, and reached from the dashboard and Settings on a phone.
-    expect([...bars.at(-1)!.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toContain('/shared');
-    expect([...bars[0]!.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(expect.arrayContaining(['/shared', '/activity']));
+    const dock = bars.at(-1)!;
+    expect([...dock.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(['/', '/presets', '/groups', '/schedules']);
+    expect(within(dock).getByRole('button', { name: 'More' })).toBeInTheDocument();
+    // The sidebar has every place. A phone reaches the rest through More.
+    expect([...bars[0]!.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(
+      expect.arrayContaining(['/shared', '/activity', '/connections', '/settings']),
+    );
     expect(await screen.findAllByRole('link', { name: 'Notifications' })).toHaveLength(2);
+  });
+
+  it('opens the rest of the places, and the theme choice, from More', async () => {
+    mockApi(routes([notification()]));
+    renderApp(
+      <AppShell username="owner">
+        <p>Page</p>
+      </AppShell>,
+    );
+    const dock = screen.getAllByRole('navigation', { name: 'Main' }).at(-1)!;
+    await userEvent.click(within(dock).getByRole('button', { name: 'More' }));
+    const sheet = await screen.findByRole('dialog', { name: 'More' });
+    expect(within(sheet).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/shared',
+      '/connections',
+      '/activity',
+      '/notifications',
+      '/settings',
+    ]);
+    expect(within(sheet).getByRole('group', { name: 'Theme' })).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 });
 

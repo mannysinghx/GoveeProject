@@ -32,8 +32,8 @@ export function DescribeBox({ label, placeholder, busy, error, result, onDescrib
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-ink-700/70 bg-ink-850 p-3">
-      <label htmlFor="ai-describe" className="block text-sm font-medium text-ink-200">
+    <div className="space-y-2 rounded-lg border border-line bg-inset p-3">
+      <label htmlFor="ai-describe" className="block text-sm font-medium text-fg-2">
         {label}
       </label>
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -60,7 +60,7 @@ export function DescribeBox({ label, placeholder, busy, error, result, onDescrib
         </Button>
       </div>
       <div aria-live="polite" className="space-y-2">
-        {busy ? <p className="text-xs text-ink-300">Drafting…</p> : null}
+        {busy ? <p className="text-xs text-fg-3">Drafting…</p> : null}
         {error ? <ErrorNotice error={error} title="No draft this time" /> : null}
         {result ? (
           <Notice tone="info">

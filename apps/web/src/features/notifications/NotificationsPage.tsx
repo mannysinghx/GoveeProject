@@ -36,12 +36,12 @@ function NotificationItem({ notification }: { notification: NotificationDto }) {
   const respond = useRespondToNotification();
   const unread = notification.readAt === null;
   return (
-    <li className={`rounded-lg p-3 ${unread ? 'border border-amber-soft/40 bg-ink-850' : 'bg-ink-850/60'}`}>
+    <li className={`rounded-lg p-3 ${unread ? 'border border-accent-ui/40 bg-inset' : 'bg-inset/60'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="min-w-0 font-medium break-words">{notification.title}</h3>
         <Badge tone={SEVERITY_TONE[notification.severity]}>{SEVERITY_LABEL[notification.severity]}</Badge>
       </div>
-      <p className="mt-1 text-sm whitespace-pre-line text-ink-300">{notification.body}</p>
+      <p className="mt-1 text-sm whitespace-pre-line text-fg-3">{notification.body}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         {notification.answer ? (
           <Badge tone="neutral" icon={<Check className="size-3" aria-hidden />}>
@@ -61,11 +61,11 @@ function NotificationItem({ notification }: { notification: NotificationDto }) {
           ))
         )}
         {notification.link !== '/notifications' ? (
-          <Link to={notification.link} className="text-xs text-amber-soft underline underline-offset-2">
+          <Link to={notification.link} className="text-xs text-accent-text underline underline-offset-2">
             Open
           </Link>
         ) : null}
-        <span className="ml-auto text-xs text-ink-400">{timeAgo(notification.createdAt)}</span>
+        <span className="ml-auto text-xs text-fg-4">{timeAgo(notification.createdAt)}</span>
       </div>
       {respond.isError ? (
         <div className="mt-2">
@@ -161,19 +161,19 @@ function ThisDevice() {
         {status.isError ? <ErrorNotice error={status.error} /> : null}
         {test.isError ? <ErrorNotice error={test.error} /> : null}
         {test.isSuccess ? (
-          <p className="text-sm text-ink-300" role="status">
+          <p className="text-sm text-fg-3" role="status">
             Test sent. It appears below{(status.data?.devices.length ?? 0) > 0 ? ', and on your devices within a few seconds' : ''}.
           </p>
         ) : null}
 
         {status.data && status.data.devices.length > 0 ? (
           <div>
-            <h3 className="mb-1 text-sm font-medium text-ink-200">Devices with alerts on</h3>
+            <h3 className="mb-1 text-sm font-medium text-fg-2">Devices with alerts on</h3>
             <ul className="space-y-1">
               {status.data.devices.map((device) => (
-                <li key={device.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-2 text-sm">
+                <li key={device.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-2 text-sm">
                   <span className="font-medium">{device.label}</span>
-                  <span className="text-xs text-ink-400">
+                  <span className="text-xs text-fg-4">
                     {device.lastError
                       ? device.lastError
                       : device.lastSuccessAt
@@ -225,7 +225,7 @@ function Choices() {
             />
             <span>
               <span className="block font-medium">{label}</span>
-              <span className="block text-xs text-ink-400">{help}</span>
+              <span className="block text-xs text-fg-4">{help}</span>
             </span>
           </label>
         ))}

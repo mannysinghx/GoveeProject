@@ -1,9 +1,10 @@
 import { Layers, Pencil, Play, Plus, Power, PowerOff, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import type { DeviceAction, DeviceDto, GroupDto, RunResultDto } from '@glm/shared';
+import { HouseStrip, lookOfDevice } from '../../components/light';
 import { RunResults } from '../../components/status';
 import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
-import { Button, Card, Dialog, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader } from '../../components/ui';
+import { Button, Dialog, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader } from '../../components/ui';
 import {
   useApplyGroupAction,
   useApplyPreset,
@@ -35,12 +36,12 @@ function GroupEditor({ group, devices, onClose }: { group: GroupDto | null; devi
           )}
         </Field>
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-ink-200">Devices</legend>
-          {devices.length === 0 ? <p className="text-sm text-ink-300">No devices discovered yet.</p> : null}
+          <legend className="mb-2 text-sm font-medium text-fg-2">Devices</legend>
+          {devices.length === 0 ? <p className="text-sm text-fg-3">No devices discovered yet.</p> : null}
           <ul className="space-y-1">
             {devices.map((device) => (
               <li key={device.id}>
-                <label className="flex min-h-11 items-center gap-3 rounded-lg px-2 hover:bg-ink-850">
+                <label className="flex min-h-11 items-center gap-3 rounded-lg px-2 hover:bg-inset">
                   <input
                     type="checkbox"
                     className="size-4"
@@ -52,7 +53,7 @@ function GroupEditor({ group, devices, onClose }: { group: GroupDto | null; devi
                     }
                   />
                   <span className="min-w-0 flex-1 truncate text-sm">{device.name}</span>
-                  <span className="text-xs text-ink-400">{device.sku}</span>
+                  <span className="text-xs text-fg-4">{device.sku}</span>
                 </label>
               </li>
             ))}
@@ -136,7 +137,7 @@ function ActionDialog({ group, onClose }: { group: GroupDto; onClose: () => void
           <ActionFields action={action} onChange={setAction} />
         )}
 
-        <p className="text-xs text-ink-400">
+        <p className="text-xs text-fg-4">
           Each device is checked on its own. Devices that cannot do this are skipped with an explanation. Devices update
           independently, not at the same instant.
         </p>
@@ -168,28 +169,32 @@ function GroupCard({
   const members = group.deviceIds.map((id) => devices.find((d) => d.id === id)).filter((d): d is DeviceDto => Boolean(d));
 
   return (
-    <Card className="flex flex-col gap-3 p-4">
-      <h3 className="font-semibold">{group.name}</h3>
+    <article className="tile flex flex-col gap-4 rounded-3xl p-5">
+      <h3 className="font-display text-lg font-semibold tracking-tight">{group.name}</h3>
       <ImportedBadge from={group.importedFrom} />
+      {members.some((device) => !device.isGoveeGroup) ? (
+        <HouseStrip looks={members.filter((device) => !device.isGoveeGroup).map(lookOfDevice)} count={30} />
+      ) : null}
       {members.length === 0 ? (
-        <p className="text-sm text-ink-300">No devices in this group.</p>
+        <p className="text-sm text-fg-3">No devices in this group.</p>
       ) : (
-        <ul className="text-sm text-ink-300">
+        <ul className="flex flex-wrap gap-1.5 text-xs text-fg-2">
           {members.map((device) => (
-            <li key={device.id}>
+            <li key={device.id} className="rounded-full border border-line bg-inset px-3 py-1">
               {device.name}
               {device.discoveryStatus === 'missing' ? <span className="text-warn"> (no longer discovered)</span> : null}
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-auto grid grid-cols-2 gap-2 pt-1">
+      <div className="mt-auto grid grid-cols-2 gap-1.5 rounded-full border border-line bg-inset p-1">
         <Button
           size="sm"
           icon={<Power className="size-4" aria-hidden />}
           disabled={apply.isPending || members.length === 0}
           aria-label={`Turn ${group.name} on`}
           onClick={() => apply.mutate({ id: group.id, action: { type: 'power', on: true } })}
+          variant="ghost"
         >
           On
         </Button>
@@ -199,6 +204,7 @@ function GroupCard({
           disabled={apply.isPending || members.length === 0}
           aria-label={`Turn ${group.name} off`}
           onClick={() => apply.mutate({ id: group.id, action: { type: 'power', on: false } })}
+          variant="ghost"
         >
           Off
         </Button>
@@ -226,9 +232,9 @@ function GroupCard({
       </div>
       {remove.isError ? <ErrorNotice error={remove.error} /> : null}
       {apply.isError ? <ErrorNotice error={apply.error} /> : null}
-      {apply.isPending ? <p className="text-sm text-ink-300" role="status">Sending...</p> : null}
+      {apply.isPending ? <p className="text-sm text-fg-3" role="status">Sending...</p> : null}
       {apply.data ? <RunResults run={apply.data} /> : null}
-    </Card>
+    </article>
   );
 }
 

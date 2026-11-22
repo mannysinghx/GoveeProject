@@ -51,17 +51,17 @@ export function CapabilityPanel({
       description="Controls above are built from this list, not from the model number."
     >
       {capabilities.length === 0 ? (
-        <p className="text-sm text-ink-300">Govee reported no capabilities for this device.</p>
+        <p className="text-sm text-fg-3">Govee reported no capabilities for this device.</p>
       ) : (
-        <ul className="divide-y divide-ink-700/60">
+        <ul className="divide-y divide-line">
           {capabilities.map((capability) => (
             <li key={`${capability.type}/${capability.instance}`} className="py-2.5 first:pt-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium">{instanceLabel(capability.instance)}</span>
                 {capability.kind === 'other' ? <Badge>Read only</Badge> : null}
               </div>
-              <p className="mt-0.5 text-sm text-ink-300">{describe(capability)}</p>
-              <p className="mt-0.5 font-mono text-xs break-all text-ink-400">
+              <p className="mt-0.5 text-sm text-fg-3">{describe(capability)}</p>
+              <p className="mt-0.5 font-mono text-xs break-all text-fg-4">
                 {capability.type} / {capability.instance}
               </p>
             </li>
@@ -70,20 +70,20 @@ export function CapabilityPanel({
       )}
 
       {absent.length > 0 ? (
-        <div className="mt-4 rounded-lg bg-ink-850 p-3">
+        <div className="mt-4 rounded-lg bg-inset p-3">
           <p className="text-sm font-medium">Not exposed by this device through the official API</p>
-          <p className="mt-1 text-sm text-ink-300">{absent.map((a) => a.label).join(', ')}.</p>
-          <p className="mt-1 text-xs text-ink-400">
+          <p className="mt-1 text-sm text-fg-3">{absent.map((a) => a.label).join(', ')}.</p>
+          <p className="mt-1 text-xs text-fg-4">
             Some of these may still work in the Govee Home app. This app only uses what the public API reports.
           </p>
         </div>
       ) : null}
 
       <details className="mt-4">
-        <summary className="cursor-pointer text-sm text-ink-300 hover:text-ink-100">
+        <summary className="cursor-pointer text-sm text-fg-3 hover:text-fg">
           Developer diagnostics: capability JSON as returned
         </summary>
-        <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-ink-950 p-3 font-mono text-xs text-ink-200">
+        <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-canvas p-3 font-mono text-xs text-fg-2">
           {JSON.stringify(rawCapabilities, null, 2)}
         </pre>
       </details>

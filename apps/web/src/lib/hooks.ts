@@ -16,6 +16,16 @@ export function useVisibleInterval(callback: () => void, delayMs: number | null)
   }, [delayMs]);
 }
 
+/** The current time, refreshed every so often, for things that read "this evening" or "in 3 days". */
+export function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
 /** Holds a value until it has stopped changing for delayMs. Keeps previews from firing per keystroke. */
 export function useDebounced<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value);

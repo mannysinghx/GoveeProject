@@ -1,6 +1,7 @@
-import { Lightbulb } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { Ambient } from '../../components/Ambient';
+import { BrandMark } from '../../components/Brand';
 import { Card, Notice } from '../../components/ui';
 
 /*
@@ -13,11 +14,12 @@ const CONTACT = 'info@lightup.ink';
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <main className="mx-auto max-w-2xl p-4 sm:p-6">
-      <Card className="space-y-4 p-5 text-sm leading-relaxed text-ink-200 sm:p-6">
-        <div className="flex items-center gap-2">
-          <Lightbulb className="size-5 text-amber-glow" aria-hidden />
-          <h1 className="text-lg font-semibold text-ink-100">{title}</h1>
+    <main className="relative mx-auto max-w-2xl p-4 py-8 sm:p-6 sm:py-10">
+      <Ambient colors={[]} />
+      <Card className="space-y-4 rounded-[2rem] p-6 text-sm leading-relaxed text-fg-2 sm:p-9">
+        <div className="flex items-center gap-3">
+          <BrandMark size={36} />
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-fg">{title}</h1>
         </div>
         <Notice tone="warn" title="Draft">
           This page has not yet been reviewed by a lawyer. It will be replaced by a reviewed version before sign-up opens to the
@@ -25,7 +27,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
         </Notice>
         {children}
         <p className="pt-2">
-          <Link to="/" className="text-amber-soft underline underline-offset-2">
+          <Link to="/" className="text-accent-text underline underline-offset-2">
             Back to Light Manager
           </Link>
         </p>
@@ -35,7 +37,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
 }
 
 function H2({ children }: { children: ReactNode }) {
-  return <h2 className="pt-2 text-base font-semibold text-ink-100">{children}</h2>;
+  return <h2 className="pt-3 font-display text-lg font-semibold tracking-tight text-fg">{children}</h2>;
 }
 
 export function PrivacyPage() {
@@ -87,7 +89,7 @@ export function PrivacyPage() {
 
       <H2>Contact</H2>
       <p>
-        <a href={`mailto:${CONTACT}`} className="text-amber-soft underline underline-offset-2">
+        <a href={`mailto:${CONTACT}`} className="text-accent-text underline underline-offset-2">
           {CONTACT}
         </a>
       </p>
@@ -108,7 +110,7 @@ export function TermsPage() {
       </ul>
       <p>
         Questions:{' '}
-        <a href={`mailto:${CONTACT}`} className="text-amber-soft underline underline-offset-2">
+        <a href={`mailto:${CONTACT}`} className="text-accent-text underline underline-offset-2">
           {CONTACT}
         </a>
       </p>
@@ -119,7 +121,7 @@ export function TermsPage() {
 /** A short line of links, for the sign-in and sign-up pages. */
 export function LegalLinks() {
   return (
-    <p className="mt-4 text-center text-xs text-ink-400">
+    <p className="mt-4 text-center text-xs text-fg-4">
       <Link to="/privacy" className="underline underline-offset-2">
         Privacy
       </Link>{' '}

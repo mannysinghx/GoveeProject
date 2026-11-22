@@ -9,7 +9,7 @@ export function PendingCommands({ commands }: { commands: CommandDto[] }) {
     <SectionCard title={`Pending commands (${commands.length})`}>
       <ul className="space-y-2" aria-live="polite">
         {commands.map((command) => (
-          <li key={command.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-ink-850 p-3 text-sm">
+          <li key={command.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-inset p-3 text-sm">
             <span>{command.summary}</span>
             <CommandStatusBadge status={command.status} />
           </li>
@@ -23,14 +23,14 @@ export function CommandHistory({ commands }: { commands: CommandDto[] }) {
   return (
     <SectionCard title="Recent commands">
       {commands.length === 0 ? (
-        <p className="text-sm text-ink-300">No commands sent to this device yet.</p>
+        <p className="text-sm text-fg-3">No commands sent to this device yet.</p>
       ) : (
-        <ul className="divide-y divide-ink-700/60">
+        <ul className="divide-y divide-line">
           {commands.map((command) => (
             <li key={command.id} className="py-2.5 first:pt-0 last:pb-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 text-sm break-words">{command.summary}</span>
-                <span className="text-xs text-ink-400">
+                <span className="text-xs text-fg-4">
                   {command.sourceType} · {timeAgo(command.createdAt)}
                 </span>
               </div>
@@ -41,7 +41,7 @@ export function CommandHistory({ commands }: { commands: CommandDto[] }) {
                   <span className="text-xs text-bad">{ERROR_CATEGORY_LABEL[command.errorCategory]}</span>
                 ) : null}
               </div>
-              {command.errorMessage ? <p className="mt-1 text-xs break-words text-ink-400">{command.errorMessage}</p> : null}
+              {command.errorMessage ? <p className="mt-1 text-xs break-words text-fg-4">{command.errorMessage}</p> : null}
             </li>
           ))}
         </ul>

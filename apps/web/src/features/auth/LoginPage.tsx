@@ -65,14 +65,14 @@ export function LoginPage({ signupOpen }: { signupOpen: boolean }) {
       </form>
       <div className="mt-4 space-y-2 text-center text-sm">
         <p>
-          <Link to="/forgot" className="text-amber-soft underline underline-offset-2">
+          <Link to="/forgot" className="text-accent-text underline underline-offset-2">
             Forgot your password?
           </Link>
         </p>
         {signupOpen ? (
-          <p className="text-ink-400">
+          <p className="text-fg-4">
             New here?{' '}
-            <Link to="/register" className="text-amber-soft underline underline-offset-2">
+            <Link to="/register" className="text-accent-text underline underline-offset-2">
               Create an account
             </Link>
           </p>

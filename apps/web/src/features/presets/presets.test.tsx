@@ -159,7 +159,7 @@ describe('the color scheme of the day', () => {
   it("shows today's scheme and what is coming, and keeps its own preset out of the grid", async () => {
     mockApi(routes([PUMPKIN, DAILY]));
     renderApp(<PresetsPage />);
-    const card = (await screen.findByRole('heading', { name: 'Color scheme of the day' })).closest('div.rounded-xl') as HTMLElement;
+    const card = (await screen.findByRole('heading', { name: 'Color scheme of the day' })).closest('.card') as HTMLElement;
     expect(within(card).getByText('Today, Fri, Nov 13')).toBeInTheDocument();
     expect(within(card).getByText('November: Pumpkin Patch')).toBeInTheDocument();
     expect(within(card).getByText('Sat, Nov 14')).toBeInTheDocument();

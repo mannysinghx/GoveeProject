@@ -48,11 +48,11 @@ export function ApplyPresetDialog({ preset, onClose }: { preset: PresetDto; onCl
   return (
     <Dialog title={`Apply "${preset.name}"`} open onClose={onClose}>
       <div className="space-y-4">
-        <ol className="space-y-1 text-sm text-ink-300">
+        <ol className="space-y-1 text-sm text-fg-3">
           {preset.actions.map((action, index) => (
             <li key={action.id}>
               {index + 1}. {action.summary}
-              {action.deviceName ? <span className="text-ink-400"> · {action.deviceName}</span> : null}
+              {action.deviceName ? <span className="text-fg-4"> · {action.deviceName}</span> : null}
             </li>
           ))}
         </ol>

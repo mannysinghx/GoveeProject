@@ -41,7 +41,7 @@ function ActionRow({
   const scenes = useScenes(draft.deviceId ?? '', draft.action.type === 'scene' && Boolean(draft.deviceId));
 
   return (
-    <Card className="space-y-3 bg-ink-850 p-3">
+    <Card className="space-y-3 bg-inset p-3">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">Step {index + 1}</span>
         <div className="flex gap-1">
@@ -107,24 +107,24 @@ function ActionRow({
 
 function Preview({ drafts, devices }: { drafts: DraftAction[]; devices: DeviceDto[] }) {
   return (
-    <div className="rounded-lg border border-ink-700 p-3">
+    <div className="rounded-lg border border-line p-3">
       <p className="text-sm font-medium">Preview</p>
-      <ol className="mt-2 space-y-1.5 text-sm text-ink-300">
+      <ol className="mt-2 space-y-1.5 text-sm text-fg-3">
         {drafts.map((draft, index) => {
           const hex = 'hex' in draft.action ? draft.action.hex : null;
           const device = devices.find((d) => d.id === draft.deviceId);
           return (
             <li key={draft.key} className="flex items-center gap-2">
-              <span className="tabular-nums text-ink-400">{index + 1}.</span>
-              {hex ? <span aria-hidden className="size-3.5 rounded border border-ink-600" style={{ backgroundColor: hex }} /> : null}
+              <span className="tabular-nums text-fg-4">{index + 1}.</span>
+              {hex ? <span aria-hidden className="size-3.5 rounded border border-line-strong" style={{ backgroundColor: hex }} /> : null}
               <span className="min-w-0 break-words">
-                {describeAction(draft.action)} <span className="text-ink-400">· {device?.name ?? 'the chosen target'}</span>
+                {describeAction(draft.action)} <span className="text-fg-4">· {device?.name ?? 'the chosen target'}</span>
               </span>
             </li>
           );
         })}
       </ol>
-      <p className="mt-2 text-xs text-ink-400">
+      <p className="mt-2 text-xs text-fg-4">
         Steps run in this order on each device. Devices are updated independently, not at the same instant. Steps a device
         cannot do are skipped and reported.
       </p>

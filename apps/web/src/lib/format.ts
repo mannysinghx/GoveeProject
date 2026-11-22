@@ -19,6 +19,21 @@ export function dateTime(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+/** "Good evening", for the top of the dashboard. */
+export function greeting(date: Date): string {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return 'Good morning';
+  if (hour >= 12 && hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/** "Sunday evening": where in the week and the day it is. */
+export function dayPart(date: Date): string {
+  const hour = date.getHours();
+  const part = hour >= 5 && hour < 12 ? 'morning' : hour >= 12 && hour < 17 ? 'afternoon' : hour >= 17 && hour < 21 ? 'evening' : 'night';
+  return `${date.toLocaleDateString(undefined, { weekday: 'long' })} ${part}`;
+}
+
 export const STATUS_LABEL: Record<CommandStatus | 'skipped', string> = {
   queued: 'Queued',
   sending: 'Sending',

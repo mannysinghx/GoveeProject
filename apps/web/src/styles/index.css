@@ -1,71 +1,336 @@
 @import 'tailwindcss';
 
-@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+@custom-variant light (&:where([data-theme='light'], [data-theme='light'] *));
 
 /*
- * A warm, low-light palette for a screen often used at night, outdoors, near the
- * lights themselves. Status colour is always paired with an icon or text.
+ * Lumen: the look of Light Manager.
+ *
+ * The interface is lit by your lights. A soft glow behind everything takes its colour from
+ * what your lights are showing, surfaces are quiet so that colour stays the loudest thing on
+ * the screen, and status is always paired with an icon or words, never colour alone.
+ *
+ * Two themes, Night (default) and Day, chosen in the app or by the device. Every text and
+ * control colour below is checked against its background for WCAG contrast in
+ * src/styles/theme-contrast.test.ts, so a palette change that fails cannot ship.
  */
-@theme {
-  --color-ink-950: #0f1113;
-  --color-ink-900: #15181b;
-  --color-ink-850: #1a1d20;
-  --color-ink-800: #212529;
-  --color-ink-700: #2d3238;
-  --color-ink-600: #434a52;
-  --color-ink-400: #8b939c;
-  --color-ink-300: #aab1b8;
-  --color-ink-200: #cdd2d6;
-  --color-ink-100: #eceae6;
 
-  --color-amber-glow: #f2b45a;
-  --color-amber-soft: #f7cd8c;
-  --color-amber-deep: #b97d2e;
-  --color-amber-wash: #2e2517;
+/* ------------------------------ Theme: Night ------------------------------- */
 
-  --color-good: #7bc794;
-  --color-good-wash: #17291e;
-  --color-warn: #e9c46a;
-  --color-warn-wash: #2c2613;
-  --color-bad: #ee8a7b;
-  --color-bad-wash: #301b18;
-  --color-info: #8ab8e0;
-  --color-info-wash: #18242f;
+:root {
+  color-scheme: dark;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --canvas: #0a0a14;
+  --surface: #12121f;
+  --raised: #1c1c30;
+  --inset: #191929;
+  --line: #2a2a44;
+  --line-strong: #3d3d5e;
+
+  --fg: #f5f3ff;
+  --fg-2: #d9d6ee;
+  --fg-3: #b0adcb;
+  --fg-4: #9895b8;
+
+  --accent: #ffb547;
+  --accent-ui: #ffb547;
+  --accent-text: #ffcc80;
+  --accent-wash: #2b2113;
+  --on-accent: #1c1204;
+  --accent-hi: #ffcf6e;
+  --accent-lo: #ff9a4a;
+
+  --good: #62d6a0;
+  --good-wash: #112a22;
+  --warn: #f2c660;
+  --warn-wash: #2b2412;
+  --bad: #ff9389;
+  --bad-wash: #2f1a1f;
+  --info: #8dbcff;
+  --info-wash: #16233a;
+
+  --elev-1: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 10px 30px -18px rgb(0 0 0 / 0.8);
+  --elev-2: inset 0 1px 0 rgb(255 255 255 / 0.07), 0 24px 60px -20px rgb(0 0 0 / 0.85);
+  --scrim: rgb(4 4 12 / 0.6);
+  --glow-strength: 24%;
+  --track: #34344f;
 }
+
+/* ------------------------------- Theme: Day -------------------------------- */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --canvas: #f5f2ec;
+  --surface: #ffffff;
+  --raised: #efebe3;
+  --inset: #f6f3ed;
+  --line: #e3ded3;
+  --line-strong: #c9c3b6;
+
+  --fg: #17142b;
+  --fg-2: #37334f;
+  --fg-3: #585473;
+  --fg-4: #64617f;
+
+  --accent: #f0a020;
+  --accent-ui: #a45c00;
+  --accent-text: #8f4a00;
+  --accent-wash: #fdf0d9;
+  --on-accent: #1c1204;
+  --accent-hi: #ffc24d;
+  --accent-lo: #f08a1c;
+
+  --good: #0f6b46;
+  --good-wash: #e1f4ea;
+  --warn: #7d5200;
+  --warn-wash: #fbf0d2;
+  --bad: #b3261e;
+  --bad-wash: #fde6e3;
+  --info: #1b5bb8;
+  --info-wash: #e2edfb;
+
+  --elev-1: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 1px 2px rgb(23 20 43 / 0.05), 0 14px 34px -20px rgb(23 20 43 / 0.22);
+  --elev-2: inset 0 1px 0 rgb(255 255 255 / 0.9), 0 28px 70px -24px rgb(23 20 43 / 0.35);
+  --scrim: rgb(23 20 43 / 0.35);
+  --glow-strength: 16%;
+  --track: #d9d3c5;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --line: var(--line-strong);
+    --fg-4: var(--fg-3);
+  }
+}
+
+/* --------------------------- Tokens for Tailwind --------------------------- */
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-inset: var(--inset);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-2: var(--fg-2);
+  --color-fg-3: var(--fg-3);
+  --color-fg-4: var(--fg-4);
+
+  --color-accent: var(--accent);
+  --color-accent-ui: var(--accent-ui);
+  --color-accent-text: var(--accent-text);
+  --color-accent-wash: var(--accent-wash);
+  --color-on-accent: var(--on-accent);
+
+  --color-good: var(--good);
+  --color-good-wash: var(--good-wash);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-bad: var(--bad);
+  --color-bad-wash: var(--bad-wash);
+  --color-info: var(--info);
+  --color-info-wash: var(--info-wash);
+
+  --shadow-card: var(--elev-1);
+  --shadow-float: var(--elev-2);
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: ui-rounded, 'SF Pro Rounded', 'Segoe UI Variable Display', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: linear(
+    0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159,
+    1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%,
+    0.997 69.8%, 1.003 76.9%, 1
+  );
+
+  --animate-rise: rise 0.55s var(--ease-out-quint) both;
+  --animate-fade: fade 0.3s ease-out both;
+  --animate-pop: pop 0.5s var(--ease-spring) both;
+  --animate-sheet: sheet 0.45s var(--ease-out-quint) both;
+  --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.94);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes sheet {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 0.45;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+}
+
+/*
+ * The glow behind the app. Registered as colours so a change fades instead of snapping.
+ * The shell sets these from what the lights are showing.
+ */
+@property --glow-1 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ffb547;
+}
+@property --glow-2 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ff7a59;
+}
+@property --glow-3 {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #8b7bff;
+}
+
+/* ----------------------------------- Base ---------------------------------- */
 
 @layer base {
   html {
-    color-scheme: dark;
-    background-color: var(--color-ink-950);
+    background-color: var(--canvas);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
 
+  /* Everything is sized in rem, so on a big monitor or a TV the whole interface grows with the screen. */
+  @media (min-width: 1920px) {
+    html {
+      font-size: 112.5%;
+    }
+  }
+  @media (min-width: 2560px) {
+    html {
+      font-size: 137.5%;
+    }
+  }
+
+  /* The page colour lives on html, so the glow can sit between it and the content. */
   body {
     margin: 0;
     min-height: 100dvh;
-    background-color: var(--color-ink-950);
-    color: var(--color-ink-100);
+    color: var(--fg);
     font-family: var(--font-sans);
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     font-feature-settings: 'tnum' 1;
+    overflow-wrap: break-word;
+    /* A phone held sideways has a notch at one side. */
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* No double-tap zoom delay on controls, which is what makes a web page feel like an app. */
+  button,
+  a,
+  input,
+  select,
+  summary,
+  [role='button'] {
+    touch-action: manipulation;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 45%, transparent);
+    color: inherit;
   }
 
   :focus-visible {
-    outline: 2px solid var(--color-amber-glow);
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline: 2px solid var(--accent-ui);
+    outline-offset: 3px;
+    border-radius: 6px;
   }
 
-  input[type='range'] {
-    accent-color: var(--color-amber-glow);
+  button,
+  [role='button'],
+  summary,
+  select,
+  input[type='checkbox'],
+  input[type='radio'] {
     cursor: pointer;
   }
 
-  /* Dialog backdrop */
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--accent-ui);
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+  }
+
+  input[type='range'] {
+    accent-color: var(--accent-ui);
+    cursor: pointer;
+  }
+
+  input[type='time'],
+  input[type='date'] {
+    color-scheme: inherit;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+
   dialog::backdrop {
-    background: rgb(0 0 0 / 0.65);
+    background: var(--scrim);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -75,30 +340,292 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  @media (forced-colors: active) {
+    /* The system palette takes over, so the shapes of things have to survive without fills. */
+    .card,
+    .glass,
+    .tile {
+      border: 1px solid CanvasText;
+    }
+    .bead {
+      forced-color-adjust: none;
     }
   }
 }
 
+/* -------------------------------- Components ------------------------------- */
+
 @layer components {
+  /* A quiet surface. Slightly see-through, so the glow behind the app tints it. */
+  .card {
+    background: color-mix(in oklab, var(--surface) 86%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--elev-1);
+  }
+
+  /* Shell chrome: the rail, the top bar, the dock, sheets and the command palette. */
+  .glass {
+    background: color-mix(in oklab, var(--surface) 72%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--elev-2);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    backdrop-filter: blur(22px) saturate(1.5);
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass {
+      background: var(--surface);
+    }
+  }
+
+  /* An interactive surface that lifts a little under a pointer. */
+  .tile {
+    background: color-mix(in oklab, var(--surface) 86%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--elev-1);
+    transition:
+      transform 0.35s var(--ease-out-quint),
+      border-color 0.2s,
+      box-shadow 0.35s;
+  }
+  @media (hover: hover) {
+    .tile:hover {
+      transform: translateY(-2px);
+      border-color: var(--line-strong);
+    }
+  }
+
+  /* The warm gradient on the main button, with a halo that follows the theme. */
+  .btn-primary {
+    background-image: linear-gradient(135deg, var(--accent-hi), var(--accent-lo));
+    color: var(--on-accent);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.45),
+      0 10px 26px -10px color-mix(in oklab, var(--accent-lo) 80%, transparent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.06) saturate(1.05);
+  }
+
+  /* The glow behind everything. */
+  .ambient {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    transition:
+      --glow-1 1.8s ease,
+      --glow-2 1.8s ease,
+      --glow-3 1.8s ease;
+  }
+  .ambient::before,
+  .ambient::after,
+  .ambient > span {
+    content: '';
+    position: absolute;
+    border-radius: 999px;
+    will-change: opacity;
+  }
+  .ambient::before {
+    inset: -30vmax auto auto -20vmax;
+    width: 80vmax;
+    height: 70vmax;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--glow-1) var(--glow-strength), transparent), transparent);
+  }
+  .ambient::after {
+    inset: 10vh -25vmax auto auto;
+    width: 70vmax;
+    height: 70vmax;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--glow-2) var(--glow-strength), transparent), transparent);
+  }
+  .ambient > span {
+    inset: auto auto -35vmax 15vw;
+    width: 80vmax;
+    height: 60vmax;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--glow-3) calc(var(--glow-strength) * 0.8), transparent), transparent);
+  }
+
+  /* One LED on a string. */
+  .bead {
+    flex: none;
+    inline-size: var(--bead-size, 0.6rem);
+    block-size: var(--bead-size, 0.6rem);
+    border-radius: 999px;
+    background: var(--bead, var(--accent));
+    box-shadow: 0 0 0.8rem 0.12rem color-mix(in oklab, var(--bead, var(--accent)) 60%, transparent);
+    opacity: var(--lit, 1);
+  }
+  .bead[data-off] {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--line-strong);
+    opacity: 1;
+  }
+  /* On a pale page a pale colour needs an edge, or a warm white light would vanish. */
+  :root[data-theme='light'] .bead:not([data-off]) {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--bead, var(--accent)) 55%, #4a3200),
+      0 0 0.8rem 0.12rem color-mix(in oklab, var(--bead, var(--accent)) 45%, transparent);
+  }
+  .beads[data-live] .bead:not([data-off]) {
+    animation: bead-breathe 4.2s ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * 150ms);
+  }
+  @keyframes bead-breathe {
+    0%,
+    100% {
+      opacity: calc(var(--lit, 1) * 0.72);
+    }
+    50% {
+      opacity: var(--lit, 1);
+    }
+  }
+
+  /* A row of colours, with a soft glow of the same colours underneath. */
+  .spectrum {
+    position: relative;
+    isolation: isolate;
+  }
+  .spectrum::before {
+    content: '';
+    position: absolute;
+    inset: 22% 4% -28% 4%;
+    z-index: -1;
+    background: var(--spectrum);
+    filter: blur(22px);
+    opacity: 0.5;
+    border-radius: inherit;
+  }
+  :root[data-theme='light'] .spectrum::before {
+    opacity: 0.38;
+  }
+
+  /* A range input with a filled track. The fill comes from --fill, set by the component. */
+  .slider {
+    --fill: 0%;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    block-size: 2rem;
+    inline-size: 100%;
+    margin: 0;
+  }
+  .slider::-webkit-slider-runnable-track {
+    block-size: 0.625rem;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--accent-ui) var(--fill), var(--track) var(--fill));
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
+    margin-block-start: calc((0.625rem - 1.75rem) / 2);
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--accent-ui);
+    box-shadow:
+      0 2px 8px rgb(0 0 0 / 0.35),
+      0 0 0 6px color-mix(in oklab, var(--accent-ui) 0%, transparent);
+    transition:
+      box-shadow 0.25s,
+      transform 0.25s var(--ease-spring);
+  }
+  .slider:active::-webkit-slider-thumb {
+    transform: scale(1.12);
+    box-shadow:
+      0 2px 8px rgb(0 0 0 / 0.35),
+      0 0 0 8px color-mix(in oklab, var(--accent-ui) 22%, transparent);
+  }
+  .slider::-moz-range-track {
+    block-size: 0.625rem;
+    border-radius: 999px;
+    background: var(--track);
+  }
+  .slider::-moz-range-progress {
+    block-size: 0.625rem;
+    border-radius: 999px;
+    background: var(--accent-ui);
+  }
+  .slider::-moz-range-thumb {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
+    border-radius: 999px;
+    background: #fff;
+    border: 3px solid var(--accent-ui);
+    box-shadow: 0 2px 8px rgb(0 0 0 / 0.35);
+  }
+  .slider:focus-visible {
+    outline-offset: 4px;
+    border-radius: 999px;
+  }
+
+  /* The colour picker. */
   .color-picker-host .react-colorful {
     width: 100%;
-    height: 180px;
+    height: 200px;
   }
   .color-picker-host .react-colorful__saturation {
-    border-radius: 10px 10px 0 0;
+    border-radius: 20px 20px 0 0;
+    border-bottom: 0;
   }
   .color-picker-host .react-colorful__last-control {
-    border-radius: 0 0 10px 10px;
-    height: 28px;
+    border-radius: 0 0 20px 20px;
+    height: 30px;
   }
   .color-picker-host .react-colorful__pointer {
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.4);
   }
 
   .kelvin-track {
     background: linear-gradient(to right, #ffb46b, #ffe4c4, #fff5ec, #e3ecff, #c9dcff);
     border-radius: 999px;
     height: 10px;
+  }
+
+  /* A strip that scrolls sideways and settles on an item, without a visible bar. */
+  .snap-row {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+    padding-block: 0.25rem 1rem;
+    scroll-padding-inline: 1rem;
+    overscroll-behavior-x: contain;
+  }
+  .snap-row::-webkit-scrollbar {
+    display: none;
+  }
+  .snap-row > * {
+    scroll-snap-align: start;
+    flex: none;
+  }
+  @media (min-width: 640px) {
+    .snap-row {
+      margin-inline: 0;
+      padding-inline: 0;
+      scroll-padding-inline: 0;
+    }
+  }
+
+  /* Text that glows with the spectrum, for the one or two places that earn it. */
+  .text-spectrum {
+    background-image: linear-gradient(100deg, var(--accent-hi), #ff7a8a 45%, #a98bff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  :root[data-theme='light'] .text-spectrum {
+    background-image: linear-gradient(100deg, #b45f00, #c2255c 50%, #5b3fd1);
   }
 }

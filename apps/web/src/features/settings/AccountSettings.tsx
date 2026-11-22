@@ -113,7 +113,7 @@ export function SignupSettings() {
             Email is not set up yet, so sign-up cannot be turned on.
           </Notice>
         ) : null}
-        <p className="text-sm text-ink-300">
+        <p className="text-sm text-fg-3">
           {data.enabled ? 'Sign-up is on.' : 'Sign-up is off.'} {data.createdLastDay} accounts made in the last day,{' '}
           {data.createdTotal} in total. {data.mailQueued} emails waiting, {data.mailFailedLastDay} not delivered in the last day.
         </p>

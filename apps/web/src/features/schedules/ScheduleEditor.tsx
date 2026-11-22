@@ -339,7 +339,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
 
         {mode === 'custom' ? (
           <fieldset>
-            <legend className="mb-2 text-sm font-medium text-ink-200">Days</legend>
+            <legend className="mb-2 text-sm font-medium text-fg-2">Days</legend>
             <div className="flex flex-wrap gap-1.5">
               {WEEKDAYS.map((day) => {
                 const on = customDays.includes(day.value);
@@ -352,7 +352,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
                       setCustomDays((current) => (on ? current.filter((d) => d !== day.value) : [...current, day.value]))
                     }
                     className={`min-h-11 min-w-12 rounded-lg border px-2 text-sm ${
-                      on ? 'border-amber-glow bg-amber-wash text-amber-soft' : 'border-ink-700 bg-ink-850 text-ink-200'
+                      on ? 'border-accent-ui bg-accent-wash text-accent-text' : 'border-line bg-inset text-fg-2'
                     }`}
                   >
                     {day.label}
@@ -364,7 +364,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
         ) : null}
 
         {mode === 'solar' ? (
-          <div className="grid gap-3 rounded-lg border border-ink-700 p-3 sm:grid-cols-2">
+          <div className="grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
             <Field label="Event">
               {(props) => (
                 <select {...props} className={inputClass} value={solarEvent} onChange={(e) => setSolarEvent(e.target.value as 'sunrise' | 'sunset')}>
@@ -411,20 +411,20 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
         ) : null}
 
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-ink-200">If a run is missed because the app was not running</legend>
+          <legend className="mb-2 text-sm font-medium text-fg-2">If a run is missed because the app was not running</legend>
           <div className="space-y-2">
-            <label className="flex items-start gap-3 rounded-lg border border-ink-700 p-3">
+            <label className="flex items-start gap-3 rounded-lg border border-line p-3">
               <input type="radio" name="missed" className="mt-0.5 size-4" checked={policy === 'skip'} onChange={() => setPolicy('skip')} />
               <span className="text-sm">
                 <span className="font-medium">Record it and do nothing</span>
-                <span className="block text-ink-300">The safest choice. Missed runs appear in the history.</span>
+                <span className="block text-fg-3">The safest choice. Missed runs appear in the history.</span>
               </span>
             </label>
-            <label className="flex items-start gap-3 rounded-lg border border-ink-700 p-3">
+            <label className="flex items-start gap-3 rounded-lg border border-line p-3">
               <input type="radio" name="missed" className="mt-0.5 size-4" checked={policy === 'run_latest'} onChange={() => setPolicy('run_latest')} />
               <span className="text-sm">
                 <span className="font-medium">Catch up with the latest one</span>
-                <span className="block text-ink-300">
+                <span className="block text-fg-3">
                   When the app returns, run only the most recent missed run, if it is recent enough. Older ones are never replayed.
                 </span>
               </span>
@@ -432,9 +432,9 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           </div>
         </fieldset>
 
-        <div className="rounded-lg border border-ink-700 p-3" aria-live="polite">
+        <div className="rounded-lg border border-line p-3" aria-live="polite">
           <p className="mb-2 flex items-center gap-2 text-sm font-medium">
-            <CalendarClock className="size-4 text-ink-400" aria-hidden />
+            <CalendarClock className="size-4 text-fg-4" aria-hidden />
             Next runs
           </p>
           {recurrenceError ? <p className="text-sm text-bad">{recurrenceError}</p> : null}
@@ -442,7 +442,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           {preview.isError ? <ErrorNotice error={preview.error} /> : null}
           {!recurrenceError && preview.data ? (
             <>
-              <ol className="space-y-1 text-sm text-ink-200">
+              <ol className="space-y-1 text-sm text-fg-2">
                 {preview.data.nextRuns.map((run) => (
                   <li key={run.at}>
                     {run.local}

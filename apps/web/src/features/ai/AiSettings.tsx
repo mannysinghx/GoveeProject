@@ -26,16 +26,16 @@ export function AiSettings() {
           {data.providers.length > 0 ? (
             <ul className="space-y-2">
               {data.providers.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-2.5 text-sm">
-                  <span className="font-medium text-ink-100">{p.label}</span>
-                  <span className="font-mono text-xs text-ink-300">{p.model}</span>
+                <li key={p.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-2.5 text-sm">
+                  <span className="font-medium text-fg">{p.label}</span>
+                  <span className="font-mono text-xs text-fg-3">{p.model}</span>
                   {p.available ? <Badge tone="good">Ready</Badge> : <Badge tone="warn">Resting after an error</Badge>}
-                  {p.note ? <span className="w-full text-xs text-ink-400">{p.note}</span> : null}
+                  {p.note ? <span className="w-full text-xs text-fg-4">{p.note}</span> : null}
                 </li>
               ))}
             </ul>
           ) : null}
-          <p className="text-sm text-ink-200">
+          <p className="text-sm text-fg-2">
             This month: about ${data.monthSpentUsd.toFixed(4)} of the ${data.monthlyLimitUsd.toFixed(2)} limit
             {isMember ? ', on your own keys' : ''}. Free models count at their paid price, so the limit never depends on a free
             allowance.

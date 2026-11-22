@@ -15,14 +15,14 @@ export function SharedModeration() {
     >
       {list.isPending ? <Loading label="Loading shared items" /> : null}
       {list.isError ? <ErrorNotice error={list.error} /> : null}
-      {list.data && list.data.length === 0 ? <p className="text-sm text-ink-300">Nothing has been shared yet.</p> : null}
+      {list.data && list.data.length === 0 ? <p className="text-sm text-fg-3">Nothing has been shared yet.</p> : null}
       {list.data && list.data.length > 0 ? (
         <ul className="space-y-2">
           {list.data.map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-3 text-sm">
-              <span className="min-w-0 font-medium break-words text-ink-100">{item.title}</span>
+            <li key={item.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-3 text-sm">
+              <span className="min-w-0 font-medium break-words text-fg">{item.title}</span>
               {item.hidden ? <Badge tone="warn">Hidden</Badge> : null}
-              <span className="w-full text-xs text-ink-400">
+              <span className="w-full text-xs text-fg-4">
                 {item.kind} by {item.by}
                 {item.official ? '' : ` (${item.sharerEmail ?? `account ${item.sharerId}`})`}, updated {dateTime(item.updatedAt)}, imported {item.imports} time(s).
                 {item.description ? ` "${item.description}"` : ''}

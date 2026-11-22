@@ -54,9 +54,9 @@ export function AccountData({ canDelete }: { canDelete: boolean }) {
         </form>
 
         {canDelete ? (
-          <form onSubmit={deleteAccount} className="max-w-md space-y-3 border-t border-ink-700 pt-5">
+          <form onSubmit={deleteAccount} className="max-w-md space-y-3 border-t border-line pt-5">
             <h3 className="text-sm font-semibold text-bad">Delete my account</h3>
-            <p className="text-sm text-ink-300">
+            <p className="text-sm text-fg-3">
               Deletes your sign-in, your keys, and every light, group, preset, schedule and record in your account. It cannot be
               undone. Download your data first if you want a copy.
             </p>
@@ -89,13 +89,13 @@ export function AdminAccounts() {
       {list.data ? (
         <ul className="space-y-2">
           {list.data.accounts.map((account) => (
-            <li key={account.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-3 text-sm">
-              <span className="min-w-0 truncate font-medium text-ink-100">{account.email ?? `Account ${account.id}`}</span>
+            <li key={account.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-3 text-sm">
+              <span className="min-w-0 truncate font-medium text-fg">{account.email ?? `Account ${account.id}`}</span>
               {account.role === 'owner' ? <Badge tone="amber">You</Badge> : null}
               {account.status === 'suspended' ? <Badge tone="warn">Suspended</Badge> : null}
               {account.displayName ? <Badge>{account.displayName}</Badge> : null}
               {account.sharingBlocked ? <Badge tone="warn">Sharing off</Badge> : null}
-              <span className="w-full text-xs text-ink-400">
+              <span className="w-full text-xs text-fg-4">
                 Joined {dateTime(account.createdAt)}. Last sign-in {account.lastSignInAt ? dateTime(account.lastSignInAt) : 'never'}.{' '}
                 {account.goveeConnected ? 'Govee key connected' : 'No Govee key'}
                 {account.devices !== null ? `, ${account.devices} light(s)` : ''}, {account.aiKeys} AI key(s).

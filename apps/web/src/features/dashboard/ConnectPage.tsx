@@ -11,8 +11,8 @@ import { useSession } from '../auth/useSession';
 function Step({ number, title, children }: { number: number; title: string; children: ReactNode }) {
   return (
     <section className="space-y-3">
-      <h2 className="flex items-center gap-2 text-sm font-semibold text-ink-100">
-        <span className="flex size-6 items-center justify-center rounded-full bg-ink-800 text-xs text-amber-soft">{number}</span>
+      <h2 className="flex items-center gap-2 text-sm font-semibold text-fg">
+        <span className="flex size-6 items-center justify-center rounded-full bg-raised text-xs text-accent-text">{number}</span>
         {title}
       </h2>
       {children}
@@ -50,7 +50,7 @@ export function ConnectPage() {
             </Notice>
           ) : status.canChange ? (
             <>
-              <div className="space-y-2 text-sm text-ink-300">
+              <div className="space-y-2 text-sm text-fg-3">
                 <GoveeKeySteps />
                 <p>Paste it below. It is checked with Govee before it is saved, and stored encrypted.</p>
               </div>
@@ -96,10 +96,10 @@ export function ConnectPage() {
                     <li key={device.id}>
                       <Link
                         to={`/devices/${device.id}`}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-ink-850 p-3 hover:bg-ink-800"
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-inset p-3 hover:bg-raised"
                       >
                         <span className="font-medium">{device.name}</span>
-                        <span className="flex items-center gap-2 text-sm text-ink-300">
+                        <span className="flex items-center gap-2 text-sm text-fg-3">
                           {device.sku}
                           {device.isPrimaryModel ? (
                             <Badge tone="amber" icon={<CheckCircle2 className="size-3" aria-hidden />}>
@@ -119,9 +119,9 @@ export function ConnectPage() {
         {isMember ? (
           <>
             <Step number={3} title="Your time zone">
-              <p className="text-sm text-ink-300">
-                Schedules use {settings.data ? <span className="font-medium text-ink-100">{settings.data.defaultTimeZone}</span> : 'your time zone'}.{' '}
-                <Link to="/settings" className="text-amber-soft underline underline-offset-2">
+              <p className="text-sm text-fg-3">
+                Schedules use {settings.data ? <span className="font-medium text-fg">{settings.data.defaultTimeZone}</span> : 'your time zone'}.{' '}
+                <Link to="/settings" className="text-accent-text underline underline-offset-2">
                   Change it in Settings
                 </Link>{' '}
                 if that is not where your lights are.
@@ -134,19 +134,19 @@ export function ConnectPage() {
               {updateSettings.isError ? <ErrorNotice error={updateSettings.error} /> : null}
             </Step>
             <Step number={4} title="Holiday shows">
-              <p className="text-sm text-ink-300">
+              <p className="text-sm text-fg-3">
                 Light shows for holidays such as Diwali, Christmas and New Year are set up for your lights, switched off. Nothing
                 runs until you turn on the ones you want in{' '}
-                <Link to="/schedules" className="text-amber-soft underline underline-offset-2">
+                <Link to="/schedules" className="text-accent-text underline underline-offset-2">
                   Schedules
                 </Link>
                 .
               </p>
             </Step>
             <Step number={5} title="AI, if you want it">
-              <p className="text-sm text-ink-300">
+              <p className="text-sm text-fg-3">
                 Ask and Describe use an AI provider with your own key, and are off without one. Add a key in{' '}
-                <Link to="/settings" className="text-amber-soft underline underline-offset-2">
+                <Link to="/settings" className="text-accent-text underline underline-offset-2">
                   Settings, under AI
                 </Link>
                 .
@@ -155,7 +155,7 @@ export function ConnectPage() {
           </>
         ) : null}
 
-        <Link to="/" className="inline-block text-sm text-amber-soft underline underline-offset-2">
+        <Link to="/" className="inline-block text-sm text-accent-text underline underline-offset-2">
           Go to the dashboard
         </Link>
       </Card>

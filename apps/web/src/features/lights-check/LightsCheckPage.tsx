@@ -53,12 +53,12 @@ function LedMarker({
   const count = markedLeds(string, marks).length;
   return (
     <div>
-      <p className="mb-1.5 text-sm font-medium text-ink-200">
-        {string.name} <span className="text-xs font-normal text-ink-400">{count === 0 ? 'none marked' : `${count} marked`}</span>
+      <p className="mb-1.5 text-sm font-medium text-fg-2">
+        {string.name} <span className="text-xs font-normal text-fg-4">{count === 0 ? 'none marked' : `${count} marked`}</span>
       </p>
       <div className="flex flex-wrap gap-1">
         {ordered.map((segment) => (
-          <div key={segment} className="flex gap-px rounded border border-ink-600 p-px">
+          <div key={segment} className="flex gap-px rounded border border-line-strong p-px">
             {[...ledsInSegment(string, segment)]
               .sort((a, b) => a - b)
               .map((led) => {
@@ -71,7 +71,7 @@ function LedMarker({
                     aria-pressed={marked}
                     aria-label={`${string.name} LED ${led}, segment ${segment}`}
                     onClick={() => onToggle(key)}
-                    className={`h-8 w-6 rounded-sm text-[9px] tabular-nums ${marked ? 'bg-amber-glow font-semibold text-ink-900' : 'bg-ink-800 text-ink-300'}`}
+                    className={`h-8 w-6 rounded-sm text-[9px] tabular-nums ${marked ? 'bg-accent font-semibold text-on-accent' : 'bg-raised text-fg-3'}`}
                   >
                     {led}
                   </button>
@@ -132,7 +132,7 @@ export function LightsCheckPage() {
 
   return (
     <>
-      <Link to="/patterns/new" className="mb-3 inline-flex min-h-9 items-center gap-1 text-sm text-ink-300 hover:text-ink-100">
+      <Link to="/patterns/new" className="mb-3 inline-flex min-h-9 items-center gap-1 text-sm text-fg-3 hover:text-fg">
         <ArrowLeft className="size-4" aria-hidden />
         Paint a pattern
       </Link>
@@ -174,7 +174,7 @@ export function LightsCheckPage() {
                     {isCurrent && apply.data ? <RunResults run={apply.data} /> : null}
                     {(isCurrent && apply.data) || answer ? (
                       <fieldset>
-                        <legend className="mb-2 text-sm font-medium text-ink-200">{details.question}</legend>
+                        <legend className="mb-2 text-sm font-medium text-fg-2">{details.question}</legend>
                         <div className="flex flex-wrap items-center gap-2">
                           <Button size="sm" variant={answer === 'good' ? 'primary' : 'secondary'} aria-pressed={answer === 'good'} onClick={() => setAnswers((a) => ({ ...a, [test]: 'good' }))}>
                             Yes
@@ -183,12 +183,12 @@ export function LightsCheckPage() {
                             {details.bad}
                           </Button>
                           {test === 'blocks' ? (
-                            <label className="flex items-center gap-2 text-sm text-ink-300">
+                            <label className="flex items-center gap-2 text-sm text-fg-3">
                               LEDs in one block
                               <input
                                 type="number"
                                 aria-label="LEDs in one color block"
-                                className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                                className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
                                 min={1}
                                 max={100}
                                 value={blockLeds ?? ''}
@@ -218,16 +218,16 @@ export function LightsCheckPage() {
                 <LedMarker key={string.deviceId} string={string} marks={marks} onToggle={toggleMark} />
               ))}
               {marked.length > 0 ? (
-                <div className="space-y-2 border-t border-ink-700/70 pt-3">
+                <div className="space-y-2 border-t border-line pt-3">
                   {marked.map(({ string, segments }) => (
-                    <p key={string.deviceId} className="text-sm text-ink-200">
+                    <p key={string.deviceId} className="text-sm text-fg-2">
                       {string.name}: LEDs {describeRanges(markedLeds(string, marks))}, in segment{segments.length === 1 ? '' : 's'} {describeRanges(segments)}
                     </p>
                   ))}
                   <Button size="sm" icon={<RefreshCcw className="size-4" aria-hidden />} busy={resend.isPending} onClick={resendMarked}>
                     Resend marked segments
                   </Button>
-                  <p className="text-xs text-ink-400">
+                  <p className="text-xs text-fg-4">
                     Sends each marked segment on its own, one a second. Check whether those LEDs change.
                   </p>
                   {resend.isError ? <ErrorNotice error={resend.error} /> : null}
@@ -260,7 +260,7 @@ export function LightsCheckPage() {
               readOnly
               aria-label="Light check report"
               rows={Math.min(10, report.split('\n').length + 1)}
-              className="w-full rounded-lg border border-ink-700 bg-ink-850 p-2 font-mono text-xs text-ink-200"
+              className="w-full rounded-lg border border-line bg-inset p-2 font-mono text-xs text-fg-2"
               value={report}
             />
           </SectionCard>

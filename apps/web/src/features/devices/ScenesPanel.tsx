@@ -72,7 +72,7 @@ export function ScenesPanel({ device }: { device: DeviceDto }) {
         {scenes.data && scenes.data.scenes.length > 0 ? (
           <>
             <div className="relative max-w-sm">
-              <Search className="absolute top-3.5 left-3 size-4 text-ink-400" aria-hidden />
+              <Search className="absolute top-3.5 left-3 size-4 text-fg-4" aria-hidden />
               <input
                 aria-label="Filter scenes"
                 placeholder={`Filter ${scenes.data.scenes.length} scenes`}
@@ -86,7 +86,7 @@ export function ScenesPanel({ device }: { device: DeviceDto }) {
               <div key={label}>
                 <div className="mb-2 flex items-center gap-2">
                   <Badge tone="info">{label}</Badge>
-                  <span className="text-xs text-ink-400">{list.length}</span>
+                  <span className="text-xs text-fg-4">{list.length}</span>
                 </div>
                 <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {list.map((scene) => (
@@ -105,7 +105,7 @@ export function ScenesPanel({ device }: { device: DeviceDto }) {
                 </ul>
               </div>
             ))}
-            {visible.length === 0 ? <p className="text-sm text-ink-300">No scenes match that filter.</p> : null}
+            {visible.length === 0 ? <p className="text-sm text-fg-3">No scenes match that filter.</p> : null}
           </>
         ) : null}
 

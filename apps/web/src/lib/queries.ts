@@ -66,12 +66,12 @@ export const keys = {
 
 /* ------------------------------- devices --------------------------------- */
 
-export function useDevices() {
+export function useDevices(refetchMs = 5000) {
   return useQuery({
     queryKey: keys.devices,
     queryFn: async () => (await api<{ devices: DeviceDto[] }>('/devices')).devices,
     // Reads the app's cache, not Govee. Pending commands need this to stay current.
-    refetchInterval: 5000,
+    refetchInterval: refetchMs,
   });
 }
 

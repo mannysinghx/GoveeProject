@@ -1,7 +1,8 @@
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { ConnectivityBadge, FreshnessBadge } from '../../components/status';
-import { Badge, Button, Detail, ErrorNotice, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
+import { LightStrip, lookOfDevice } from '../../components/light';
+import { Badge, Button, Detail, ErrorNotice, Loading, Notice, SectionCard } from '../../components/ui';
 import { dateTime, timeAgo } from '../../lib/format';
 import { useDevice, useRefreshDevice } from '../../lib/queries';
 import { CapabilityPanel } from './CapabilityPanel';
@@ -18,7 +19,7 @@ export function DeviceDetailPage() {
   if (device.isError) {
     return (
       <>
-        <Link to="/" className="mb-4 inline-flex items-center gap-1 text-sm text-ink-300 hover:text-ink-100">
+        <Link to="/" className="mb-4 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-fg-3 hover:text-fg">
           <ArrowLeft className="size-4" aria-hidden />
           Dashboard
         </Link>
@@ -29,16 +30,28 @@ export function DeviceDetailPage() {
 
   const d = device.data;
   const missing = d.discoveryStatus === 'missing';
+  const look = lookOfDevice(d);
 
   return (
     <>
-      <Link to="/" className="mb-3 inline-flex min-h-9 items-center gap-1 text-sm text-ink-300 hover:text-ink-100">
+      <Link to="/" className="mb-4 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-fg-3 hover:text-fg">
         <ArrowLeft className="size-4" aria-hidden />
         Dashboard
       </Link>
-      <PageHeader
-        title={d.name}
-        actions={
+      <header
+        className="card mb-6 overflow-hidden rounded-[2rem] p-6 sm:p-8"
+        style={{ backgroundImage: 'radial-gradient(110% 150% at 0% 0%, color-mix(in oklab, var(--accent) 13%, transparent), transparent 60%)' }}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold tracking-[0.14em] text-accent-text uppercase">{d.sku}</p>
+            <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-fg sm:text-4xl">{d.name}</h1>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <ConnectivityBadge device={d} />
+              {!missing ? <FreshnessBadge device={d} /> : null}
+              {d.isPrimaryModel ? <Badge tone="amber">Permanent Outdoor Lights Elite</Badge> : null}
+            </div>
+          </div>
           <Button
             icon={<RefreshCw className="size-4" aria-hidden />}
             busy={refresh.isPending}
@@ -47,16 +60,13 @@ export function DeviceDetailPage() {
           >
             Refresh status
           </Button>
-        }
-      />
-
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <ConnectivityBadge device={d} />
-          {!missing ? <FreshnessBadge device={d} /> : null}
-          {d.isPrimaryModel ? <Badge tone="amber">Permanent Outdoor Lights Elite</Badge> : null}
         </div>
+        {d.isGoveeGroup ? null : (
+          <LightStrip className="mt-7" color={look.color} lit={look.lit} on={look.on === true} live={look.live} count={44} size="0.7rem" />
+        )}
+      </header>
 
+      <div className="space-y-6">
         {missing ? (
           <Notice tone="warn" title="Govee no longer lists this device">
             It was last listed {dateTime(d.lastDiscoveredAt)}. Its history, presets and schedules are kept, but it cannot
@@ -101,7 +111,7 @@ export function DeviceDetailPage() {
 
         {!missing ? <DeviceControls device={d} /> : null}
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid gap-6 lg:grid-cols-2">
           <ReportedStatePanel device={d} />
           <SectionCard title="Device">
             <dl className="grid grid-cols-2 gap-4">

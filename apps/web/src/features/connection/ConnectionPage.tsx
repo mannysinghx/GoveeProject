@@ -90,17 +90,17 @@ function AdviceCard({ advice }: { advice: ConnectionAdviceDto }) {
 function LightRow({ device }: { device: DeviceHealthDto }) {
   const badge = STATE_BADGE[device.state];
   return (
-    <li className="rounded-lg bg-ink-850 p-3">
+    <li className="rounded-lg bg-inset p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="min-w-0 font-medium break-words">{device.name}</span>
         <Badge tone={badge.tone}>{badge.label}</Badge>
       </div>
-      <p className="mt-1 text-xs text-ink-400">
+      <p className="mt-1 text-xs text-fg-4">
         {device.problemSince ? `Since ${dateTime(device.problemSince)}. ` : ''}
         {device.state !== 'not_monitored' ? `Last online: ${timeAgo(device.lastOnlineAt)}. Last checked: ${timeAgo(device.lastCheckedAt)}. ` : ''}
         {device.dropsLast7Days > 0 ? `Dropped ${device.dropsLast7Days} time${device.dropsLast7Days === 1 ? '' : 's'} in the last 7 days.` : ''}
       </p>
-      {device.note ? <p className="mt-1 text-xs text-ink-400">{device.note}</p> : null}
+      {device.note ? <p className="mt-1 text-xs text-fg-4">{device.note}</p> : null}
     </li>
   );
 }
@@ -109,11 +109,11 @@ function WaitingRow({ delivery, online }: { delivery: MissedDeliveryDto; online:
   const send = useSendMissed();
   const dismiss = useDismissMissed();
   return (
-    <li className="rounded-lg bg-ink-850 p-3">
+    <li className="rounded-lg bg-inset p-3">
       <p className="font-medium break-words">
         {delivery.deviceName} missed "{delivery.runName}"
       </p>
-      <p className="mt-1 text-xs text-ink-400">
+      <p className="mt-1 text-xs text-fg-4">
         Missed {timeAgo(delivery.createdAt)}. {delivery.stepCount} command{delivery.stepCount === 1 ? '' : 's'}.
         {online ? ' The light is back online.' : ' Waiting for the light to come back online.'}
       </p>
@@ -169,7 +169,7 @@ function CatchUp({ report }: { report: ConnectionReportDto }) {
         />
         <span>
           <span className="block font-medium">Resend automatically when a light comes back</span>
-          <span className="block text-xs text-ink-400">
+          <span className="block text-xs text-fg-4">
             Off by default, because this changes your lights at whatever time they return. Anything older than a day is not
             sent, and nothing overwrites a command you sent after the light came back.
           </span>
@@ -187,12 +187,12 @@ function CatchUp({ report }: { report: ConnectionReportDto }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-ink-300">Nothing is waiting.</p>
+        <p className="mt-3 text-sm text-fg-3">Nothing is waiting.</p>
       )}
       {report.recentDeliveries.length > 0 ? (
         <>
-          <h3 className="mt-4 text-sm font-medium text-ink-200">Recent</h3>
-          <ul className="mt-1 space-y-1 text-xs text-ink-400">
+          <h3 className="mt-4 text-sm font-medium text-fg-2">Recent</h3>
+          <ul className="mt-1 space-y-1 text-xs text-fg-4">
             {report.recentDeliveries.map((delivery) => (
               <li key={delivery.id}>
                 {delivery.deviceName}, "{delivery.runName}": {DELIVERY_LABEL[delivery.status]}. {timeAgo(delivery.finishedAt)}.
@@ -250,13 +250,13 @@ export function ConnectionPage() {
 
           <SectionCard title="What happened" description="Problems the app saw, and what it did by itself.">
             {data.automaticActions.length === 0 ? (
-              <p className="text-sm text-ink-300">No connection events yet.</p>
+              <p className="text-sm text-fg-3">No connection events yet.</p>
             ) : (
               <ul className="space-y-1.5 text-sm">
                 {data.automaticActions.map((event) => (
                   <li key={event.id}>
-                    <span className="text-ink-200">{event.message}</span>{' '}
-                    <span className="text-xs text-ink-400">{timeAgo(event.createdAt)}</span>
+                    <span className="text-fg-2">{event.message}</span>{' '}
+                    <span className="text-xs text-fg-4">{timeAgo(event.createdAt)}</span>
                   </li>
                 ))}
               </ul>
@@ -267,12 +267,12 @@ export function ConnectionPage() {
             <SectionCard title="Connection history">
               <ul className="space-y-2 text-sm">
                 {data.incidents.map((incident) => (
-                  <li key={incident.id} className="rounded-lg bg-ink-850 p-2.5">
+                  <li key={incident.id} className="rounded-lg bg-inset p-2.5">
                     <p className="font-medium break-words">
                       {incident.deviceName ? `${incident.deviceName}: ` : ''}
                       {INCIDENT_LABEL[incident.kind]}
                     </p>
-                    <p className="text-xs text-ink-400">
+                    <p className="text-xs text-fg-4">
                       {dateTime(incident.openedAt)}. {lasted(incident)}.
                     </p>
                   </li>

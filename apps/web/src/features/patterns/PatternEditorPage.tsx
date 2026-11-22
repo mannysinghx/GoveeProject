@@ -81,14 +81,14 @@ function ledCountSource(string: PatternString): string {
 
 function LedCountInput({ string, onCommit }: { string: PatternString; onCommit: (count: number | null) => void }) {
   return (
-    <label className="flex items-center gap-2 text-xs text-ink-300">
+    <label className="flex items-center gap-2 text-xs text-fg-3">
       LEDs
       <input
         // Starts afresh when the value changes elsewhere, such as after being limited.
         key={`${string.ledSource}-${string.ledCount}`}
         type="number"
         aria-label={`LEDs on ${string.name}`}
-        className="min-h-9 w-20 rounded-lg border border-ink-700 bg-ink-850 px-2 text-sm text-ink-100"
+        className="min-h-9 w-20 rounded-lg border border-line bg-inset px-2 text-sm text-fg"
         min={string.segments.length}
         max={1000}
         placeholder="Count"
@@ -108,11 +108,11 @@ const STROKE_SAMPLE_PX = 8;
 
 function ColorChoice({ label, value, onChange }: { label: string; value: string; onChange: (hex: string) => void }) {
   return (
-    <label className="flex items-center gap-3 text-sm font-medium text-ink-200">
+    <label className="flex items-center gap-3 text-sm font-medium text-fg-2">
       <input
         type="color"
         aria-label={label}
-        className="h-11 w-14 cursor-pointer rounded-lg border border-ink-700 bg-ink-850 p-1"
+        className="h-11 w-14 cursor-pointer rounded-lg border border-line bg-inset p-1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -154,8 +154,8 @@ function StringArrangement({
     >
       <ol className="space-y-2">
         {strings.map((string, index) => (
-          <li key={string.deviceId} className="flex flex-wrap items-center gap-2 rounded-lg bg-ink-850 p-2.5">
-            <span className="w-5 text-center text-sm text-ink-400 tabular-nums">{index + 1}</span>
+          <li key={string.deviceId} className="flex flex-wrap items-center gap-2 rounded-lg bg-inset p-2.5">
+            <span className="w-5 text-center text-sm text-fg-4 tabular-nums">{index + 1}</span>
             {/* Takes its own line on a phone, so a long name is never squeezed by the controls. */}
             <label className="flex min-h-9 min-w-0 flex-[1_1_calc(100%-2rem)] items-center gap-2 text-sm sm:flex-1">
               <input
@@ -167,11 +167,11 @@ function StringArrangement({
               />
               <span className="min-w-0">
                 <span className="block font-medium break-words">{string.name}</span>
-                <span className="block text-xs text-ink-400">
+                <span className="block text-xs text-fg-4">
                   {string.ledCount !== null ? `${string.ledCount} LEDs in ` : ''}
                   {string.segments.length} segments
                 </span>
-                <span className="block text-xs text-ink-400">{ledCountSource(string)}</span>
+                <span className="block text-xs text-fg-4">{ledCountSource(string)}</span>
               </span>
             </label>
             <LedCountInput string={string} onCommit={(count) => onChange(withLedCount(strings, string.deviceId, count))} />
@@ -207,7 +207,7 @@ function StringArrangement({
         ))}
       </ol>
       {notPaintable.length > 0 ? (
-        <p className="mt-3 text-xs text-ink-400">
+        <p className="mt-3 text-xs text-fg-4">
           Not shown: {notPaintable.map((d) => d.name).join(', ')}. Groups and lights without segment control cannot be
           painted. A group's lights appear here individually.
         </p>
@@ -218,7 +218,7 @@ function StringArrangement({
         </div>
       ) : null}
       {discover.isSuccess ? (
-        <p className="mt-3 text-xs text-ink-400" role="status">
+        <p className="mt-3 text-xs text-fg-4" role="status">
           Light list updated from Govee.
         </p>
       ) : null}
@@ -299,9 +299,9 @@ function SeriesCanvas({
         const perRow = segmentsPerRow(string);
         return (
           <div key={string.deviceId}>
-            <p className="mb-1.5 text-sm font-medium text-ink-200">
+            <p className="mb-1.5 text-sm font-medium text-fg-2">
               {stringIndex + 1}. {string.name}
-              {string.ledCount !== null ? <span className="ml-2 text-xs font-normal text-ink-400">{string.ledCount} LEDs</span> : null}
+              {string.ledCount !== null ? <span className="ml-2 text-xs font-normal text-fg-4">{string.ledCount} LEDs</span> : null}
               {string.connectivity === 'offline' ? <span className="ml-2 text-xs font-normal text-bad">offline</span> : null}
             </p>
             <div className="space-y-1">
@@ -313,7 +313,7 @@ function SeriesCanvas({
                     {rowIndex > 0 ? (
                       // Where the string turns: the right end after a left-to-right row, then the left.
                       <div className={`mb-1 flex ${reversed ? 'justify-end' : 'justify-start'}`} aria-hidden>
-                        <div className="h-3 border-x-2 border-dashed border-ink-600" style={{ width: `${100 / perRow}%` }} />
+                        <div className="h-3 border-x-2 border-dashed border-line-strong" style={{ width: `${100 / perRow}%` }} />
                       </div>
                     ) : null}
                     <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` }}>
@@ -340,7 +340,7 @@ function SeriesCanvas({
                               }
                             }}
                             // Only the cells capture touch, so labels and gaps still scroll the page on a phone.
-                            className="flex h-12 min-w-0 touch-none gap-px rounded border border-ink-500 p-px"
+                            className="flex h-12 min-w-0 touch-none gap-px rounded border border-line-strong p-px"
                             style={{ gridColumnStart: offset + column + 1 }}
                           >
                             {leds.length === 0 ? (
@@ -582,7 +582,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 }}
               />
             ) : null}
-            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-ink-850 p-3">
+            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-inset p-3">
               <ColorChoice label="One color for everything" value={allColor} onChange={setAllColor} />
               <Button
                 size="sm"
@@ -592,7 +592,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
               >
                 Color all {shownCount === 1 ? 'of this string' : `${shownCount} strings`}
               </Button>
-              <p className="w-full text-xs text-ink-400">
+              <p className="w-full text-xs text-fg-4">
                 Replaces what's painted, as one undoable step. The lights change when you press Send.
               </p>
             </div>
@@ -637,7 +637,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
             </div>
 
             {cells.length === 0 ? (
-              <p className="text-sm text-ink-300">Include at least one string above to start painting.</p>
+              <p className="text-sm text-fg-3">Include at least one string above to start painting.</p>
             ) : (
               <SeriesCanvas
                 pattern={pattern}
@@ -657,7 +657,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
               />
             )}
 
-            <div className="space-y-2 border-t border-ink-700/70 pt-4">
+            <div className="space-y-2 border-t border-line pt-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
@@ -668,12 +668,12 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 >
                   Repeat
                 </Button>
-                <label className="flex items-center gap-2 text-sm text-ink-300">
+                <label className="flex items-center gap-2 text-sm text-fg-3">
                   leaving a gap of
                   <input
                     type="number"
                     aria-label="Segments left blank between repeats"
-                    className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                    className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
                     min={0}
                     max={Math.max(0, cells.length)}
                     value={repeatGap}
@@ -681,10 +681,10 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                   />
                   segments
                 </label>
-                <label className="flex items-center gap-2 text-sm text-ink-300">
+                <label className="flex items-center gap-2 text-sm text-fg-3">
                   <select
                     aria-label="Where Repeat fills"
-                    className="min-h-9 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                    className="min-h-9 rounded-lg border border-line bg-inset px-2 text-fg"
                     value={repeatDirection}
                     onChange={(e) => setRepeatDirection(e.target.value as RepeatDirection)}
                   >
@@ -693,12 +693,12 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                   </select>
                 </label>
               </div>
-              <p className="text-xs text-ink-400" role="status">
+              <p className="text-xs text-fg-4" role="status">
                 {repeatStatus}
               </p>
             </div>
 
-            <div className="flex flex-wrap items-end gap-2 border-t border-ink-700/70 pt-4">
+            <div className="flex flex-wrap items-end gap-2 border-t border-line pt-4">
               <Button
                 size="sm"
                 icon={<Blend className="size-4" aria-hidden />}
@@ -715,12 +715,12 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
               >
                 Alternate colors
               </Button>
-              <label className="flex items-center gap-2 text-sm text-ink-300">
+              <label className="flex items-center gap-2 text-sm text-fg-3">
                 every
                 <input
                   type="number"
                   aria-label="Segments in each run of alternating colors"
-                  className="min-h-9 w-16 rounded-lg border border-ink-700 bg-ink-850 px-2 text-ink-100"
+                  className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
                   min={1}
                   max={Math.max(1, cells.length)}
                   value={runLength}
@@ -729,7 +729,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 segments
               </label>
             </div>
-            <p className="text-xs text-ink-400">
+            <p className="text-xs text-fg-4">
               Both tools run along all the strings shown, carrying on from one to the next. Gradient blends from the
               background to the fill color. Alternate swaps between them, such as red and green for Christmas.
             </p>
@@ -747,7 +747,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
         <SectionCard
           title="Try it on the lights"
           action={
-            <Link to="/patterns/check" className="text-sm text-amber-soft underline underline-offset-2">
+            <Link to="/patterns/check" className="text-sm text-accent-text underline underline-offset-2">
               LEDs look wrong?
             </Link>
           }
@@ -768,7 +768,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 )}
               </Field>
             ) : null}
-            <p className="text-sm text-ink-300">
+            <p className="text-sm text-fg-3">
               This takes about {seconds} second{seconds === 1 ? '' : 's'}: {actions.length} command
               {actions.length === 1 ? '' : 's'}, plus a base color, across {shownCount} string{shownCount === 1 ? '' : 's'}. Each string changes a
               section at a time, and they are not in perfect sync.
@@ -785,14 +785,14 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
               Send to {shownCount} string{shownCount === 1 ? '' : 's'}
             </Button>
             {apply.isPending ? (
-              <p className="text-sm text-ink-300" role="status">
+              <p className="text-sm text-fg-3" role="status">
                 Sending a section at a time...
               </p>
             ) : null}
             {apply.isError ? <ErrorNotice error={apply.error} /> : null}
             {apply.data ? <RunResults run={apply.data} /> : null}
             {apply.data ? (
-              <p className="text-xs text-ink-400">
+              <p className="text-xs text-fg-4">
                 Govee does not report segment colors, so this app cannot confirm the pattern. Check the lights themselves.
               </p>
             ) : null}
@@ -849,7 +849,7 @@ export function PatternEditorPage() {
 
   return (
     <>
-      <Link to="/presets" className="mb-3 inline-flex min-h-9 items-center gap-1 text-sm text-ink-300 hover:text-ink-100">
+      <Link to="/presets" className="mb-3 inline-flex min-h-9 items-center gap-1 text-sm text-fg-3 hover:text-fg">
         <ArrowLeft className="size-4" aria-hidden />
         Scenes & Presets
       </Link>

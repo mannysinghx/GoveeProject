@@ -1,19 +1,10 @@
 import { Copy, PartyPopper, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { DAILY_SCHEME_PRESET, describeRecurrence, type PresetDto } from '@glm/shared';
-import { Badge, Button, Card, ErrorNotice, Notice } from '../../components/ui';
+import { Spectrum } from '../../components/light';
+import { Badge, Button, ErrorNotice, Notice } from '../../components/ui';
 import { useDuplicatePreset, useSchedules } from '../../lib/queries';
 import { filterAndSort, isFiltering, usesEffect, type PresetFilter } from './preset-list';
-
-function Swatches({ colors }: { colors: string[] }) {
-  return (
-    <div aria-hidden className="flex h-5 gap-px overflow-hidden rounded border border-ink-600">
-      {colors.map((color, index) => (
-        <span key={index} className="min-w-0 flex-1" style={{ backgroundColor: color }} />
-      ))}
-    </div>
-  );
-}
 
 function FestivalCard({ preset, onApply }: { preset: PresetDto; onApply: () => void }) {
   const duplicate = useDuplicatePreset();
@@ -21,30 +12,34 @@ function FestivalCard({ preset, onApply }: { preset: PresetDto; onApply: () => v
   if (!builtin) return null;
   const effect = usesEffect(preset);
   return (
-    <Card className="flex flex-col gap-2 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <h4 className="min-w-0 text-sm font-semibold break-words">{preset.name}</h4>
-        <Badge tone={effect ? 'info' : 'neutral'}>{effect ? 'Moving effect' : 'Pattern'}</Badge>
+    <article className="tile flex flex-col overflow-hidden rounded-3xl">
+      <div className="px-4 pt-4 pb-5">
+        <Spectrum colors={builtin.colors} height="h-11" />
       </div>
-      <Swatches colors={builtin.colors} />
-      <p className="text-xs text-ink-300">{preset.description}</p>
-      <p className="text-xs text-ink-400">{builtin.when}</p>
-      <div className="mt-auto flex flex-wrap gap-2 pt-1">
-        <Button size="sm" variant="primary" aria-label={`Apply ${preset.name}`} icon={<Play className="size-4" aria-hidden />} onClick={onApply}>
-          Apply
-        </Button>
-        <Button
-          size="sm"
-          aria-label={`Duplicate ${preset.name}`}
-          icon={<Copy className="size-4" aria-hidden />}
-          busy={duplicate.isPending}
-          onClick={() => duplicate.mutate(preset.id)}
-        >
-          Duplicate
-        </Button>
+      <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h4 className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{preset.name}</h4>
+          <Badge tone={effect ? 'info' : 'neutral'}>{effect ? 'Moving effect' : 'Pattern'}</Badge>
+        </div>
+        <p className="text-sm text-fg-3">{preset.description}</p>
+        <p className="text-xs text-fg-4">{builtin.when}</p>
+        <div className="mt-auto flex flex-wrap gap-2 pt-2">
+          <Button size="sm" variant="primary" aria-label={`Apply ${preset.name}`} icon={<Play className="size-4" aria-hidden />} onClick={onApply}>
+            Apply
+          </Button>
+          <Button
+            size="sm"
+            aria-label={`Duplicate ${preset.name}`}
+            icon={<Copy className="size-4" aria-hidden />}
+            busy={duplicate.isPending}
+            onClick={() => duplicate.mutate(preset.id)}
+          >
+            Duplicate
+          </Button>
+        </div>
+        {duplicate.isError ? <ErrorNotice error={duplicate.error} /> : null}
       </div>
-      {duplicate.isError ? <ErrorNotice error={duplicate.error} /> : null}
-    </Card>
+    </article>
   );
 }
 
@@ -113,24 +108,24 @@ export function FestivalPresets({
   return (
     <section aria-labelledby="festival-heading" className="space-y-4">
       <div>
-        <h2 id="festival-heading" className="text-lg font-semibold">
+        <h2 id="festival-heading" className="font-display text-2xl font-semibold tracking-tight">
           Festival presets
         </h2>
-        <p className="mt-1 text-sm text-ink-300">
+        <p className="mt-1 text-sm text-fg-3">
           {isFiltering(filter) ? `${festival.length} of ${all.length}` : festival.length} ready-made looks that span all your strings. Patterns are fixed colors. Moving effects are Govee's
           own, so Govee decides how they look. To change one, duplicate it and edit the copy.
         </p>
       </div>
       {fireworks ? <FireworksNotice preset={fireworks} onApply={() => onApply(fireworks)} /> : null}
       {festival.length === 0 && !fireworks ? (
-        <p className="rounded-lg border border-dashed border-ink-700 p-4 text-sm text-ink-300" role="status">
+        <p className="rounded-3xl border border-dashed border-line-strong p-5 text-sm text-fg-3" role="status">
           No ready-made look matches. Try fewer words, or clear the search.
         </p>
       ) : null}
       {grouped ? (
         occasions.map((occasion) => (
           <div key={occasion}>
-            <h3 className="mb-2 text-sm font-medium text-ink-200">{occasion}</h3>
+            <h3 className="mb-3 text-xs font-semibold tracking-[0.14em] text-fg-4 uppercase">{occasion}</h3>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {festival
                 .filter((p) => p.builtin?.occasion === occasion)

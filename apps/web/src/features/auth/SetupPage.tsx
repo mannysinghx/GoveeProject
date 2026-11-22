@@ -1,8 +1,9 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, KeyRound, Lightbulb, Smartphone } from 'lucide-react';
+import { ExternalLink, KeyRound, Smartphone } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, ErrorNotice, Field, inputClass } from '../../components/ui';
+import { AuthLayout } from '../../components/AuthLayout';
+import { Button, ErrorNotice, Field, inputClass } from '../../components/ui';
 import { api } from '../../lib/api';
 import { keys } from '../../lib/queries';
 import { PASSWORD_MIN_LENGTH, useSetup } from './useSession';
@@ -12,38 +13,38 @@ const API_KEY_DOCS = 'https://developer.govee.com/reference/apply-you-govee-api-
 function Welcome({ onContinue }: { onContinue: () => void }) {
   return (
     <>
-      <h1 className="text-xl font-semibold">Welcome to Light Manager</h1>
-      <p className="mt-2 text-sm text-ink-300">
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Welcome to Light Manager</h1>
+      <p className="mt-2 text-sm text-fg-3">
         This app runs on your own computer and controls your Govee lights through the official Govee API. Before you
         start, you need two things.
       </p>
       <ol className="mt-5 space-y-4">
         <li className="flex gap-3">
-          <Smartphone className="mt-0.5 size-5 shrink-0 text-amber-glow" aria-hidden />
+          <Smartphone className="mt-0.5 size-5 shrink-0 text-accent-ui" aria-hidden />
           <div>
             <p className="font-medium">Add your lights in the Govee Home app</p>
-            <p className="mt-0.5 text-sm text-ink-300">
+            <p className="mt-0.5 text-sm text-fg-3">
               This app can only see lights already linked to your Govee account.
             </p>
           </div>
         </li>
         <li className="flex gap-3">
-          <KeyRound className="mt-0.5 size-5 shrink-0 text-amber-glow" aria-hidden />
+          <KeyRound className="mt-0.5 size-5 shrink-0 text-accent-ui" aria-hidden />
           <div>
             <p className="font-medium">Get a Govee developer API key</p>
-            <p className="mt-0.5 text-sm text-ink-300">
+            <p className="mt-0.5 text-sm text-fg-3">
               In the Govee Home app, open Settings and choose Apply for API Key.{' '}
               <a
                 href={API_KEY_DOCS}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-amber-soft underline underline-offset-2"
+                className="inline-flex items-center gap-1 text-accent-text underline underline-offset-2"
               >
                 Govee's instructions
                 <ExternalLink className="size-3" aria-hidden />
               </a>
             </p>
-            <p className="mt-2 text-sm text-ink-300">
+            <p className="mt-2 text-sm text-fg-3">
               Connect it after setup, on the Connect page. It is checked with Govee, stored encrypted, and never shown again.
             </p>
           </div>
@@ -94,8 +95,8 @@ function OwnerForm({ setupCodeRequired }: { setupCodeRequired: boolean }) {
 
   return (
     <>
-      <h1 className="text-xl font-semibold">Create the owner account</h1>
-      <p className="mt-2 text-sm text-ink-300">
+      <h1 className="font-display text-2xl font-semibold tracking-tight">Create the owner account</h1>
+      <p className="mt-2 text-sm text-fg-3">
         The owner account runs this server. It needs no email to start: you can add one in Settings later, to sign in and
         reset your password by email. It can only be created once.
       </p>
@@ -169,18 +170,15 @@ function OwnerForm({ setupCodeRequired }: { setupCodeRequired: boolean }) {
 export function SetupPage({ setupCodeRequired }: { setupCodeRequired: boolean }) {
   const [step, setStep] = useState<'welcome' | 'owner'>('welcome');
   return (
-    <main className="flex min-h-dvh items-center justify-center p-4">
-      <Card className="w-full max-w-lg p-6">
-        <div className="mb-5 flex items-center gap-2 text-sm text-ink-400">
-          <Lightbulb className="size-4 text-amber-glow" aria-hidden />
-          First-time setup, step {step === 'welcome' ? '1' : '2'} of 3
-        </div>
-        {step === 'welcome' ? (
-          <Welcome onContinue={() => setStep('owner')} />
-        ) : (
-          <OwnerForm setupCodeRequired={setupCodeRequired} />
-        )}
-      </Card>
-    </main>
+    <AuthLayout wide>
+      <p className="mb-5 text-xs font-semibold tracking-[0.14em] text-accent-text uppercase">
+        First-time setup, step {step === 'welcome' ? '1' : '2'} of 3
+      </p>
+      {step === 'welcome' ? (
+        <Welcome onContinue={() => setStep('owner')} />
+      ) : (
+        <OwnerForm setupCodeRequired={setupCodeRequired} />
+      )}
+    </AuthLayout>
   );
 }

@@ -43,7 +43,7 @@ function SlotNames({ item }: { item: SharedItemDto }) {
         update.mutate({ id: item.id, slotLabels: labels, refresh: false });
       }}
     >
-      <p className="text-sm text-ink-300">The lights it uses are shown with these names. Your own light names are not shared.</p>
+      <p className="text-sm text-fg-3">The lights it uses are shown with these names. Your own light names are not shared.</p>
       {item.slots.map((slot) => (
         <Field key={slot.key} label={`${slot.sku}, ${slot.segmentCount} segments`}>
           {(props) => (
@@ -121,7 +121,7 @@ export function ShareButton({ kind, sourceId, name }: { kind: SharedKind; source
             </>
           ) : (
             <form className="space-y-3" onSubmit={submit}>
-              <p className="text-sm text-ink-300">
+              <p className="text-sm text-fg-3">
                 Everyone with an account can see it in Shared{isOwner ? ', under Light Manager' : `, as made by ${shared.data?.displayName ?? 'you'}`}, and
                 import a copy. Your lights, their names and your location are not shared.
               </p>
@@ -148,5 +148,5 @@ export function ShareButton({ kind, sourceId, name }: { kind: SharedKind; source
 /** "Imported from …", on what came from the Shared space. */
 export function ImportedBadge({ from }: { from: string | null | undefined }) {
   if (!from) return null;
-  return <span className="self-start rounded-full border border-ink-700 bg-ink-850 px-2 py-0.5 text-xs text-ink-300">Imported from {from}</span>;
+  return <span className="self-start rounded-full border border-line bg-inset px-2 py-0.5 text-xs text-fg-3">Imported from {from}</span>;
 }

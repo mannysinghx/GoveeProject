@@ -1,15 +1,12 @@
-import { CalendarClock, Lightbulb, Power, PowerOff, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
+import { ArrowRight, CalendarClock, Lightbulb, Power, PowerOff, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { DeviceDto, DiagnosticsDto, PresetDto, RefreshAllResultDto } from '@glm/shared';
-import {
-  CommandResultLine,
-  ConnectivityBadge,
-  FreshnessBadge,
-} from '../../components/status';
-import { Badge, Button, Card, EmptyState, ErrorNotice, Loading, Notice, PageHeader, SectionCard } from '../../components/ui';
-import { dateTime, formatStateValue, timeAgo } from '../../lib/format';
-import { useVisibleInterval } from '../../lib/hooks';
+import { HouseStrip, LightStrip, lookOfDevice, OnlineRing, Spectrum } from '../../components/light';
+import { CommandResultLine, ConnectivityBadge, FreshnessBadge } from '../../components/status';
+import { Badge, Button, EmptyState, ErrorNotice, Loading, Notice, SectionCard } from '../../components/ui';
+import { dateTime, dayPart, formatStateValue, greeting, timeAgo } from '../../lib/format';
+import { useNow, useVisibleInterval } from '../../lib/hooks';
 import {
   useConnectionReport,
   useDeviceControl,
@@ -32,7 +29,7 @@ function ConnectionBanner({ diagnostics }: { diagnostics: DiagnosticsDto }) {
         tone="warn"
         title="No Govee API key is connected"
         action={
-          <Link to="/connect" className="text-sm whitespace-nowrap underline underline-offset-2">
+          <Link to="/connect" className="text-sm font-medium whitespace-nowrap underline underline-offset-2">
             Connect
           </Link>
         }
@@ -47,7 +44,7 @@ function ConnectionBanner({ diagnostics }: { diagnostics: DiagnosticsDto }) {
         tone="bad"
         title="Govee rejected the API key"
         action={
-          <Link to="/settings" className="text-sm whitespace-nowrap underline underline-offset-2">
+          <Link to="/settings" className="text-sm font-medium whitespace-nowrap underline underline-offset-2">
             Settings
           </Link>
         }
@@ -72,6 +69,7 @@ function reportedValue(device: DeviceDto, instance: string): string | null {
   return formatStateValue(instance, state.reported.value);
 }
 
+/** One light string: what it is showing, how it is doing, and the two buttons that matter most. */
 function DeviceCard({ device }: { device: DeviceDto }) {
   const control = useDeviceControl(device.id);
   const canPower = device.capabilities.some((c) => c.kind === 'power');
@@ -79,52 +77,60 @@ function DeviceCard({ device }: { device: DeviceDto }) {
   const power = reportedValue(device, 'powerSwitch');
   const brightness = reportedValue(device, 'brightness');
   const historical = device.connectivity === 'offline' || device.connectivity === 'checking';
+  const look = lookOfDevice(device);
+  const known = power === 'On' || power === 'Off';
 
   return (
-    <Card className="flex flex-col gap-3 p-4">
+    <article className="tile flex flex-col gap-4 rounded-3xl p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <Link
             to={`/devices/${device.id}`}
-            className="block truncate font-semibold text-ink-100 underline-offset-2 hover:underline"
+            className="block truncate font-display text-lg font-semibold tracking-tight text-fg underline-offset-4 hover:underline"
           >
             {device.name}
           </Link>
-          <p className="mt-0.5 text-xs text-ink-400">{device.sku}</p>
+          <p className="mt-0.5 text-xs text-fg-4">{device.sku}</p>
         </div>
         {device.isPrimaryModel ? <Badge tone="amber">Outdoor Elite</Badge> : null}
         {device.isGoveeGroup ? <Badge tone="info">Govee group</Badge> : null}
       </div>
+
+      {device.isGoveeGroup ? null : <LightStrip color={look.color} lit={look.lit} on={look.on === true} live={look.live} count={22} />}
 
       <div className="flex flex-wrap gap-1.5">
         {device.isGoveeGroup ? null : <ConnectivityBadge device={device} />}
         {!missing && !device.isGoveeGroup ? <FreshnessBadge device={device} /> : null}
       </div>
 
-      <dl className="grid grid-cols-2 gap-2 text-sm">
+      <dl className="grid grid-cols-2 gap-3 text-sm">
         <div>
-          <dt className="text-xs text-ink-400">{historical ? 'Last reported power' : 'Reported power'}</dt>
-          <dd className="mt-0.5">{power ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
+          <dt className="text-xs font-medium text-fg-4">{historical ? 'Last reported power' : 'Reported power'}</dt>
+          <dd className="mt-0.5 font-medium">{power ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
         </div>
         <div>
-          <dt className="text-xs text-ink-400">{historical ? 'Last reported brightness' : 'Reported brightness'}</dt>
-          <dd className="mt-0.5">{brightness ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
+          <dt className="text-xs font-medium text-fg-4">{historical ? 'Last reported brightness' : 'Reported brightness'}</dt>
+          <dd className="mt-0.5 font-medium">{brightness ?? (device.isGoveeGroup ? 'Not reported' : 'Unknown')}</dd>
         </div>
       </dl>
 
       {canPower && !missing ? (
-        <div className="mt-auto grid grid-cols-2 gap-2">
+        <div className="mt-auto grid grid-cols-2 gap-1.5 rounded-full border border-line bg-inset p-1">
           <Button
+            variant={known && power === 'On' ? 'primary' : 'ghost'}
             icon={<Power className="size-4" aria-hidden />}
             aria-label={`Turn ${device.name} on`}
+            {...(known ? { 'aria-pressed': power === 'On' } : {})}
             disabled={control.isPending}
             onClick={() => control.mutate({ kind: 'power', on: true })}
           >
             On
           </Button>
           <Button
+            variant={known && power === 'Off' ? 'secondary' : 'ghost'}
             icon={<PowerOff className="size-4" aria-hidden />}
             aria-label={`Turn ${device.name} off`}
+            {...(known ? { 'aria-pressed': power === 'Off' } : {})}
             disabled={control.isPending}
             onClick={() => control.mutate({ kind: 'power', on: false })}
           >
@@ -133,39 +139,65 @@ function DeviceCard({ device }: { device: DeviceDto }) {
         </div>
       ) : null}
 
-      {control.isPending ? <p className="text-xs text-ink-300" role="status">Sending...</p> : null}
+      {control.isPending ? (
+        <p className="text-xs text-fg-3" role="status">
+          Sending...
+        </p>
+      ) : null}
       {control.isError ? <ErrorNotice error={control.error} /> : null}
       {control.data ? <CommandResultLine command={control.data.command} /> : null}
-    </Card>
+    </article>
   );
 }
 
-function QuickPresets({ presets }: { presets: PresetDto[] }) {
+/** The colours a preset paints, read from its steps. Nothing in a step, nothing to draw. */
+function presetColors(preset: PresetDto): string[] {
+  return preset.actions.flatMap((step) => ('hex' in step.action ? [step.action.hex] : []));
+}
+
+/** The presets the person has made, as tiles of the colours they paint. One tap applies one. */
+function QuickScenes({ presets }: { presets: PresetDto[] }) {
   const [applying, setApplying] = useState<PresetDto | null>(null);
   return (
-    <SectionCard
-      title="Saved presets"
-      action={
-        <Link to="/presets" className="text-sm text-amber-soft underline underline-offset-2">
+    <section aria-labelledby="scenes-heading">
+      <div className="mb-3 flex items-end justify-between gap-3">
+        <h2 id="scenes-heading" className="font-display text-xl font-semibold tracking-tight">
+          Saved presets
+        </h2>
+        <Link to="/presets" className="inline-flex items-center gap-1 text-sm font-medium text-accent-text hover:underline">
           Manage
+          <ArrowRight className="size-3.5" aria-hidden />
         </Link>
-      }
-    >
+      </div>
       {presets.length === 0 ? (
-        <p className="text-sm text-ink-300">No presets yet. Create one under Scenes & Presets.</p>
+        <div className="card rounded-3xl p-6 text-sm text-fg-3">
+          No presets yet. Create one under{' '}
+          <Link to="/presets" className="font-medium text-accent-text underline underline-offset-2">
+            Scenes & Presets
+          </Link>
+          .
+        </div>
       ) : (
-        <ul className="flex flex-wrap gap-2">
+        <ul className="snap-row">
           {presets.slice(0, 8).map((preset) => (
-            <li key={preset.id}>
-              <Button size="sm" icon={<Sparkles className="size-4" aria-hidden />} onClick={() => setApplying(preset)}>
-                {preset.name}
-              </Button>
+            <li key={preset.id} className="w-44">
+              <button
+                type="button"
+                onClick={() => setApplying(preset)}
+                className="tile group flex h-full w-full flex-col gap-4 rounded-3xl p-4 text-left"
+              >
+                <Spectrum colors={presetColors(preset)} height="h-10" />
+                <span className="flex items-center gap-2 text-sm font-medium text-fg">
+                  <Sparkles className="size-4 shrink-0 text-accent-ui transition-transform duration-300 group-hover:rotate-12" aria-hidden />
+                  <span className="min-w-0 break-words">{preset.name}</span>
+                </span>
+              </button>
             </li>
           ))}
         </ul>
       )}
       {applying ? <ApplyPresetDialog preset={applying} onClose={() => setApplying(null)} /> : null}
-    </SectionCard>
+    </section>
   );
 }
 
@@ -217,11 +249,62 @@ function ConnectionAlert() {
       tone={report.data.overall === 'problem' ? 'bad' : 'warn'}
       title={first?.title ?? `${waiting} light${waiting === 1 ? '' : 's'} missed a pattern`}
       action={
-        <Link to="/connections" className="shrink-0 text-sm font-medium underline">
+        <Link to="/connections" className="shrink-0 text-sm font-medium underline underline-offset-2">
           See what to try
         </Link>
       }
     />
+  );
+}
+
+/** The greeting, how many lights are up, and the whole display drawn as one string of light. */
+function Hero({
+  devices,
+  diagnostics,
+  checking,
+  onCheck,
+}: {
+  devices: DeviceDto[];
+  diagnostics: DiagnosticsDto | undefined;
+  checking: boolean;
+  onCheck: () => void;
+}) {
+  const now = useNow();
+  const date = new Date(now);
+  const present = devices.filter((d) => d.discoveryStatus === 'present');
+  const lights = present.filter((d) => !d.isGoveeGroup);
+  const online = present.filter((d) => d.connectivity === 'online').length;
+  const looks = lights.map(lookOfDevice);
+  const reached = diagnostics?.govee.lastSuccessfulConnectionAt ?? null;
+
+  return (
+    <section
+      aria-label="Overview"
+      className="card relative overflow-hidden rounded-[2rem] p-6 sm:p-8"
+      style={{ backgroundImage: 'radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 55%)' }}
+    >
+      <div className="flex items-start justify-between gap-4 sm:items-center sm:gap-8">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold tracking-[0.14em] text-accent-text uppercase">{dayPart(date)}</p>
+          <h1 className="sr-only">Dashboard</h1>
+          <p aria-hidden className="mt-2 font-display text-3xl leading-tight font-semibold tracking-tight sm:text-5xl">
+            <span className="text-spectrum">{greeting(date)}</span>
+          </p>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-fg-3 sm:text-base">
+            {reached
+              ? `${present.length} device(s) discovered. ${online} reported online. Govee last reached ${timeAgo(reached)}.`
+              : 'Your lights at a glance.'}
+          </p>
+          <div className="mt-5">
+            <Button variant="primary" icon={<RefreshCw className="size-4" aria-hidden />} busy={checking} onClick={onCheck}>
+              Check lights now
+            </Button>
+          </div>
+        </div>
+        {present.length > 0 ? <OnlineRing online={online} total={present.length} className="size-[4.75rem] sm:size-32" /> : null}
+      </div>
+      {looks.length > 0 ? <HouseStrip looks={looks} className="mt-8" /> : null}
+    </section>
   );
 }
 
@@ -245,30 +328,12 @@ export function DashboardPage() {
   }, [hasDevices]);
 
   const list = devices.data ?? [];
-  const present = list.filter((d) => d.discoveryStatus === 'present');
-  const online = present.filter((d) => d.connectivity === 'online').length;
 
   return (
-    <>
-      <PageHeader
-        title="Dashboard"
-        description={
-          diagnostics.data?.govee.lastSuccessfulConnectionAt
-            ? `${present.length} device(s) discovered. ${online} reported online. Govee last reached ${timeAgo(diagnostics.data.govee.lastSuccessfulConnectionAt)}.`
-            : 'Your lights at a glance.'
-        }
-        actions={
-          <Button
-            icon={<RefreshCw className="size-4" aria-hidden />}
-            busy={checkAll.isPending}
-            onClick={() => checkAll.mutate()}
-          >
-            Check lights now
-          </Button>
-        }
-      />
+    <div className="space-y-6">
+      <Hero devices={list} diagnostics={diagnostics.data} checking={checkAll.isPending} onCheck={() => checkAll.mutate()} />
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         {diagnostics.data ? <ConnectionBanner diagnostics={diagnostics.data} /> : null}
         <ConnectionAlert />
         {diagnostics.data?.govee.usingLocalTestEndpoint ? (
@@ -278,91 +343,104 @@ export function DashboardPage() {
         ) : null}
         {checkAll.isError ? <ErrorNotice error={checkAll.error} title="Could not check the lights" /> : null}
         {checkAll.data ? <CheckResult result={checkAll.data} current={list} /> : null}
-
-        {devices.isPending ? <Loading label="Loading devices" /> : null}
-        {devices.isError ? <ErrorNotice error={devices.error} title="Could not load devices" /> : null}
-
-        {devices.data && list.length === 0 ? (
-          <EmptyState
-            icon={<Lightbulb className="size-8" aria-hidden />}
-            title="No devices yet"
-            action={
-              <Link to="/connect">
-                <Button variant="primary">Connect to Govee</Button>
-              </Link>
-            }
-          >
-            Make sure your lights are in the Govee Home app, then ask Govee for your device list.
-          </EmptyState>
-        ) : null}
-
-        {list.length > 0 ? (
-          <section aria-label="Devices" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {list.map((device) => (
-              <DeviceCard key={device.id} device={device} />
-            ))}
-          </section>
-        ) : null}
-
-        {list.length > 0 ? <MasterBrightness devices={list} /> : null}
-
-        <div className="grid gap-5 lg:grid-cols-2">
-          <SectionCard
-            title="Upcoming schedules"
-            action={
-              <Link to="/schedules" className="text-sm text-amber-soft underline underline-offset-2">
-                Manage
-              </Link>
-            }
-          >
-            {summary.data && summary.data.upcoming.length > 0 ? (
-              <ul className="space-y-2">
-                {summary.data.upcoming.map((item) => (
-                  <li key={item.scheduleId} className="flex items-start gap-3 rounded-lg bg-ink-850 p-3 text-sm">
-                    <CalendarClock className="mt-0.5 size-4 shrink-0 text-ink-400" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="font-medium">{item.scheduleName}</p>
-                      <p className="text-ink-300">
-                        {item.actionSummary} <span className="text-ink-400">· {item.targetName}</span>
-                      </p>
-                      <p className="text-xs text-ink-400">{item.run.local}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-ink-300">Nothing scheduled.</p>
-            )}
-          </SectionCard>
-
-          <SectionCard
-            title="Recent problems"
-            action={
-              <Link to="/activity" className="text-sm text-amber-soft underline underline-offset-2">
-                All activity
-              </Link>
-            }
-          >
-            {summary.data && summary.data.recentFailures.length > 0 ? (
-              <ul className="space-y-2">
-                {summary.data.recentFailures.map((event) => (
-                  <li key={event.id} className="flex items-start gap-3 rounded-lg bg-ink-850 p-3 text-sm">
-                    <TriangleAlert className="mt-0.5 size-4 shrink-0 text-bad" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="break-words text-ink-200">{event.message}</p>
-                      <p className="text-xs text-ink-400">{timeAgo(event.createdAt)}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-ink-300">No recent failures.</p>
-            )}
-          </SectionCard>
-        </div>
-
-        {presets.data ? <QuickPresets presets={presets.data.filter((preset) => !preset.builtin)} /> : null}
       </div>
-    </>
+
+      {devices.isPending ? <Loading label="Loading devices" /> : null}
+      {devices.isError ? <ErrorNotice error={devices.error} title="Could not load devices" /> : null}
+
+      {devices.data && list.length === 0 ? (
+        <EmptyState
+          icon={<Lightbulb className="size-8" aria-hidden />}
+          title="No devices yet"
+          action={
+            <Link to="/connect">
+              <Button variant="primary">Connect to Govee</Button>
+            </Link>
+          }
+        >
+          Make sure your lights are in the Govee Home app, then ask Govee for your device list.
+        </EmptyState>
+      ) : null}
+
+      {list.length > 0 ? (
+        <section aria-label="Devices" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {list.map((device) => (
+            <DeviceCard key={device.id} device={device} />
+          ))}
+        </section>
+      ) : null}
+
+      {list.length > 0 ? <MasterBrightness devices={list} /> : null}
+
+      {presets.data ? <QuickScenes presets={presets.data.filter((preset) => !preset.builtin)} /> : null}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <SectionCard
+          title="Upcoming schedules"
+          action={
+            <Link to="/schedules" className="inline-flex items-center gap-1 text-sm font-medium text-accent-text hover:underline">
+              Manage
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          }
+        >
+          {summary.data && summary.data.upcoming.length > 0 ? (
+            <ul className="space-y-2.5">
+              {summary.data.upcoming.map((item, index) => (
+                <li
+                  key={item.scheduleId}
+                  className={`flex items-start gap-3 rounded-2xl p-3.5 text-sm ${index === 0 ? 'bg-accent-wash ring-1 ring-accent-ui/20' : 'bg-inset'}`}
+                >
+                  <span
+                    className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${index === 0 ? 'bg-accent text-on-accent' : 'bg-raised text-fg-3'}`}
+                  >
+                    <CalendarClock className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-medium">{item.scheduleName}</p>
+                    <p className="text-fg-3">
+                      {item.actionSummary} <span className="text-fg-4">· {item.targetName}</span>
+                    </p>
+                    <p className="mt-0.5 text-xs text-fg-4">
+                      {item.run.local} · {timeAgo(item.run.at)}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-fg-3">Nothing scheduled.</p>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Recent problems"
+          action={
+            <Link to="/activity" className="inline-flex items-center gap-1 text-sm font-medium text-accent-text hover:underline">
+              All activity
+              <ArrowRight className="size-3.5" aria-hidden />
+            </Link>
+          }
+        >
+          {summary.data && summary.data.recentFailures.length > 0 ? (
+            <ul className="space-y-2.5">
+              {summary.data.recentFailures.map((event) => (
+                <li key={event.id} className="flex items-start gap-3 rounded-2xl bg-inset p-3.5 text-sm">
+                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-bad-wash text-bad">
+                    <TriangleAlert className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="break-words text-fg-2">{event.message}</p>
+                    <p className="text-xs text-fg-4">{timeAgo(event.createdAt)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-fg-3">No recent failures.</p>
+          )}
+        </SectionCard>
+      </div>
+    </div>
   );
 }

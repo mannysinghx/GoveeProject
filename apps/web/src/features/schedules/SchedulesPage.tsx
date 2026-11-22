@@ -15,9 +15,9 @@ function HistoryDialog({ schedule, onClose }: { schedule: ScheduleDto; onClose: 
     <Dialog title={`History: ${schedule.name}`} open onClose={onClose} wide>
       {executions.isPending ? <Loading /> : null}
       {executions.isError ? <ErrorNotice error={executions.error} /> : null}
-      {executions.data?.length === 0 ? <p className="text-sm text-ink-300">This schedule has not run yet.</p> : null}
+      {executions.data?.length === 0 ? <p className="text-sm text-fg-3">This schedule has not run yet.</p> : null}
       {executions.data && executions.data.length > 0 ? (
-        <ul className="divide-y divide-ink-700/60">
+        <ul className="divide-y divide-line">
           {executions.data.map((execution) => (
             <li key={execution.id} className="py-3 first:pt-0">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -27,7 +27,7 @@ function HistoryDialog({ schedule, onClose }: { schedule: ScheduleDto; onClose: 
                   <RunStatusBadge status={execution.status} />
                 </span>
               </div>
-              {execution.errorSummary ? <p className="mt-1 text-xs break-words text-ink-400">{execution.errorSummary}</p> : null}
+              {execution.errorSummary ? <p className="mt-1 text-xs break-words text-fg-4">{execution.errorSummary}</p> : null}
             </li>
           ))}
         </ul>
@@ -55,8 +55,8 @@ function ScheduleCard({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="font-semibold break-words">{schedule.name}</h3>
-          <p className="mt-0.5 text-sm text-ink-300">
-            {schedule.actionSummary} <span className="text-ink-400">· {schedule.targetName}</span>
+          <p className="mt-0.5 text-sm text-fg-3">
+            {schedule.actionSummary} <span className="text-fg-4">· {schedule.targetName}</span>
           </p>
         </div>
         {schedule.enabled ? (
@@ -66,13 +66,13 @@ function ScheduleCard({
         )}
       </div>
 
-      <p className="text-sm text-ink-200">{describeRecurrence(schedule.recurrence)}</p>
-      <p className="text-xs text-ink-400">{schedule.timeZone}</p>
+      <p className="text-sm text-fg-2">{describeRecurrence(schedule.recurrence)}</p>
+      <p className="text-xs text-fg-4">{schedule.timeZone}</p>
       <ImportedBadge from={schedule.importedFrom} />
 
       {schedule.nextRun ? (
-        <div className="rounded-lg bg-ink-850 p-3 text-sm">
-          <p className="text-xs text-ink-400">Next run</p>
+        <div className="rounded-lg bg-inset p-3 text-sm">
+          <p className="text-xs text-fg-4">Next run</p>
           <p className="mt-0.5">{schedule.nextRun.local}</p>
           {schedule.nextRun.note === 'dst_gap_moved_forward' ? (
             <p className="mt-1 text-xs text-warn">Moved later because clocks go forward that day.</p>
@@ -86,7 +86,7 @@ function ScheduleCard({
       {schedule.problem ? <Notice tone="warn">{schedule.problem}</Notice> : null}
 
       {schedule.lastExecution ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-ink-400">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-fg-4">
           Last: {dateTime(schedule.lastExecution.scheduledFor)}
           <RunStatusBadge status={schedule.lastExecution.status} />
         </div>
@@ -177,7 +177,7 @@ export function SchedulesPage() {
       ) : null}
       {holidaySteps.length > 0 ? (
         <details className="mt-6">
-          <summary className="min-h-9 cursor-pointer py-2 text-sm font-medium text-ink-200">
+          <summary className="min-h-9 cursor-pointer py-2 text-sm font-medium text-fg-2">
             See each holiday step ({holidaySteps.length} schedules, with their history)
           </summary>
           <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">

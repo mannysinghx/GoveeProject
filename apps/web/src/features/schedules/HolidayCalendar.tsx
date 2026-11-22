@@ -1,6 +1,7 @@
 import { Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { describeTime, type HolidayDto } from '@glm/shared';
+import { Spectrum } from '../../components/light';
 import { Badge, Button, ErrorNotice, SectionCard } from '../../components/ui';
 import { useHolidays, useSetHolidayEnabled, useSetHolidaySkipped } from '../../lib/queries';
 import { HolidayEditor } from './HolidayEditor';
@@ -14,25 +15,21 @@ function HolidayRow({ holiday, onEdit }: { holiday: HolidayDto; onEdit: () => vo
   const setEnabled = useSetHolidayEnabled();
   const setSkipped = useSetHolidaySkipped();
   return (
-    <li className="rounded-lg bg-ink-850 p-3">
+    <li className="rounded-3xl bg-inset p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="min-w-0 font-medium break-words">{holiday.name}</h4>
+        <h4 className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{holiday.name}</h4>
         {!holiday.enabled ? <Badge>Off</Badge> : holiday.skipped ? <Badge tone="warn">Skipping next</Badge> : <Badge tone="good">On</Badge>}
       </div>
-      <p className="mt-0.5 text-sm text-ink-200">
+      <p className="mt-0.5 text-sm text-fg-2">
         {holiday.nextDate ? dateLabel(holiday.nextDate) : 'No date known after 2037'}, {describeTime(holiday.startTime)}
         {holiday.endTime ? ` to ${describeTime(holiday.endTime)}` : ''}
       </p>
-      <p className="text-xs text-ink-400">
+      <p className="text-xs text-fg-4">
         {holiday.description}
         {holiday.customized ? ' Changed by you.' : ''}
       </p>
-      <div aria-hidden className="mt-2 flex h-3 gap-px overflow-hidden rounded border border-ink-600">
-        {holiday.colors.map((color) => (
-          <span key={color} className="min-w-0 flex-1" style={{ backgroundColor: color }} />
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-2">
+      <Spectrum colors={holiday.colors} height="h-4" className="mt-3 mb-4" />
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" aria-label={`Edit ${holiday.name}`} icon={<Pencil className="size-4" aria-hidden />} onClick={onEdit}>
           Edit
         </Button>
@@ -78,7 +75,7 @@ export function HolidayCalendar() {
           <HolidayRow key={holiday.key} holiday={holiday} onEdit={() => setEditingKey(holiday.key)} />
         ))}
       </ul>
-      <p className="mt-3 text-xs text-ink-400">
+      <p className="mt-3 text-xs text-fg-4">
         Dates are worked out for each year. Diwali follows the lunar calendar, using Drik Panchang's dates for Los Angeles, and
         other calendars can differ by a day. Many holidays have no official colors, so those are suggestions.
       </p>

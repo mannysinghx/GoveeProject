@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties } from 'react';
 import { useSettings } from '../lib/queries';
 
 const COMMIT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']);
@@ -43,6 +43,8 @@ export function CommitSlider({
 
   const shown = draft ?? value ?? min;
   const known = draft !== null || value !== null;
+  // The filled part of the track, for the stylesheet.
+  const fill = known && max > min ? ((shown - min) / (max - min)) * 100 : 0;
 
   const send = (next: number) => {
     if (lastSent.current === next) return;
@@ -77,17 +79,18 @@ export function CommitSlider({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-3">
-        <label htmlFor={id} className="text-sm font-medium text-ink-200">
+        <label htmlFor={id} className="text-sm font-medium text-fg-2">
           {label}
         </label>
-        <output htmlFor={id} className="text-sm font-semibold text-ink-100 tabular-nums">
+        <output htmlFor={id} className="font-display text-lg font-semibold text-fg tabular-nums">
           {known ? `${shown}${unit}` : 'Unknown'}
         </output>
       </div>
       <input
         id={id}
         type="range"
-        className="h-8 w-full"
+        className="slider"
+        style={{ '--fill': `${fill}%` } as CSSProperties}
         min={min}
         max={max}
         step={step}
@@ -99,7 +102,7 @@ export function CommitSlider({
           if (COMMIT_KEYS.has(event.key)) commit();
         }}
       />
-      <div className="mt-1 flex justify-between text-xs text-ink-400">
+      <div className="mt-1 flex justify-between text-xs text-fg-4">
         <span>
           {min}
           {unit}

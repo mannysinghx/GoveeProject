@@ -34,10 +34,12 @@ export function MasterBrightness({ devices }: { devices: DeviceDto[] }) {
   const accepted = (send.data?.outcomes.length ?? 0) - refused.length;
 
   return (
-    <Card className="p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <SunMedium className="size-4 text-amber-soft" aria-hidden />
-        <h2 className="font-semibold">Brightness for all lights</h2>
+    <Card className="p-5 sm:p-6">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="flex size-10 items-center justify-center rounded-full bg-accent-wash text-accent-text ring-1 ring-accent-ui/25">
+          <SunMedium className="size-5" aria-hidden />
+        </span>
+        <h2 className="font-display text-lg font-semibold tracking-tight">Brightness for all lights</h2>
       </div>
       <CommitSlider
         label={`All ${lights.length} light${lights.length === 1 ? '' : 's'} together`}
@@ -48,20 +50,20 @@ export function MasterBrightness({ devices }: { devices: DeviceDto[] }) {
         value={same ? (known[0] as number) : null}
         onCommit={(value) => send.mutate(value)}
       />
-      <p className="mt-2 text-xs text-ink-400">
+      <p className="mt-2 text-xs text-fg-4">
         {same || known.length === 0
           ? 'Changes how bright the whole display is. The colors and pattern stay as they are, and the level stays when the pattern changes.'
           : `The lights differ right now: ${live.map((d, i) => `${d.name} ${reported[i] === null ? 'unknown' : `${reported[i]}%`}`).join(', ')}. Moving the slider sets them all to the same level.`}
       </p>
       <div className="mt-2 text-sm" role="status">
-        {send.isPending ? <p className="text-ink-300">Sending to {lights.length} light{lights.length === 1 ? '' : 's'}...</p> : null}
+        {send.isPending ? <p className="text-fg-3">Sending to {lights.length} light{lights.length === 1 ? '' : 's'}...</p> : null}
         {send.data && refused.length === 0 ? (
-          <p className="text-ink-300">
+          <p className="text-fg-3">
             Govee accepted it for all {send.data.outcomes.length} light{send.data.outcomes.length === 1 ? '' : 's'}.
           </p>
         ) : null}
         {refused.length > 0 ? (
-          <p className="text-ink-300">
+          <p className="text-fg-3">
             Govee accepted it for {accepted} of {send.data?.outcomes.length} lights.
           </p>
         ) : null}

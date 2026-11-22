@@ -9,6 +9,7 @@ import { AccountData, AdminAccounts } from '../account/AccountData';
 import { SharedModeration } from '../sharing/SharedModeration';
 import { GoveeKeySettings } from '../account/GoveeKey';
 import { PASSWORD_MIN_LENGTH, useChangePassword, useSession } from '../auth/useSession';
+import { Appearance } from './Appearance';
 import { EmailSettings, SignupSettings } from './AccountSettings';
 
 function GeneralSettings({ settings }: { settings: AppSettings }) {
@@ -122,7 +123,7 @@ function GeneralSettings({ settings }: { settings: AppSettings }) {
         </div>
 
         <fieldset>
-          <legend className="mb-2 text-sm font-medium text-ink-200">Location for sunrise and sunset schedules (optional)</legend>
+          <legend className="mb-2 text-sm font-medium text-fg-2">Location for sunrise and sunset schedules (optional)</legend>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Latitude" hint="Entered by hand. Nothing is looked up or sent anywhere.">
               {(props) => (
@@ -206,14 +207,15 @@ export function SettingsPage() {
       <PageHeader
         title="Settings"
         actions={
-          <Link to="/activity" className="text-sm text-amber-soft underline underline-offset-2">
+          <Link to="/activity" className="text-sm text-accent-text underline underline-offset-2">
             Activity and diagnostics
           </Link>
         }
       />
       {settings.isPending ? <Loading label="Loading settings" /> : null}
       {settings.isError ? <ErrorNotice error={settings.error} /> : null}
-      <div className="max-w-3xl space-y-5">
+      <div className="max-w-3xl space-y-6">
+        <Appearance />
         {settings.data ? <GeneralSettings settings={settings.data} /> : null}
         <GoveeKeySettings />
         <AiSettings />
@@ -223,7 +225,7 @@ export function SettingsPage() {
         {isOwner ? <SignupSettings /> : null}
         {isOwner ? <AdminAccounts /> : null}
         {isOwner ? <SharedModeration /> : null}
-        <p className="text-sm text-ink-400">
+        <p className="text-sm text-fg-4">
           <Link to="/privacy" className="underline underline-offset-2">
             Privacy
           </Link>{' '}
