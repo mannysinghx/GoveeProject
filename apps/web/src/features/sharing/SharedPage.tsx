@@ -335,7 +335,7 @@ export function SharedPage() {
           {official.length === 0 ? (
             <EmptyState title="Nothing here yet">{isOwner ? 'Share your presets, groups and schedules, and they appear here for everyone.' : 'Official presets and schedules will appear here.'}</EmptyState>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {official.map((item) => (
                 <SharedCard key={item.id} item={item} onImport={() => setImporting([item])} />
               ))}
@@ -348,7 +348,7 @@ export function SharedPage() {
           {community.length === 0 ? (
             <EmptyState title="Nothing shared yet">Share a preset, group or schedule from its page, and it appears here.</EmptyState>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {community.map((item) => (
                 <SharedCard key={item.id} item={item} onImport={() => setImporting([item])} />
               ))}

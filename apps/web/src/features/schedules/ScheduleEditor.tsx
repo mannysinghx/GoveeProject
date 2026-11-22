@@ -214,7 +214,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           )}
         </Field>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Target">
             {(props) => (
               <select {...props} className={inputClass} required value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -253,7 +253,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
           ) : null}
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Repeat">
             {(props) => (
               <select {...props} className={inputClass} value={mode} onChange={(e) => setMode(e.target.value as RepeatMode)}>
@@ -364,7 +364,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
         ) : null}
 
         {mode === 'solar' ? (
-          <div className="grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
             <Field label="Event">
               {(props) => (
                 <select {...props} className={inputClass} value={solarEvent} onChange={(e) => setSolarEvent(e.target.value as 'sunrise' | 'sunset')}>
@@ -400,7 +400,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
         ) : null}
 
         {showBounds ? (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Start date (optional)">
               {(props) => <input {...props} type="date" className={inputClass} value={startDate} onChange={(e) => setStartDate(e.target.value)} />}
             </Field>

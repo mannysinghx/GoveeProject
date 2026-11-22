@@ -111,7 +111,7 @@ export function DeviceDetailPage() {
 
         {!missing ? <DeviceControls device={d} /> : null}
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <ReportedStatePanel device={d} />
           <SectionCard title="Device">
             <dl className="grid grid-cols-2 gap-4">

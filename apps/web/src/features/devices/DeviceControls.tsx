@@ -159,7 +159,7 @@ function ColorControl({ device, capability }: { device: DeviceDto; capability: C
 
   return (
     <SectionCard title="Colour">
-      <div className="grid gap-5 md:grid-cols-[minmax(0,18rem)_1fr]">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,18rem)_1fr]">
         <div className="color-picker-host">
           <HexColorPicker
             color={hex}
@@ -305,7 +305,7 @@ export function DeviceControls({ device }: { device: DeviceDto }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {power ? <PowerControl device={device} capability={power} /> : null}
         {brightness ? <BrightnessControl device={device} capability={brightness} /> : null}
       </div>

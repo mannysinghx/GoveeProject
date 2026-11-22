@@ -363,7 +363,7 @@ export function DashboardPage() {
       ) : null}
 
       {list.length > 0 ? (
-        <section aria-label="Devices" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <section aria-label="Devices" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((device) => (
             <DeviceCard key={device.id} device={device} />
           ))}
@@ -374,7 +374,7 @@ export function DashboardPage() {
 
       {presets.data ? <QuickScenes presets={presets.data.filter((preset) => !preset.builtin)} /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SectionCard
           title="Upcoming schedules"
           action={

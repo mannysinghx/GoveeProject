@@ -169,7 +169,7 @@ export function SchedulesPage() {
         </EmptyState>
       ) : null}
       {yours && yours.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {yours.map((schedule) => (
             <ScheduleCard key={schedule.id} {...cardProps(schedule)} />
           ))}
@@ -180,7 +180,7 @@ export function SchedulesPage() {
           <summary className="min-h-9 cursor-pointer py-2 text-sm font-medium text-fg-2">
             See each holiday step ({holidaySteps.length} schedules, with their history)
           </summary>
-          <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {holidaySteps.map((schedule) => (
               <ScheduleCard key={schedule.id} {...cardProps(schedule)} />
             ))}

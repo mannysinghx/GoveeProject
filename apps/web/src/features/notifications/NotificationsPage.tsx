@@ -251,7 +251,7 @@ export function NotificationsPage() {
           </Button>
         }
       />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
           <Notice title="Lights Check">
             Govee can only say it accepted a command, not that your lights changed. So each notification shows the colors that

@@ -19,7 +19,7 @@ import { filterAndSort, isFiltering, NO_FILTER, PRESET_SORTS, type PresetFilter,
 function PatternFinder({ filter, onChange, shown, total }: { filter: PresetFilter; onChange: (next: PresetFilter) => void; shown: number; total: number }) {
   return (
     <Card className="p-4 sm:p-5">
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_12rem_12rem]">
         <Field label="Search patterns">
           {(props) => (
             <div className="relative">
@@ -208,7 +208,7 @@ export function PresetsPage() {
         }
       />
 
-      <div className="mb-8 grid gap-2 md:grid-cols-3">
+      <div className="mb-8 grid grid-cols-1 gap-2 md:grid-cols-3">
         {[
           {
             tone: 'amber' as const,
@@ -264,7 +264,7 @@ export function PresetsPage() {
             </EmptyState>
           ) : null}
           {yourPresets && yourPresets.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               {yourPresets.map((preset) => (
                 <PresetCard
                   key={preset.id}

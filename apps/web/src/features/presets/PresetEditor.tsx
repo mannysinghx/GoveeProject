@@ -50,7 +50,7 @@ function ActionRow({
           <Button size="sm" variant="ghost" aria-label={`Remove step ${index + 1}`} icon={<Trash2 className="size-4" aria-hidden />} onClick={onRemove} />
         </div>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Device">
           {(props) => (
             <select
@@ -166,7 +166,7 @@ export function PresetEditor({ preset, onClose }: { preset: PresetDto | null; on
   return (
     <Dialog title={preset ? `Edit "${preset.name}"` : 'New preset'} open onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Name">
             {(props) => (
               <input {...props} className={inputClass} required maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />

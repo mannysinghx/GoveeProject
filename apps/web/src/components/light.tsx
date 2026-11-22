@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { intToHex, type DeviceDto } from '@glm/shared';
+import { useFitCount } from '../lib/use-fit-count';
 
 /*
  * The visual language of the app: what a light is showing, drawn as light.
@@ -66,7 +67,14 @@ export function glowColors(devices: DeviceDto[]): string[] {
 
 type CssVars = CSSProperties & Record<`--${string}`, string | number>;
 
-/** One string of lights. Dark and hollow when off, breathing softly when live. */
+const DEFAULT_BEAD_REM = 0.6;
+/** A bead and the gap after it, in rem, with a little slack so the row can spread evenly. */
+const beadPitch = (beadRem: number) => beadRem + 0.35;
+
+/**
+ * One string of lights. Dark and hollow when off, breathing softly when live. `count` is the most
+ * beads drawn: a narrow screen gets fewer, so the string never runs off the edge.
+ */
 export function LightStrip({
   color,
   lit = 1,
@@ -84,10 +92,11 @@ export function LightStrip({
   size?: string;
   className?: string;
 }) {
+  const [ref, fit] = useFitCount<HTMLDivElement>(beadPitch(size ? Number.parseFloat(size) : DEFAULT_BEAD_REM), 6, count);
   const style: CssVars = { '--bead': color, '--lit': lit, ...(size ? { '--bead-size': size } : {}) };
   return (
-    <div aria-hidden className={`beads flex items-center justify-between gap-1 ${className}`} style={style} {...(live ? { 'data-live': '' } : {})}>
-      {Array.from({ length: count }, (_, index) => (
+    <div ref={ref} aria-hidden className={`beads flex items-center justify-between gap-1 ${className}`} style={style} {...(live ? { 'data-live': '' } : {})}>
+      {Array.from({ length: fit }, (_, index) => (
         <span key={index} className="bead" style={{ '--i': index } as CssVars} {...(on ? {} : { 'data-off': '' })} />
       ))}
     </div>
@@ -99,11 +108,12 @@ export function LightStrip({
  * showing. Hollow where a light is off. It is the dashboard's picture of the whole display.
  */
 export function HouseStrip({ looks, count = 60, className = '' }: { looks: LightLook[]; count?: number; className?: string }) {
+  const [ref, fit] = useFitCount<HTMLDivElement>(beadPitch(DEFAULT_BEAD_REM), 12, count);
   const anyLive = looks.some((look) => look.live);
   return (
-    <div aria-hidden className={`beads flex items-center justify-between gap-1 ${className}`} {...(anyLive ? { 'data-live': '' } : {})}>
-      {Array.from({ length: count }, (_, index) => {
-        const look = looks.length > 0 ? (looks[Math.floor((index * looks.length) / count)] as LightLook) : null;
+    <div ref={ref} aria-hidden className={`beads flex items-center justify-between gap-1 ${className}`} {...(anyLive ? { 'data-live': '' } : {})}>
+      {Array.from({ length: fit }, (_, index) => {
+        const look = looks.length > 0 ? (looks[Math.floor((index * looks.length) / fit)] as LightLook) : null;
         const style: CssVars = { '--i': index, ...(look ? { '--bead': look.color, '--lit': look.lit } : {}) };
         return <span key={index} className="bead" style={style} {...(look?.on === true ? {} : { 'data-off': '' })} />;
       })}

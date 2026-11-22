@@ -126,7 +126,7 @@ export function FestivalPresets({
         occasions.map((occasion) => (
           <div key={occasion}>
             <h3 className="mb-3 text-xs font-semibold tracking-[0.14em] text-fg-4 uppercase">{occasion}</h3>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {festival
                 .filter((p) => p.builtin?.occasion === occasion)
                 .map((preset) => (
@@ -136,7 +136,7 @@ export function FestivalPresets({
           </div>
         ))
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {festival.map((preset) => (
             <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
           ))}

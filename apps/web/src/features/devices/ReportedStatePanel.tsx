@@ -52,7 +52,7 @@ function StateRow({ state }: { state: CapabilityStateDto }) {
         <span className="text-sm font-medium">{instanceLabel(state.instance)}</span>
         <VerificationBadge verification={state.verification} />
       </div>
-      <dl className="mt-2 grid gap-1.5 text-sm sm:grid-cols-3">
+      <dl className="mt-2 grid grid-cols-1 gap-1.5 text-sm sm:grid-cols-3">
         <div>
           <dt className="text-xs text-fg-4">Requested</dt>
           <dd>

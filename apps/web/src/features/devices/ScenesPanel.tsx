@@ -88,7 +88,7 @@ export function ScenesPanel({ device }: { device: DeviceDto }) {
                   <Badge tone="info">{label}</Badge>
                   <span className="text-xs text-fg-4">{list.length}</span>
                 </div>
-                <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {list.map((scene) => (
                     <li key={scene.key}>
                       <Button

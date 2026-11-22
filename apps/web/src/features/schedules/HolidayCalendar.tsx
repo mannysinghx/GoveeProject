@@ -70,7 +70,7 @@ export function HolidayCalendar() {
       title="Holiday calendar"
       description={`Your lights change by themselves on each of these, soonest first (${holidays.data[0]?.timeZone}). Your other schedules still run on these days, so your usual pattern shows until the holiday starts.`}
     >
-      <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {holidays.data.map((holiday) => (
           <HolidayRow key={holiday.key} holiday={holiday} onEdit={() => setEditingKey(holiday.key)} />
         ))}

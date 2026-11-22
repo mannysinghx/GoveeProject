@@ -452,9 +452,10 @@
 
   /* One LED on a string. */
   .bead {
-    flex: none;
-    inline-size: var(--bead-size, 0.6rem);
-    block-size: var(--bead-size, 0.6rem);
+    /* Shrinks, rather than overflowing, if a row is ever tighter than the count that was asked for. */
+    flex: 0 1 var(--bead-size, 0.6rem);
+    min-inline-size: 0.25rem;
+    aspect-ratio: 1;
     border-radius: 999px;
     background: var(--bead, var(--accent));
     box-shadow: 0 0 0.8rem 0.12rem color-mix(in oklab, var(--bead, var(--accent)) 60%, transparent);
@@ -502,6 +503,10 @@
   }
   :root[data-theme='light'] .spectrum::before {
     opacity: 0.38;
+  }
+  /* A white or pale segment needs an edge on a pale page. */
+  :root[data-theme='light'] .spectrum > span {
+    box-shadow: inset 0 0 0 1px rgb(23 20 43 / 0.16);
   }
 
   /* A range input with a filled track. The fill comes from --fill, set by the component. */

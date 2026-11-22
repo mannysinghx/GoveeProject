@@ -272,7 +272,7 @@ export function GroupsPage() {
         </EmptyState>
       ) : null}
       {groups.data && groups.data.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {groups.data.map((group) => (
             <GroupCard
               key={group.id}

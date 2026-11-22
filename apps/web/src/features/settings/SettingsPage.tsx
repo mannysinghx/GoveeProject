@@ -65,7 +65,7 @@ function GeneralSettings({ settings }: { settings: AppSettings }) {
           )}
         </Field>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Status check interval (seconds)" hint="How often an open dashboard asks Govee for status. Minimum 30.">
             {(props) => (
               <input
@@ -124,7 +124,7 @@ function GeneralSettings({ settings }: { settings: AppSettings }) {
 
         <fieldset>
           <legend className="mb-2 text-sm font-medium text-fg-2">Location for sunrise and sunset schedules (optional)</legend>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Latitude" hint="Entered by hand. Nothing is looked up or sent anywhere.">
               {(props) => (
                 <input {...props} type="number" step="any" min={-90} max={90} className={inputClass} value={latitude} onChange={(e) => setLatitude(e.target.value)} />

@@ -131,7 +131,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
               <CalendarSync className="size-4" aria-hidden />
               Coming up
             </h3>
-            <ol className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <ol className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {shown.map((day) => (
                 <DayRow key={day.date} day={day} />
               ))}

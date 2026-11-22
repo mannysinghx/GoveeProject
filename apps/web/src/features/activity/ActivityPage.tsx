@@ -148,7 +148,7 @@ export function ActivityPage() {
         <Diagnostics />
 
         <SectionCard title="Activity">
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
             <Field label="Device">
               {(props) => (
                 <select {...props} className={inputClass} value={deviceId} onChange={(e) => reset(() => setDeviceId(e.target.value))}>
