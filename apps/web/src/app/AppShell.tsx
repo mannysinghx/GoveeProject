@@ -14,7 +14,7 @@ import { ApplyPresetDialog } from '../features/presets/ApplyPresetDialog';
 import { useDocumentTitle, withAppName } from '../lib/hooks';
 import { isApplePlatform } from '../lib/platform';
 import { useDevices, useNotifications } from '../lib/queries';
-import { dockItems, moreItems, NAV, pageTitle, type NavItem } from './nav';
+import { accessibleName, dockItems, moreItems, NAV, pageTitle, type NavItem } from './nav';
 
 function UnreadCount({ count, className = '', compact = false }: { count: number; className?: string; compact?: boolean }) {
   if (count === 0) return null;
@@ -31,7 +31,7 @@ function UnreadCount({ count, className = '', compact = false }: { count: number
 function RailLink({ item, unread }: { item: NavItem; unread: number }) {
   const Icon = item.icon;
   const isBell = item.to === '/notifications';
-  const label = isBell && unread > 0 ? `Notifications, ${unread} unread` : item.label;
+  const label = isBell && unread > 0 ? `Notifications, ${unread} unread` : accessibleName(item);
   return (
     <NavLink
       to={item.to}
@@ -39,7 +39,7 @@ function RailLink({ item, unread }: { item: NavItem; unread: number }) {
       aria-label={label}
       title={item.label}
       className={({ isActive }) =>
-        `group relative flex min-h-12 items-center justify-center gap-3 rounded-2xl px-3 text-sm font-medium transition-[background-color,color] duration-200 xl:justify-start ${
+        `group relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-2xl px-1 text-sm font-medium transition-[background-color,color] duration-200 xl:min-h-12 xl:flex-row xl:justify-start xl:gap-3 xl:px-3 ${
           isActive
             ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui'
             : 'text-fg-3 hover:bg-raised/70 hover:text-fg'
@@ -52,6 +52,8 @@ function RailLink({ item, unread }: { item: NavItem; unread: number }) {
           <span aria-hidden className="absolute -top-1 -right-1 size-2.5 rounded-full bg-accent ring-2 ring-surface xl:hidden" />
         ) : null}
       </span>
+      {/* A caption under the icon where the rail is narrow, so a touch or keyboard user sees what each place is. */}
+      <span className="max-w-full truncate text-[10px] leading-tight xl:hidden">{item.short ?? item.label}</span>
       <span className="hidden xl:inline">{item.label}</span>
       {isBell ? <UnreadCount count={unread} className="ml-auto hidden xl:inline" /> : null}
     </NavLink>
@@ -61,7 +63,7 @@ function RailLink({ item, unread }: { item: NavItem; unread: number }) {
 function Rail({ username, unread }: { username: string; unread: number }) {
   const logout = useLogout();
   return (
-    <aside className="glass fixed top-3 bottom-3 left-[max(0.75rem,env(safe-area-inset-left))] z-30 hidden w-[4.75rem] flex-col rounded-[2rem] md:flex xl:w-64">
+    <aside className="glass fixed top-3 bottom-3 left-[max(0.75rem,env(safe-area-inset-left))] z-30 hidden w-[6.25rem] flex-col rounded-[2rem] md:flex xl:w-64">
       <div className="flex justify-center px-3 pt-5 pb-4 xl:justify-start xl:px-5">
         <span className="xl:hidden">
           <Brand compact />
@@ -70,7 +72,7 @@ function Rail({ username, unread }: { username: string; unread: number }) {
           <Brand />
         </span>
       </div>
-      <nav aria-label="Main" className="flex-1 space-y-1 overflow-y-auto px-2.5 xl:px-3">
+      <nav aria-label="Main" className="flex-1 space-y-1 overflow-y-auto px-2.5 py-1.5 xl:px-3">
         {NAV.map((item) => (
           <RailLink key={item.to} item={item} unread={unread} />
         ))}
@@ -117,8 +119,7 @@ function Dock({ moreActive, onMore }: { moreActive: boolean; onMore: () => void 
           key={to}
           to={to}
           end={end ?? false}
-          // The name has to contain the visible word, so someone who says "click Home" is understood.
-          aria-label={short && !label.toLowerCase().includes(short.toLowerCase()) ? `${short}, ${label}` : label}
+          aria-label={accessibleName({ label, short })}
           className={({ isActive }) =>
             `${item} ${isActive ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-3 active:bg-raised/70'}`
           }
@@ -131,6 +132,7 @@ function Dock({ moreActive, onMore }: { moreActive: boolean; onMore: () => void 
         type="button"
         aria-label="More"
         aria-haspopup="dialog"
+        {...(moreActive ? { 'aria-current': 'true' as const } : {})}
         onClick={onMore}
         className={`${item} ${moreActive ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-3 active:bg-raised/70'}`}
       >
@@ -222,7 +224,7 @@ export function AppShell({ username, children }: { username: string; children: R
   useDocumentTitle(title ? withAppName(title) : 'Light Manager');
 
   return (
-    <div className="min-h-dvh md:pl-24 xl:pl-[17.5rem]">
+    <div className="min-h-dvh md:pl-32 xl:pl-[17.5rem]">
       <Ambient colors={devices.data ? glowColors(devices.data) : []} />
       <a
         href="#main"

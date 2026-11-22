@@ -173,7 +173,7 @@ describe('the color scheme of the day', () => {
   it('asks before showing it now, like any other preset', async () => {
     const { calls } = mockApi(routes([PUMPKIN, DAILY]));
     renderApp(<PresetsPage />);
-    await userEvent.click(await screen.findByRole('button', { name: "Show today's scheme now: November: Pumpkin Patch" }));
+    await userEvent.click(await screen.findByRole('button', { name: "Show it now: November: Pumpkin Patch" }));
     expect(await screen.findByRole('heading', { name: 'Apply "November: Pumpkin Patch"' })).toBeInTheDocument();
     expect(calls.some((c) => c.method === 'POST')).toBe(false);
   });

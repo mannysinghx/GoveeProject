@@ -9,10 +9,11 @@ import { createPreferenceStore, usePreference } from './preference-store';
 export type ThemePreference = 'auto' | 'light' | 'dark';
 export type ResolvedTheme = 'light' | 'dark';
 
-const THEME_COLOR: Record<ResolvedTheme, string> = { dark: '#0a0a14', light: '#f5f2ec' };
+export const THEME_COLOR: Record<ResolvedTheme, string> = { dark: '#0a0a14', light: '#f5f2ec' };
 
 export const THEME_VALUES = ['auto', 'light', 'dark'] as const;
-export const themeStore = createPreferenceStore<ThemePreference>('glm.theme', THEME_VALUES, 'auto');
+export const THEME_STORAGE_KEY = 'glm.theme';
+export const themeStore = createPreferenceStore<ThemePreference>(THEME_STORAGE_KEY, THEME_VALUES, 'auto');
 
 export function resolveTheme(preference: ThemePreference, deviceIsLight: boolean): ResolvedTheme {
   if (preference === 'auto') return deviceIsLight ? 'light' : 'dark';

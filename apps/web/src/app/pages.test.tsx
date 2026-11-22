@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { StrictMode } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type DiagnosticsDto, type PresetDto, type ScheduleDto, type SessionDto } from '@glm/shared';
@@ -289,6 +290,23 @@ describe('dashboard', () => {
     });
     renderApp(<DashboardPage />, { state: { checkNow: true } });
     expect(await screen.findByText('Asked Govee just now: all 1 lights are online.')).toBeInTheDocument();
+    expect(calls.filter((c) => c.path === '/devices/refresh-all')).toHaveLength(1);
+  });
+
+  it('asks once even when React runs the page\'s effects twice, as it does while developing', async () => {
+    const lit = device({ connectivity: 'online' });
+    const { calls } = mockApi({
+      ...dashboardRoutes,
+      'GET /devices': { json: { devices: [lit] } },
+      'POST /devices/refresh-all': { json: { checked: 1, listError: null, failures: [], devices: [lit] } },
+    });
+    renderApp(
+      <StrictMode>
+        <DashboardPage />
+      </StrictMode>,
+      { state: { checkNow: true } },
+    );
+    await screen.findByText('Asked Govee just now: all 1 lights are online.');
     expect(calls.filter((c) => c.path === '/devices/refresh-all')).toHaveLength(1);
   });
 

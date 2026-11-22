@@ -57,7 +57,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
               <Button
                 size="sm"
                 variant="primary"
-                aria-label={`Show today's scheme now: ${today.name}`}
+                aria-label={`Show it now: ${today.name}`}
                 icon={<Play className="size-4" aria-hidden />}
                 onClick={() => onApply(todaysPreset)}
               >

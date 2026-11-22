@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useLocation } from 'react-router-dom';
@@ -5,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type CapabilityStateDto, type PresetDto, type RunResultDto } from '@glm/shared';
 import { PrivacyPage } from '../features/legal/LegalPages';
 import { Appearance } from '../features/settings/Appearance';
-import { glowStore, themeStore } from '../lib/theme';
+import { glowStore, THEME_COLOR, THEME_STORAGE_KEY, themeStore } from '../lib/theme';
 import { device, mockApi, renderApp } from '../test/fixtures';
 import { AppShell } from './AppShell';
 
@@ -225,10 +227,11 @@ describe('the command palette', () => {
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
   });
 
-  it("names the wide screen's search bar by the words on it, so a voice command for them works", () => {
+  it("opens from the wide screen's search bar too, which is named by the words on it so a voice command for them works", async () => {
     mockApi(routes());
     shell();
-    expect(screen.getByRole('button', { name: /^Search or jump to/ })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /^Search or jump to/ }));
+    expect(await screen.findByRole('combobox')).toBeInTheDocument();
   });
 });
 
@@ -293,6 +296,41 @@ describe('the phone dock', () => {
     await userEvent.click(screen.getByRole('button', { name: 'More' }));
     const sheet = await screen.findByRole('dialog', { name: 'More' });
     expect(await within(sheet).findByRole('link', { name: 'Notifications, 3 unread' })).toHaveAttribute('href', '/notifications');
+  });
+});
+
+describe('the sidebar', () => {
+  const rail = () => screen.getAllByRole('navigation', { name: 'Main' })[0]!;
+
+  it('names each place with the word beside it too, and shows a caption under each icon where the sidebar is narrow', () => {
+    mockApi(routes());
+    shell();
+    const links = within(rail());
+    expect(links.getByRole('link', { name: 'Home, Dashboard' })).toHaveAttribute('href', '/');
+    expect(links.getByRole('link', { name: 'Timers, Schedules' })).toHaveAttribute('href', '/schedules');
+    expect(links.getByRole('link', { name: 'Health, Connections' })).toHaveAttribute('href', '/connections');
+    // The caption is the short word, the wide label is the full one.
+    expect(within(links.getByRole('link', { name: 'Home, Dashboard' })).getByText('Home')).toBeInTheDocument();
+    expect(within(links.getByRole('link', { name: 'Home, Dashboard' })).getByText('Dashboard')).toBeInTheDocument();
+  });
+
+  it('says who is signed in to a screen reader at every width, and has a tooltip on the icon-only sign out', () => {
+    mockApi(routes());
+    shell();
+    expect(screen.getAllByText(/Signed in as/)[0]).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Sign out' })[0]).toHaveAttribute('title', 'Sign out');
+  });
+
+  it('marks More as the current place, for those who cannot see its colour, when the page is one of its places', () => {
+    mockApi(routes());
+    shell('/settings');
+    expect(screen.getByRole('button', { name: 'More' })).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('does not mark More as current on a page that has its own place on the dock', () => {
+    mockApi(routes());
+    shell('/presets');
+    expect(screen.getByRole('button', { name: 'More' })).not.toHaveAttribute('aria-current');
   });
 });
 
@@ -381,6 +419,50 @@ describe('the theme', () => {
     deviceSays(false);
     shell();
     await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+  });
+
+  it('follows the device while the page is open: a change to a dark device turns Auto to Night', async () => {
+    const listeners = new Set<() => void>();
+    let light = true;
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      get matches() {
+        return light && query.includes('light');
+      },
+      media: query,
+      addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+    }));
+    mockApi(routes());
+    shell();
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'light'));
+    light = false;
+    act(() => listeners.forEach((listener) => listener()));
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+  });
+
+  it("paints the browser's own bar to match: its theme-color follows Day and Night", async () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    document.head.append(meta);
+    try {
+      mockApi(routes());
+      shell();
+      const cycle = () => screen.getByRole('button', { name: /^Theme:/ });
+      await userEvent.click(cycle()); // Day
+      expect(meta.content).toBe(THEME_COLOR.light);
+      await userEvent.click(cycle()); // Night
+      expect(meta.content).toBe(THEME_COLOR.dark);
+    } finally {
+      meta.remove();
+    }
+  });
+
+  it('agrees with public/theme-init.js, which sets the theme before the first paint: same key, same colours', () => {
+    const script = readFileSync(join(import.meta.dirname, '../../public/theme-init.js'), 'utf8');
+    expect(script).toContain(`'${THEME_STORAGE_KEY}'`);
+    expect(script).toContain(`'${THEME_COLOR.light}'`);
+    expect(script).toContain(`'${THEME_COLOR.dark}'`);
+    for (const value of ['light', 'dark', 'auto']) expect(script).toContain(`'${value}'`);
   });
 
   it('a choice beats the device: Night stays Night on a light device', async () => {

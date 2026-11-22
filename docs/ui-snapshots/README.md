@@ -17,7 +17,7 @@ Dark charcoal with amber, a left sidebar on a computer, a seven-item tab bar on 
 
 ## Where the code is
 
-The git tag **`ui-classic-2026-11-22`** points at `ffe49b6`, the last commit with the classic UI. The redesign changed only `apps/web` (and the docs). The server, the shared package, the database and every API are the same, so the classic interface still works against today's server.
+The git tag **`ui-classic-2026-11-22`** points at `ffe49b6`, the last commit with the classic UI. The redesign changed only the web app (`apps/web`) in code; the docs and README were updated to match. The server, the shared package, the database and every API are the same, so the classic interface still works against today's server.
 
 To look at it without changing anything, in a second folder:
 

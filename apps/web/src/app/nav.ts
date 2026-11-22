@@ -35,6 +35,15 @@ export const NAV: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: Settings, keywords: 'account keys password email appearance theme' },
 ];
 
+/**
+ * The accessible name of a place. It has to contain the words a person sees, so that "click Home" works for someone
+ * using voice control: where the short word ("Home") is not part of the full name ("Dashboard"), both are given.
+ */
+export function accessibleName(item: Pick<NavItem, 'label' | 'short'>): string {
+  const { label, short } = item;
+  return short && !label.toLowerCase().includes(short.toLowerCase()) ? `${short}, ${label}` : label;
+}
+
 /** Where the phone dock goes directly. Everything else is one tap away under More. */
 export const DOCK_PATHS = ['/', '/presets', '/groups', '/schedules'];
 

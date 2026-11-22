@@ -1,5 +1,5 @@
 import { ArrowRight, CalendarClock, Lightbulb, Power, PowerOff, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { DeviceDto, DiagnosticsDto, PresetDto, RefreshAllResultDto } from '@glm/shared';
 import { HouseStrip, LightStrip, lookOfDevice, OnlineRing, Spectrum } from '../../components/light';
@@ -326,8 +326,15 @@ export function DashboardPage() {
   // The command palette's "Check lights now" lands here with a note to run the check, so progress, the result and
   // any error show on this page, where the button of the same name shows them.
   const checkNow = (location.state as { checkNow?: boolean } | null)?.checkNow === true;
+  const asked = useRef(false);
   useEffect(() => {
-    if (!checkNow) return;
+    if (!checkNow) {
+      asked.current = false;
+      return;
+    }
+    // React runs this twice in development, before the note is cleared. Ask once.
+    if (asked.current) return;
+    asked.current = true;
     checkAll.mutate();
     navigate(location.pathname, { replace: true, state: null });
     // Once per request: the note is cleared from the address as soon as it is used.

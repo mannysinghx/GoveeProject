@@ -13,7 +13,7 @@ const KIND_LABEL: Record<SharedKind, string> = { preset: 'Preset', group: 'Group
 function Swatches({ colors }: { colors: string[] }) {
   if (colors.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1" aria-label={`Colours: ${colors.join(', ')}`}>
+    <div role="img" className="flex flex-wrap gap-1" aria-label={`Colours: ${colors.join(', ')}`}>
       {colors.map((hex) => (
         <span key={hex} aria-hidden className="size-5 rounded border border-line-strong" style={{ backgroundColor: hex }} />
       ))}

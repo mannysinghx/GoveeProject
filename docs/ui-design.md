@@ -1,6 +1,6 @@
 # The interface: how it looks and why
 
-The interface is called **Lumen**. It was redesigned on 22 November 2026; the original is saved ([how](ui-snapshots/README.md)). Only `apps/web` changed. No server code, API, database table or setting was touched.
+The interface is called **Lumen**. It was redesigned on 22 November 2026; the original is saved ([how](ui-snapshots/README.md)). Only the web app (`apps/web`) changed in code; the docs and README were updated to match. No server code, API, database table or setting was touched.
 
 ## The idea
 
@@ -16,16 +16,16 @@ The look is the same on every screen size, and the layout changes to suit the ha
 
 | | |
 |---|---|
-| Phone | Checked down to 320 px wide. A floating glass dock with Home, Scenes, Groups, Timers and More. More opens a sheet with the rest, the theme choice and Sign out. Forms and dialogs rise from the bottom as sheets, where a thumb is. Safe areas are respected (notch, home bar, landscape). |
-| Tablet / small laptop | A slim rail of icons with tooltips. |
-| Computer | A full rail with names, and a search bar that opens the command palette. |
-| Big monitor or TV | Everything is sized in `rem`, so above 1920 px wide and again above 2560 px the whole interface grows. |
+| Phone | Looked at by hand down to 320 px wide, in one browser (Chromium), and a test guards one cause of sideways overflow; not yet seen on a real phone, so the safe-area handling is by design, not observed. A floating glass dock with Home, Scenes, Groups, Timers and More. More opens a sheet with the rest, the theme choice and Sign out. Forms and dialogs rise from the bottom as sheets, where a thumb is. Safe areas are respected (notch, home bar, landscape). |
+| Tablet / small laptop | A slim sidebar of icons with a caption under each, so a finger or the keyboard can see what each place is, and the search bar. |
+| Computer | A full sidebar with names, and the search bar that opens the command palette. |
+| Big monitor or TV | Nearly everything is sized in `rem`, so at 1920 px wide and above, and again at 2560 px, the whole interface grows. |
 | Keyboard | Ctrl+K, or Command+K on a Mac, opens the command palette from anywhere. It jumps to a page, applies a scene (with the same confirmation as everywhere else) or runs an action; arrow keys, Home, End and Enter. There is deliberately no single-key shortcut such as `/`: a key that cannot be turned off catches people using speech input or a switch (WCAG 2.1.4). Every control is also an ordinary button or link, so nothing depends on the palette. |
 | Touch | Main controls are 44 px tall (compact ones 36 px), there is no double-tap zoom delay, and cards do not lift on hover on devices that cannot hover. |
 | Day and night | **Auto** (follows the device), **Day** or **Night**, from the top bar, More, the palette or Settings. Applied before the first paint, so there is no flash. |
-| Reduced motion | All animation drops to nothing. |
-| More contrast, forced colours | With more contrast asked for, borders strengthen in both themes. In forced colours, selected and current states get an outline (a tint would vanish), fields keep a visible focus outline, and colour swatches keep their colours. |
-| Screen readers | One `h1` per page and no skipped heading levels, labelled groups and buttons, accessible names that contain the words you see ("Home", "Timers"), a tab title that names every page (and goes back to what it was when you sign out), unread notifications marked "New" in words, decorative pictures hidden, and every picture of light beside words that say the same thing. A dialog gives focus back to the control that opened it. |
+| Reduced motion | Animation drops to nothing, including the slider thumb's press. |
+| More contrast, forced colours | With more contrast asked for, borders strengthen in both themes. In forced colours, selected and current states (including More, when you are on one of its pages) get an outline that a focus outline still beats, fields keep a visible focus outline, and anything painted with an inline colour, such as a swatch or a bead, keeps it. |
+| Screen readers | Once a page has loaded, one `h1` and no skipped heading levels, labelled groups and buttons, accessible names that contain the words you see on the places in the menu, the search bar and the buttons that start a scene ("Home", "Timers", "Show it now"), a tab title that names each page (the dashboard's is the app's name, and it goes back to what it was when you sign out), unread notifications marked "New" in words, decorative pictures hidden, and every picture of light beside words that say the same thing. A dialog gives focus back to the control that opened it. |
 
 ## Colour
 
@@ -36,10 +36,11 @@ Tokens are CSS variables in `apps/web/src/styles/index.css`, defined once for Ni
 | `canvas`, `surface`, `raised`, `inset` | The page, a card, a raised control or hovered row, a well or field inside a card |
 | `fg`, `fg-2`, `fg-3`, `fg-4` | Text, strongest to quietest |
 | `line`, `line-strong` | Hairlines, borders |
+| `field-line` | The edge of a text field, select or colour box: 3:1 on every surface, tested |
 | `accent`, `accent-text`, `accent-ui`, `accent-wash`, `on-accent` | The warm brand colour as a fill, as text, as a control or focus ring, as a tint, and the text on a fill |
 | `good`, `warn`, `bad`, `info` (and `-wash`) | Status. Always with an icon or words |
 
-**Contrast is tested, not hoped for.** `src/styles/theme-contrast.test.ts` reads the real stylesheet and checks every pairing in both themes: text on every surface at 4.5:1, text on the primary button across its whole gradient, status colours on their washes, focus rings and selected states at 3:1 on every surface. Change a colour and the test says whether it still reads.
+**Contrast is tested, not hoped for.** `src/styles/theme-contrast.test.ts` reads the real stylesheet and checks the colour tokens in both themes: text on every surface at 4.5:1, text on the primary button across its whole gradient, status colours on their washes, the `accent-ui` colour that focus rings, sliders and the ring or border that marks a selected state are drawn in at 3:1 on every surface, and the edge of a text field (`--field-line`) at 3:1. It checks the tokens, not each component, and it cannot see a colour with transparency laid over another, so selected states use the full-strength `accent-ui` ring, not a faint one. A palette change that fails it cannot ship.
 
 ## Building blocks
 
@@ -64,7 +65,7 @@ Tokens are CSS variables in `apps/web/src/styles/index.css`, defined once for Ni
 
 ## What it does not do
 
-- The glow follows a light's reported or accepted colour, or its colour temperature. Govee does not report segment colours, so after a painted pattern the glow follows only what the app can know, and the lights themselves are the truth. This is the same honesty as the rest of the app: nothing here claims more than Govee said.
+- The glow follows a light's reported or accepted colour or its colour temperature, and a warm white for a light that is on but reports neither. Govee does not report segment colours, so after a painted pattern the glow follows only what the app can know, and the lights themselves are the truth. This is the same honesty as the rest of the app: nothing here claims more than Govee said.
 - The installed iPhone web app uses the system's status bar (`apple-mobile-web-app-status-bar-style=default`), so the clock stays readable in both themes. This has not been checked on a real iPhone.
 - The theme and glow choices are per browser. They are not saved to the account.
 - No fonts are downloaded. The interface uses each platform's own typeface (San Francisco, Segoe UI, Roboto), with the rounded variant for headings where the platform has one, because the security policy allows nothing from outside this site.

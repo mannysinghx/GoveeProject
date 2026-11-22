@@ -84,6 +84,16 @@ describe('the more-contrast preference', () => {
   });
 });
 
+describe('forced colours', () => {
+  it('marks selected and current states with an outline that is weaker than the focus outline, so a focused selected control still shows focus', () => {
+    expect(css).toMatch(/:where\(\[aria-pressed='true'\][^)]*\[aria-current='page'\][^)]*\)\s*\{\s*outline: 2px solid Highlight/);
+  });
+
+  it('keeps colour swatches and beads as the colours they are', () => {
+    expect(css).toMatch(/\.spectrum > span,\s*\[style\*='background-color'\] \{\s*forced-color-adjust: none/);
+  });
+});
+
 describe('the two themes', () => {
   it('define the same set of colours, so neither is missing one the other has', () => {
     const night = Object.keys(NIGHT).filter((name) => !name.startsWith('elev') && name !== 'scrim' && name !== 'glow-strength');

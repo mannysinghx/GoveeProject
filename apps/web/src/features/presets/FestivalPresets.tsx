@@ -55,7 +55,7 @@ function FireworksNotice({ preset, onApply }: { preset: PresetDto; onApply: () =
       tone="info"
       title="New Year fireworks"
       action={
-        <Button size="sm" aria-label={`Try ${preset.name}`} icon={<PartyPopper className="size-4" aria-hidden />} onClick={onApply}>
+        <Button size="sm" aria-label={`Try it: ${preset.name}`} icon={<PartyPopper className="size-4" aria-hidden />} onClick={onApply}>
           Try it
         </Button>
       }

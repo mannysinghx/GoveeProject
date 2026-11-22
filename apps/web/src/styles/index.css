@@ -354,6 +354,10 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+    /* The slider thumb is a pseudo-element, which the universal selector above does not reach. */
+    .slider::-webkit-slider-thumb {
+      transition: none !important;
+    }
   }
 
   @media (forced-colors: active) {
@@ -364,13 +368,13 @@
       border: 1px solid CanvasText;
     }
     .bead,
-    .spectrum > span {
+    .spectrum > span,
+    [style*='background-color'] {
       forced-color-adjust: none;
     }
-    /* A tint does not survive forced colours, so mark what is selected or current with an outline. */
-    [aria-pressed='true'],
-    [aria-current='page'],
-    [role='option'][aria-selected='true'] {
+    /* A tint does not survive forced colours, so mark what is selected or current with an outline. :where() keeps
+       it weaker than :focus-visible, so the keyboard focus outline still shows on a selected control. */
+    :where([aria-pressed='true'], [aria-current='page'], [aria-current='true'], [role='option'][aria-selected='true']) {
       outline: 2px solid Highlight;
       outline-offset: -2px;
     }

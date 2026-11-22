@@ -271,7 +271,7 @@ export function EmptyState({
 const INPUT_CLASSES =
   // The border is what shows where a field is, so it has its own colour at 3:1 or more (--field-line). The focus
   // outline is hidden, not removed: Windows high-contrast mode turns it into a visible one.
-  'w-full min-h-11 rounded-2xl border border-field-line bg-inset px-4 text-sm text-fg placeholder:text-fg-4 transition-[border-color,box-shadow] duration-200 hover:border-fg-4 focus:border-accent-ui focus:outline-hidden focus:ring-4 focus:ring-accent-ui/20 disabled:opacity-50 aria-[invalid=true]:border-bad focus:aria-[invalid=true]:border-bad focus:aria-[invalid=true]:ring-bad/25';
+  'w-full min-h-11 rounded-2xl border border-field-line bg-inset px-4 text-sm text-fg placeholder:text-fg-4 transition-[border-color,box-shadow] duration-200 hover:border-fg-4 focus:border-accent-ui focus:outline-hidden focus:ring-4 focus:ring-accent-ui/20 disabled:opacity-50 aria-[invalid=true]:border-bad focus:aria-[invalid=true]:border-bad focus:aria-[invalid=true]:ring-2 focus:aria-[invalid=true]:ring-bad';
 
 export const inputClass = INPUT_CLASSES;
 

@@ -45,7 +45,7 @@ function HolidayRow({ holiday, onEdit }: { holiday: HolidayDto; onEdit: () => vo
           <Button
             size="sm"
             variant="ghost"
-            aria-label={`${holiday.skipped ? 'Keep' : 'Skip next'} ${holiday.name}`}
+            aria-label={holiday.skipped ? `Keep it: ${holiday.name}` : `Skip next ${holiday.name}`}
             busy={setSkipped.isPending}
             onClick={() => setSkipped.mutate({ key: holiday.key, skip: !holiday.skipped })}
           >
