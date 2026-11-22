@@ -166,6 +166,9 @@ describe('the bell', () => {
     );
     const bars = screen.getAllByRole('navigation', { name: 'Main' });
     expect(bars.at(-1)?.querySelectorAll('a')).toHaveLength(7);
+    // Shared is on the phone bar; Activity is in the sidebar, and reached from the dashboard and Settings on a phone.
+    expect([...bars.at(-1)!.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toContain('/shared');
+    expect([...bars[0]!.querySelectorAll('a')].map((a) => a.getAttribute('href'))).toEqual(expect.arrayContaining(['/shared', '/activity']));
     expect(await screen.findAllByRole('link', { name: 'Notifications' })).toHaveLength(2);
   });
 });

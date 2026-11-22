@@ -24,6 +24,7 @@ import { GroupsPage } from '../features/groups/GroupsPage';
 import { PatternEditorPage } from '../features/patterns/PatternEditorPage';
 import { PresetsPage } from '../features/presets/PresetsPage';
 import { SchedulesPage } from '../features/schedules/SchedulesPage';
+import { SharedPage } from '../features/sharing/SharedPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { setUnauthenticatedHandler } from '../lib/api';
 import { keys } from '../lib/queries';
@@ -87,6 +88,7 @@ export function App() {
         <Route path="/connections" element={<ConnectionPage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/shared" element={<SharedPage />} />
         {linkRoutes}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

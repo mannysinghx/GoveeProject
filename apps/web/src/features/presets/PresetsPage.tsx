@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { DeviceDto, PresetDto } from '@glm/shared';
 import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader, SectionCard } from '../../components/ui';
+import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
 import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../../lib/queries';
 import { ScenesPanel } from '../devices/ScenesPanel';
 import { isPatternPreset } from '../patterns/pattern-model';
@@ -91,6 +92,7 @@ function PresetCard({
         <h3 className="font-semibold">{preset.name}</h3>
         <Badge tone="amber">App preset</Badge>
       </div>
+      <ImportedBadge from={preset.importedFrom} />
       {preset.description ? <p className="text-sm text-ink-300">{preset.description}</p> : null}
       <ol className="space-y-1 text-sm text-ink-300">
         {preset.actions.map((action, index) => (
@@ -116,6 +118,7 @@ function PresetCard({
         <Button size="sm" icon={<Copy className="size-4" aria-hidden />} busy={duplicate.isPending} onClick={() => duplicate.mutate(preset.id)}>
           Duplicate
         </Button>
+        {preset.builtin ? null : <ShareButton kind="preset" sourceId={preset.id} name={preset.name} />}
         {confirming ? (
           <>
             <Button size="sm" variant="danger" busy={remove.isPending} onClick={() => remove.mutate(preset.id)}>

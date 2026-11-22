@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { DELETE_CONFIRMATION } from '@glm/shared';
 import { Badge, Button, ErrorNotice, Field, inputClass, Loading, Notice, SectionCard } from '../../components/ui';
 import { dateTime } from '../../lib/format';
+import { useModerateAccount } from '../sharing/queries';
 import { useAdminAccounts, useDeleteAccount, useExportAccount, useSetAccountStatus } from './queries';
 
 function PasswordField({ value, onChange, label = 'Current password' }: { value: string; onChange: (v: string) => void; label?: string }) {
@@ -80,6 +81,7 @@ export function AccountData({ canDelete }: { canDelete: boolean }) {
 export function AdminAccounts() {
   const list = useAdminAccounts();
   const setStatus = useSetAccountStatus();
+  const moderate = useModerateAccount();
   return (
     <SectionCard title="Accounts" description="Only you see this. Suspending signs a person out and stops their schedules until you reactivate them.">
       {list.isPending ? <Loading label="Loading accounts" /> : null}
@@ -91,6 +93,8 @@ export function AdminAccounts() {
               <span className="min-w-0 truncate font-medium text-ink-100">{account.email ?? `Account ${account.id}`}</span>
               {account.role === 'owner' ? <Badge tone="amber">You</Badge> : null}
               {account.status === 'suspended' ? <Badge tone="warn">Suspended</Badge> : null}
+              {account.displayName ? <Badge>{account.displayName}</Badge> : null}
+              {account.sharingBlocked ? <Badge tone="warn">Sharing off</Badge> : null}
               <span className="w-full text-xs text-ink-400">
                 Joined {dateTime(account.createdAt)}. Last sign-in {account.lastSignInAt ? dateTime(account.lastSignInAt) : 'never'}.{' '}
                 {account.goveeConnected ? 'Govee key connected' : 'No Govee key'}
@@ -106,11 +110,23 @@ export function AdminAccounts() {
                   {account.status === 'active' ? 'Suspend' : 'Reactivate'}
                 </Button>
               ) : null}
+              {account.role === 'member' ? (
+                <Button size="sm" variant="ghost" busy={moderate.block.isPending && moderate.block.variables?.id === account.id} onClick={() => moderate.block.mutate({ id: account.id, blocked: !account.sharingBlocked })}>
+                  {account.sharingBlocked ? 'Allow sharing' : 'Stop sharing'}
+                </Button>
+              ) : null}
+              {account.role === 'member' && account.displayName ? (
+                <Button size="sm" variant="ghost" busy={moderate.resetName.isPending && moderate.resetName.variables === account.id} onClick={() => moderate.resetName.mutate(account.id)}>
+                  Reset name
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
       ) : null}
       {setStatus.isError ? <ErrorNotice error={setStatus.error} /> : null}
+      {moderate.block.isError ? <ErrorNotice error={moderate.block.error} /> : null}
+      {moderate.resetName.isError ? <ErrorNotice error={moderate.resetName.error} /> : null}
     </SectionCard>
   );
 }

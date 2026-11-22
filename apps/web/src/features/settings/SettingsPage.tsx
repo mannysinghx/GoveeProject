@@ -6,6 +6,7 @@ import { timeZoneOptions } from '../../lib/format';
 import { Link } from 'react-router-dom';
 import { useSettings, useUpdateSettings } from '../../lib/queries';
 import { AccountData, AdminAccounts } from '../account/AccountData';
+import { SharedModeration } from '../sharing/SharedModeration';
 import { GoveeKeySettings } from '../account/GoveeKey';
 import { PASSWORD_MIN_LENGTH, useChangePassword, useSession } from '../auth/useSession';
 import { EmailSettings, SignupSettings } from './AccountSettings';
@@ -202,7 +203,14 @@ export function SettingsPage() {
   const isOwner = useSession().data?.role === 'owner';
   return (
     <>
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        actions={
+          <Link to="/activity" className="text-sm text-amber-soft underline underline-offset-2">
+            Activity and diagnostics
+          </Link>
+        }
+      />
       {settings.isPending ? <Loading label="Loading settings" /> : null}
       {settings.isError ? <ErrorNotice error={settings.error} /> : null}
       <div className="max-w-3xl space-y-5">
@@ -214,6 +222,7 @@ export function SettingsPage() {
         <AccountData canDelete={!isOwner} />
         {isOwner ? <SignupSettings /> : null}
         {isOwner ? <AdminAccounts /> : null}
+        {isOwner ? <SharedModeration /> : null}
         <p className="text-sm text-ink-400">
           <Link to="/privacy" className="underline underline-offset-2">
             Privacy

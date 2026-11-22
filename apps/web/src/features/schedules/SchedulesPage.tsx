@@ -3,6 +3,7 @@ import { CalendarClock, History, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { describeRecurrence, type ScheduleDto } from '@glm/shared';
 import { RunStatusBadge } from '../../components/status';
+import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorNotice, Loading, Notice, PageHeader } from '../../components/ui';
 import { dateTime } from '../../lib/format';
 import { useDeleteSchedule, useScheduleExecutions, useSchedules, useToggleSchedule } from '../../lib/queries';
@@ -67,6 +68,7 @@ function ScheduleCard({
 
       <p className="text-sm text-ink-200">{describeRecurrence(schedule.recurrence)}</p>
       <p className="text-xs text-ink-400">{schedule.timeZone}</p>
+      <ImportedBadge from={schedule.importedFrom} />
 
       {schedule.nextRun ? (
         <div className="rounded-lg bg-ink-850 p-3 text-sm">
@@ -104,6 +106,7 @@ function ScheduleCard({
         <Button size="sm" icon={<History className="size-4" aria-hidden />} onClick={onHistory}>
           History
         </Button>
+        {schedule.builtinShow ? null : <ShareButton kind="schedule" sourceId={schedule.id} name={schedule.name} />}
         {confirming ? (
           <>
             <Button size="sm" variant="danger" busy={remove.isPending} onClick={() => remove.mutate(schedule.id)}>

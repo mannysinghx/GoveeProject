@@ -1,4 +1,4 @@
-import { Activity, Bell, CalendarClock, Layers, Lightbulb, LogOut, Settings, Sparkles, Wifi } from 'lucide-react';
+import { Activity, Bell, CalendarClock, Layers, Lightbulb, LogOut, Settings, Share2, Sparkles, Wifi } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Button } from '../components/ui';
@@ -10,8 +10,10 @@ const NAV = [
   { to: '/presets', label: 'Scenes & Presets', short: 'Presets', icon: Sparkles },
   { to: '/groups', label: 'Groups', icon: Layers },
   { to: '/schedules', label: 'Schedules', short: 'Timers', icon: CalendarClock },
+  { to: '/shared', label: 'Shared', icon: Share2 },
   { to: '/connections', label: 'Connections', short: 'Health', icon: Wifi },
-  { to: '/activity', label: 'Activity', icon: Activity },
+  // The phone bar holds seven. Activity is reached there from the dashboard and Settings.
+  { to: '/activity', label: 'Activity', icon: Activity, phone: false },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -115,7 +117,7 @@ export function AppShell({ username, children }: { username: string; children: R
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-7 border-t border-ink-700 bg-ink-900 pb-[env(safe-area-inset-bottom)] md:hidden"
       >
-        {NAV.map(({ to, label, short, icon: Icon, end }) => (
+        {NAV.filter((item) => !('phone' in item) || item.phone !== false).map(({ to, label, short, icon: Icon, end }) => (
           <NavLink
             key={to}
             to={to}

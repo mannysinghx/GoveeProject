@@ -71,6 +71,14 @@ export function PrivacyPage() {
         account&apos;s lights and records are kept apart from every other account&apos;s.
       </p>
 
+      <H2>What you share</H2>
+      <p>
+        If you share a preset, group or schedule, everyone with an account can see it and import a copy: its name, description,
+        colours and timing, the model of each light it uses with the name you give it, and your display name. Your email address,
+        your lights and their names, and your location are not shared. Stopping a share, or deleting your account, removes it from
+        the Shared space; copies people already imported stay theirs.
+      </p>
+
       <H2>Your choices</H2>
       <p>
         In Settings you can download everything in your account, remove your keys, and delete your account. Deleting it removes

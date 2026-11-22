@@ -2,6 +2,7 @@ import { Layers, Pencil, Play, Plus, Power, PowerOff, Trash2 } from 'lucide-reac
 import { useState, type FormEvent } from 'react';
 import type { DeviceAction, DeviceDto, GroupDto, RunResultDto } from '@glm/shared';
 import { RunResults } from '../../components/status';
+import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
 import { Button, Card, Dialog, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader } from '../../components/ui';
 import {
   useApplyGroupAction,
@@ -169,6 +170,7 @@ function GroupCard({
   return (
     <Card className="flex flex-col gap-3 p-4">
       <h3 className="font-semibold">{group.name}</h3>
+      <ImportedBadge from={group.importedFrom} />
       {members.length === 0 ? (
         <p className="text-sm text-ink-300">No devices in this group.</p>
       ) : (
@@ -208,6 +210,7 @@ function GroupCard({
         <Button size="sm" icon={<Pencil className="size-4" aria-hidden />} onClick={onEdit}>
           Edit
         </Button>
+        <ShareButton kind="group" sourceId={group.id} name={group.name} />
         {confirming ? (
           <>
             <Button size="sm" variant="danger" busy={remove.isPending} onClick={() => remove.mutate(group.id)}>
