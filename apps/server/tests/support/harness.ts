@@ -99,7 +99,7 @@ export async function createHarness(
   const secrets = new SecretRegistry(configSecrets(config));
   const logger = createLogger({ level: config.logLevel, secrets, destination });
   const platform = createPlatform(config, { clock, logger, secrets, ...options.overrides });
-  const owner = platform.accounts.sole();
+  const owner = platform.accounts.forUser(1)!;
   const ctx: TestContext = {
     ...owner,
     auth: platform.auth,

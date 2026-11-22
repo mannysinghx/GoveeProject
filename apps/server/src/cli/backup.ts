@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import Database from 'better-sqlite3';
+import { resolveAccountFile } from '../auth/control.js';
 import { loadConfig, loadDotEnv } from '../config/env.js';
 import { controlBackupPathFor, createVerifiedBackup, type BackupManifest } from '../database/backup.js';
 
@@ -12,6 +14,9 @@ import { controlBackupPathFor, createVerifiedBackup, type BackupManifest } from 
  * sessions, encrypted keys) next to it as <name>.control.sqlite, when it exists. Each copy is
  * checked before it is kept, and gets a manifest (<file>.manifest.json) with its SHA-256,
  * size, migrations and row counts, so it can be verified again later with `npm run db:verify`.
+ *
+ * Each member's account file, if there are any, is copied the same way into a folder beside
+ * the backup, <name>.accounts/, under its own file name.
  *
  * Usage: npm run db:backup -- [destination-file]
  */
@@ -39,6 +44,24 @@ async function main(): Promise<void> {
     const control = await createVerifiedBackup(config.controlDatabasePath, controlBackupPathFor(destination));
     console.log(summary('Control database backup', control.file, control.manifest));
     console.log(`Manifest written to ${control.manifestPath}`);
+
+    const reader = new Database(config.controlDatabasePath, { readonly: true, fileMustExist: true });
+    const members = reader.prepare("SELECT id, account_file FROM users WHERE role = 'member' ORDER BY id").all() as {
+      id: number;
+      account_file: string;
+    }[];
+    reader.close();
+    const membersDir = `${destination.replace(/\.sqlite$/, '')}.accounts`;
+    let copied = 0;
+    for (const member of members) {
+      const source = resolveAccountFile(config, member.account_file);
+      // A member whose file was never made (it is made when first loaded) has nothing to copy.
+      if (!fs.existsSync(source)) continue;
+      const result = await createVerifiedBackup(source, path.join(membersDir, path.basename(source)));
+      copied += 1;
+      console.log(summary(`Account ${member.id} backup`, result.file, result.manifest));
+    }
+    console.log(members.length === 0 ? 'No member accounts.' : `Backed up ${copied} of ${members.length} member accounts to ${membersDir}`);
   } else {
     console.log('No control database yet, so only the account file was backed up.');
   }

@@ -7,6 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "dev:mock": "tsx watch --env-file-if-exists=dev-mock.env src/main.ts",
     "mock-govee": "tsx scripts/mock-govee.ts",
+    "fake-smtp": "tsx scripts/fake-smtp.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -14,6 +14,7 @@ import Fastify, {
 import type { ApiErrorBody } from '@glm/shared';
 import { registerActivityRoutes } from '../activity/activity-routes.js';
 import { registerAiRoutes } from '../ai/ai-routes.js';
+import { registerAdminRoutes } from '../auth/admin-routes.js';
 import { registerAuthRoutes } from '../auth/auth-routes.js';
 import { constantTimeEqual, type SessionInfo } from '../auth/auth-service.js';
 import { SESSION_COOKIE } from '../auth/cookies.js';
@@ -41,6 +42,8 @@ declare module 'fastify' {
   interface FastifyContextConfig {
     /** Routes without this flag require a signed-in session. Secure by default. */
     public?: boolean;
+    /** Only the owner may call this. Anyone else gets 404, as if it did not exist. */
+    owner?: boolean;
     /** Skips the Host check. Only for the health route, which container health checks call by IP. */
     anyHost?: boolean;
   }
@@ -50,6 +53,7 @@ export interface RouteEntry {
   method: string;
   url: string;
   public: boolean;
+  owner: boolean;
 }
 
 const MUTATING_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -106,7 +110,10 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
     const methods = Array.isArray(route.method) ? route.method : [route.method];
     for (const method of methods) {
       if (method === 'HEAD') continue;
-      routeTable.push({ method, url: route.url, public: route.config?.public === true });
+      if (route.config?.public === true && route.config?.owner === true) {
+        throw new Error(`${method} ${route.url} cannot be both public and owner-only.`);
+      }
+      routeTable.push({ method, url: route.url, public: route.config?.public === true, owner: route.config?.owner === true });
     }
   });
 
@@ -172,10 +179,13 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
       api.addHook('onRequest', async (request) => {
         request.session = platform.auth.validateSession(request.cookies[SESSION_COOKIE]);
         // The one place a session becomes an account. Public routes get one too when signed in.
-        request.account = request.session ? platform.accounts.forUser(request.session.userId) : null;
+        request.account = request.session ? platform.accounts.ensure(request.session.userId) : null;
         if (request.routeOptions.config.public) return;
         if (!request.session) {
           throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
+        }
+        if (request.routeOptions.config.owner && request.session.role !== 'owner') {
+          throw new AppError(404, 'not_found', 'That endpoint does not exist.');
         }
         if (!request.account) {
           throw new AppError(503, 'account_unavailable', 'Your account is not available right now. Try again in a minute.');
@@ -199,6 +209,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
       registerConnectionRoutes(api);
       registerAiRoutes(api);
       registerNotificationRoutes(api, platform);
+      registerAdminRoutes(api, platform);
     },
     { prefix: '/api/v1' },
   );

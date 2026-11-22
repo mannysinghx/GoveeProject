@@ -147,6 +147,11 @@ export class NotificationService {
     private readonly subject: string,
     private readonly logger: Logger,
     private readonly clock: Clock,
+    /**
+     * Put in front of every button token, so the public route that receives one can tell whose
+     * account it belongs to without a session. The owner's is "1".
+     */
+    private readonly tokenPrefix: string,
   ) {}
 
   start(): void {
@@ -224,7 +229,7 @@ export class NotificationService {
     const tokens = new Map<NotificationAction, string>();
     const expires = new Date(this.clock.nowMs() + TOKEN_LIFETIME_MS).toISOString();
     for (const action of actions) {
-      const token = crypto.randomBytes(32).toString('base64url');
+      const token = `${this.tokenPrefix}.${crypto.randomBytes(32).toString('base64url')}`;
       this.db
         .prepare('INSERT INTO notification_tokens (token_hash, notification_id, action, expires_at) VALUES (?, ?, ?, ?)')
         .run(hashToken(token), id, action, expires);

@@ -34,6 +34,38 @@ export interface SessionDto {
   username: string | null;
   csrfToken: string | null;
   expiresAt: string | null;
+  /** Whether the sign-in page should offer "Create an account". */
+  signupOpen: boolean;
+  /** The signed-in person's verified address, or null when they have none yet. */
+  email: string | null;
+  role: 'owner' | 'member' | null;
+}
+
+/** What a link from an email is for, as shown before anything is done with it. */
+export interface LinkCheckDto {
+  purpose: 'signup' | 'reset' | 'email_change';
+  email: string;
+}
+
+/** The proof-of-work puzzle a sign-up or reset form solves before it is sent. */
+export interface ChallengeDto {
+  challenge: string;
+  difficulty: number;
+  expiresAt: string;
+}
+
+export interface SignupSettingsDto {
+  enabled: boolean;
+  dailyCap: number;
+  totalCap: number;
+  /** False until SMTP is configured. Sign-up cannot be turned on without it. */
+  mailConfigured: boolean;
+  /** Accounts made in the last 24 hours, and in total, not counting the owner. */
+  createdLastDay: number;
+  createdTotal: number;
+  /** Mail waiting to be sent, and mail that could not be sent in the last day. */
+  mailQueued: number;
+  mailFailedLastDay: number;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -491,7 +523,7 @@ export interface DiagnosticsDto {
   nodeVersion: string;
   uptimeSeconds: number;
   backend: 'ok';
-  database: { status: 'ok' | 'error'; schemaVersion: string | null; path: string };
+  database: { status: 'ok' | 'error'; schemaVersion: string | null; /** Shown to the owner only. */ path: string | null };
   govee: {
     keyConfigured: boolean;
     /** Only true when the base URL was overridden for local testing. */

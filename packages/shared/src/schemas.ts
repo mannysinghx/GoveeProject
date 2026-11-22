@@ -86,6 +86,79 @@ export const changePasswordRequestSchema = z.object({
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
 
 /* -------------------------------------------------------------------------- */
+/* Email sign-up                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Plain ASCII addresses only, with a dotted domain. That keeps every address safe to put in a
+ * mail header as it is, and keeps look-alike Unicode addresses out.
+ */
+const EMAIL_PATTERN =
+  /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+/** One spelling per address: NFKC, trimmed, lowercased. Applied before storing or comparing. */
+export function normalizeEmail(raw: string): string {
+  return raw.normalize('NFKC').trim().toLowerCase();
+}
+
+export function isEmailAddress(value: string): boolean {
+  return value.length <= 254 && EMAIL_PATTERN.test(value);
+}
+
+export const emailSchema = z
+  .string()
+  .max(320, 'Use at most 254 characters')
+  .transform(normalizeEmail)
+  .refine(isEmailAddress, 'Enter an email address, such as name@example.com');
+
+/** The answer to the sign-up form's proof-of-work challenge. */
+const proofSchema = {
+  challenge: z.string().min(1).max(200),
+  nonce: z.string().regex(/^\d{1,16}$/, 'Expected a number'),
+};
+
+export const registerRequestSchema = z.object({
+  email: emailSchema,
+  ...proofSchema,
+  /** Hidden from people. Anything typed here means a bot filled in the form. */
+  website: z.string().max(200).optional(),
+});
+export type RegisterRequest = z.infer<typeof registerRequestSchema>;
+
+export const forgotPasswordRequestSchema = z.object({
+  email: emailSchema,
+  ...proofSchema,
+  website: z.string().max(200).optional(),
+});
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
+
+const linkTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{20,128}$/, 'That link is not complete');
+
+export const linkCheckRequestSchema = z.object({ token: linkTokenSchema });
+
+export const completeSignupRequestSchema = z.object({ token: linkTokenSchema, password: passwordSchema });
+export const resetPasswordRequestSchema = z.object({ token: linkTokenSchema, password: passwordSchema });
+export const confirmEmailRequestSchema = z.object({ token: linkTokenSchema });
+
+export const changeEmailRequestSchema = z.object({
+  newEmail: emailSchema,
+  currentPassword: z.string().max(256),
+});
+export type ChangeEmailRequest = z.infer<typeof changeEmailRequestSchema>;
+
+export const SIGNUP_CAP_MAX = 100_000;
+
+export const signupSettingsUpdateSchema = z
+  .object({
+    enabled: z.boolean(),
+    dailyCap: z.number().int().min(0).max(SIGNUP_CAP_MAX),
+    totalCap: z.number().int().min(0).max(SIGNUP_CAP_MAX),
+  })
+  .partial()
+  .refine((value) => Object.keys(value).length > 0, 'Nothing to change');
+export type SignupSettingsUpdate = z.infer<typeof signupSettingsUpdateSchema>;
+
+/* -------------------------------------------------------------------------- */
 /* Device actions                                                             */
 /* -------------------------------------------------------------------------- */
 

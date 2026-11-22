@@ -21,6 +21,21 @@ export function accountFileFor(config: AppConfig): string {
   return path.relative(path.dirname(config.controlDatabasePath), config.databasePath) || config.databasePath;
 }
 
+/**
+ * Where a member's account file is on disk. Recorded paths are relative to the control
+ * database's folder. With an in-memory control database (tests), accounts are in memory too.
+ * A recorded path cannot climb out of that folder.
+ */
+export function resolveAccountFile(config: AppConfig, accountFile: string): string {
+  if (config.controlDatabasePath === ':memory:') return ':memory:';
+  const base = path.dirname(config.controlDatabasePath);
+  const resolved = path.resolve(base, accountFile);
+  if (path.isAbsolute(accountFile) || !resolved.startsWith(base + path.sep)) {
+    throw new Error('An account file path in the control database points outside its folder.');
+  }
+  return resolved;
+}
+
 interface LegacyUser {
   id: number;
   username: string;

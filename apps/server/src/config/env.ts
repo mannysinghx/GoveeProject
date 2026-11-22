@@ -12,6 +12,11 @@ export const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.
 
 export const OFFICIAL_GOVEE_BASE_URL = 'https://openapi.api.govee.com';
 const OFFICIAL_GOVEE_HOST = 'openapi.api.govee.com';
+/**
+ * The only mail servers the app will log in to, plus loopback for the local test server. The
+ * mailbox password is sent to SMTP_HOST, so a typo or a hostile variable cannot send it elsewhere.
+ */
+export const ALLOWED_SMTP_HOSTS = new Set(['mail.privateemail.com', 'smtp.privateemail.com']);
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 
 export function isLoopbackHost(host: string): boolean {
@@ -111,12 +116,38 @@ const envSchema = z.object({
   GEMINI_MODEL: z.preprocess(emptyToUndefined, z.string().default('gemini-3.1-flash-lite')),
   GLM_API_KEY: optionalString,
   GLM_MODEL: z.preprocess(emptyToUndefined, z.string().default('glm-4.7-flash')),
+
+  // Email, for sign-up and password reset. See docs/deploy-railway.md. Mail is off until SMTP_HOST is set.
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(65535).default(465)),
+  // tls: encrypted from the start (port 465). starttls: upgraded before signing in (587).
+  // plain: only for a mail server on this computer, used in tests and development.
+  SMTP_SECURITY: z.preprocess(emptyToUndefined, z.enum(['tls', 'starttls', 'plain']).optional()),
+  SMTP_USER: optionalString,
+  SMTP_PASSWORD: optionalString,
+  MAIL_FROM: optionalString,
+  // Below Namecheap's 500 an hour, leaving room for mail sent from the mailbox by hand.
+  MAIL_HOURLY_LIMIT: positiveInt(300),
+  SMTP_TIMEOUT_MS: positiveInt(20_000),
+  // The address links in emails point to, such as https://lightup.ink.
+  PUBLIC_URL: optionalString,
+  // About 2^n hashes for the browser to find. 18 takes about a second on a phone.
+  SIGNUP_POW_DIFFICULTY: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(26).default(18)),
 });
 
 export interface AiProviderConfig {
   id: AiProviderId;
   apiKey: string;
   model: string;
+}
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  security: 'tls' | 'starttls' | 'plain';
+  user: string | null;
+  password: string | null;
+  timeoutMs: number;
 }
 
 export interface AppConfig {
@@ -184,6 +215,18 @@ export interface AppConfig {
     providers: AiProviderConfig[];
     monthlyLimitUsd: number;
     timeoutMs: number;
+  };
+  mail: {
+    /** Null when SMTP_HOST is not set: nothing is sent, and sign-up cannot be turned on. */
+    smtp: SmtpConfig | null;
+    /** The sender address, MAIL_FROM or SMTP_USER. */
+    from: string | null;
+    hourlyLimit: number;
+  };
+  /** Where links in emails point, with no trailing slash. */
+  publicUrl: string;
+  signup: {
+    powDifficulty: number;
   };
 }
 
@@ -258,6 +301,58 @@ function validateGoveeBaseUrl(raw: string): { baseUrl: string; local: boolean } 
   );
 }
 
+const MAIL_ADDRESS = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9.-]{1,253}$/;
+
+/**
+ * SMTP_HOST must be one of ALLOWED_SMTP_HOSTS, or loopback. A password is only ever sent over
+ * an encrypted connection, except to loopback, and "plain" is refused for any other host.
+ */
+function resolveSmtp(e: z.infer<typeof envSchema>): { smtp: SmtpConfig | null; from: string | null } {
+  if (!e.SMTP_HOST) {
+    if (e.SMTP_USER || e.SMTP_PASSWORD) throw new ConfigError('SMTP_USER and SMTP_PASSWORD are set, but SMTP_HOST is not.');
+    return { smtp: null, from: null };
+  }
+  const host = e.SMTP_HOST.toLowerCase();
+  const loopback = isLoopbackHost(host);
+  if (!loopback && !ALLOWED_SMTP_HOSTS.has(host)) {
+    throw new ConfigError(`SMTP_HOST must be one of ${[...ALLOWED_SMTP_HOSTS].join(', ')}, or a loopback address used for local testing.`);
+  }
+  const security = e.SMTP_SECURITY ?? (e.SMTP_PORT === 465 ? 'tls' : 'starttls');
+  if (security === 'plain' && !loopback) {
+    throw new ConfigError('SMTP_SECURITY=plain is only allowed for a mail server on this computer.');
+  }
+  if (Boolean(e.SMTP_USER) !== Boolean(e.SMTP_PASSWORD)) {
+    throw new ConfigError('Set both SMTP_USER and SMTP_PASSWORD, or neither.');
+  }
+  if (!loopback && !e.SMTP_USER) throw new ConfigError('SMTP_USER and SMTP_PASSWORD are required for this mail server.');
+  const from = e.MAIL_FROM ?? e.SMTP_USER ?? null;
+  if (!from) throw new ConfigError('Set MAIL_FROM, the address mail is sent from.');
+  if (!MAIL_ADDRESS.test(from)) throw new ConfigError('MAIL_FROM must be a plain email address, such as info@example.com.');
+  return {
+    smtp: { host, port: e.SMTP_PORT, security, user: e.SMTP_USER ?? null, password: e.SMTP_PASSWORD ?? null, timeoutMs: e.SMTP_TIMEOUT_MS },
+    from,
+  };
+}
+
+/** PUBLIC_URL if set, otherwise the first allowed host, otherwise this computer. */
+function resolvePublicUrl(e: z.infer<typeof envSchema>, allowedHosts: string[] | null): string {
+  if (e.PUBLIC_URL) {
+    let url: URL;
+    try {
+      url = new URL(e.PUBLIC_URL);
+    } catch {
+      throw new ConfigError('PUBLIC_URL is not a valid URL.');
+    }
+    if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLoopbackHost(url.hostname))) {
+      throw new ConfigError('PUBLIC_URL must start with https://, except for this computer.');
+    }
+    return url.origin;
+  }
+  const host = allowedHosts?.find((h) => !isLoopbackHost(h));
+  if (host) return `https://${host}`;
+  return `http://localhost:${e.PORT}`;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
@@ -269,6 +364,12 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const e = parsed.data;
   const { baseUrl, local } = validateGoveeBaseUrl(e.GOVEE_API_BASE_URL);
+  const mail = resolveSmtp(e);
+  const allowedHosts = e.ALLOWED_HOSTS
+    ? e.ALLOWED_HOSTS.split(',')
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean)
+    : null;
 
   const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(PROJECT_ROOT, p));
   const databasePath = e.DATABASE_PATH === ':memory:' ? ':memory:' : resolveFromRoot(e.DATABASE_PATH);
@@ -287,11 +388,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     env: e.NODE_ENV,
     host: e.HOST,
     port: e.PORT,
-    allowedHosts: e.ALLOWED_HOSTS
-      ? e.ALLOWED_HOSTS.split(',')
-          .map((h) => h.trim().toLowerCase())
-          .filter(Boolean)
-      : null,
+    allowedHosts,
     cookieSecure: e.COOKIE_SECURE === 'auto' ? 'auto' : e.COOKIE_SECURE === 'true',
     trustProxy: e.TRUST_PROXY > 0,
     trustProxyHops: e.TRUST_PROXY,
@@ -345,6 +442,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       monthlyLimitUsd: e.AI_MONTHLY_LIMIT_USD,
       timeoutMs: e.AI_TIMEOUT_MS,
     },
+    mail: { ...mail, hourlyLimit: e.MAIL_HOURLY_LIMIT },
+    publicUrl: resolvePublicUrl(e, allowedHosts),
+    signup: { powDifficulty: e.SIGNUP_POW_DIFFICULTY },
   };
 }
 

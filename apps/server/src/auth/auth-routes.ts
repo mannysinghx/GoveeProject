@@ -1,8 +1,16 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
+  changeEmailRequestSchema,
   changePasswordRequestSchema,
+  completeSignupRequestSchema,
+  confirmEmailRequestSchema,
+  forgotPasswordRequestSchema,
+  linkCheckRequestSchema,
   loginRequestSchema,
+  registerRequestSchema,
+  resetPasswordRequestSchema,
   setupRequestSchema,
+  type ChallengeDto,
   type SessionDto,
 } from '@glm/shared';
 import type { PlatformContext } from '../app/context.js';
@@ -18,13 +26,19 @@ function sessionDto(platform: PlatformContext, session: SessionInfo | null): Ses
     username: session?.username ?? null,
     csrfToken: session?.csrfToken ?? null,
     expiresAt: session?.expiresAt ?? null,
+    signupOpen: platform.signup.isOpen(),
+    email: session?.email ?? null,
+    role: session?.role ?? null,
   };
 }
 
 const clientIp = (request: FastifyRequest) => request.ip;
 
+/** The same answer for every address, known or not. */
+const SENT_IF_POSSIBLE = { ok: true } as const;
+
 export function registerAuthRoutes(api: FastifyInstance, platform: PlatformContext): void {
-  const { auth, config } = platform;
+  const { auth, config, signup, pow } = platform;
 
   api.get('/auth/session', { config: { public: true } }, async (request) => {
     return sessionDto(platform, request.session);
@@ -61,5 +75,57 @@ export function registerAuthRoutes(api: FastifyInstance, platform: PlatformConte
     );
     setSessionCookie(reply, request, config, token, session.expiresAt);
     return sessionDto(platform, session);
+  });
+
+  /* ----------------------------- email sign-up ----------------------------- */
+
+  // The browser solves this before sending the register or forgot-password form.
+  api.get('/auth/challenge', { config: { public: true } }, async (_request, reply): Promise<ChallengeDto> => {
+    void reply.header('cache-control', 'no-store');
+    return pow.issue();
+  });
+
+  api.post('/auth/register', { config: { public: true } }, async (request, reply) => {
+    const body = parseInput(registerRequestSchema, request.body);
+    signup.register(body, clientIp(request));
+    return reply.status(202).send(SENT_IF_POSSIBLE);
+  });
+
+  // Opening a link only asks what it is for. Nothing is used up until the form is sent.
+  api.post('/auth/link/check', { config: { public: true } }, async (request) => {
+    return signup.checkLink(parseInput(linkCheckRequestSchema, request.body).token);
+  });
+
+  // Makes the account. Signs nobody in: the person signs in with their new password next.
+  api.post('/auth/register/complete', { config: { public: true } }, async (request, reply) => {
+    const body = parseInput(completeSignupRequestSchema, request.body);
+    const result = await signup.completeSignup(body.token, body.password, clientIp(request));
+    return reply.status(201).send(result);
+  });
+
+  api.post('/auth/password/forgot', { config: { public: true } }, async (request, reply) => {
+    const body = parseInput(forgotPasswordRequestSchema, request.body);
+    signup.forgotPassword(body, clientIp(request));
+    return reply.status(202).send(SENT_IF_POSSIBLE);
+  });
+
+  api.post('/auth/password/reset', { config: { public: true } }, async (request, reply) => {
+    const body = parseInput(resetPasswordRequestSchema, request.body);
+    const result = await signup.resetPassword(body.token, body.password, clientIp(request));
+    // Every session of this person was ended, including this browser's, if it had one.
+    clearSessionCookie(reply, request, config);
+    return result;
+  });
+
+  // Signed in, with the current password: sends a link to the new address.
+  api.post('/auth/email/change', async (request, reply) => {
+    const body = parseInput(changeEmailRequestSchema, request.body);
+    await signup.requestEmailChange(request.session!.userId, body.newEmail, body.currentPassword, clientIp(request));
+    return reply.status(202).send(SENT_IF_POSSIBLE);
+  });
+
+  // Public, because the link may be opened in a browser that is not signed in. The token is the permission.
+  api.post('/auth/email/confirm', { config: { public: true } }, async (request) => {
+    return signup.confirmEmailChange(parseInput(confirmEmailRequestSchema, request.body).token, clientIp(request));
   });
 }

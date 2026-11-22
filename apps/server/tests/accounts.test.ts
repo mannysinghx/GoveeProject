@@ -8,13 +8,25 @@ import { authedClient, createHarness, type Harness } from './support/harness.js'
  * public or signed-in, so nobody adds a public route, or a route that skips the account
  * lookup, without deciding to. Written from the route files, not from the app's output.
  */
-const ROUTES: [method: string, url: string, kind: 'public' | 'signed-in'][] = [
+const ROUTES: [method: string, url: string, kind: 'public' | 'signed-in' | 'owner'][] = [
   // Sign-in, on the platform
   ['GET', '/api/v1/auth/session', 'public'],
   ['POST', '/api/v1/auth/setup', 'public'],
   ['POST', '/api/v1/auth/login', 'public'],
   ['POST', '/api/v1/auth/logout', 'signed-in'],
   ['POST', '/api/v1/auth/change-password', 'signed-in'],
+  // Email sign-up, reset and address change
+  ['GET', '/api/v1/auth/challenge', 'public'],
+  ['POST', '/api/v1/auth/register', 'public'],
+  ['POST', '/api/v1/auth/link/check', 'public'],
+  ['POST', '/api/v1/auth/register/complete', 'public'],
+  ['POST', '/api/v1/auth/password/forgot', 'public'],
+  ['POST', '/api/v1/auth/password/reset', 'public'],
+  ['POST', '/api/v1/auth/email/change', 'signed-in'],
+  ['POST', '/api/v1/auth/email/confirm', 'public'],
+  // The owner's server settings
+  ['GET', '/api/v1/admin/signup', 'owner'],
+  ['PATCH', '/api/v1/admin/signup', 'owner'],
   // System
   ['GET', '/api/v1/health', 'public'],
   ['GET', '/api/v1/system/status', 'signed-in'],
@@ -105,12 +117,13 @@ describe('route census', () => {
   it('lists every API route, and exactly which ones are public', () => {
     const actual = h.app.routeTable
       .filter((r) => r.url.startsWith('/api/v1'))
-      .map((r) => `${r.method} ${r.url} ${r.public ? 'public' : 'signed-in'}`)
+      .map((r) => `${r.method} ${r.url} ${r.public ? 'public' : r.owner ? 'owner' : 'signed-in'}`)
       .sort();
     const expected = ROUTES.map(([method, url, kind]) => `${method} ${url} ${kind}`).sort();
     expect(actual).toEqual(expected);
-    expect(ROUTES).toHaveLength(75);
-    expect(ROUTES.filter(([, , kind]) => kind === 'public')).toHaveLength(5);
+    expect(ROUTES).toHaveLength(85);
+    expect(ROUTES.filter(([, , kind]) => kind === 'public')).toHaveLength(12);
+    expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(2);
   });
 });
 
@@ -133,6 +146,7 @@ describe('one account per request', () => {
     await client.post('/api/v1/groups', { name: 'Front', deviceIds: [] });
     // As if this user's account file had not loaded yet.
     h.platform.accounts.forUser = () => null;
+    h.platform.accounts.ensure = () => null;
     for (const url of ['/api/v1/groups', '/api/v1/devices', '/api/v1/settings', '/api/v1/activity']) {
       const response = await client.get(url);
       expect(response.statusCode).toBe(503);
@@ -176,18 +190,44 @@ describe('AccountRegistry', () => {
     } as unknown as AccountContext;
   }
 
-  it('finds accounts by user, refuses duplicates, and will not guess when there is more than one', () => {
+  it('finds accounts by user and refuses duplicates', () => {
     const registry = new AccountRegistry();
     const log: string[] = [];
     const first = fakeAccount(1, log);
     registry.add(first);
-    expect(registry.sole()).toBe(first);
+    expect(registry.forUser(1)).toBe(first);
     expect(() => registry.add(fakeAccount(1, log))).toThrow(/already loaded/);
     const second = fakeAccount(2, log);
     registry.add(second);
     expect(registry.forUser(2)).toBe(second);
     expect(registry.forUser(3)).toBeNull();
-    expect(() => registry.sole()).toThrow(/exactly one/);
+  });
+
+  it('loads an account on first use, starts it if the others are running, and survives a failed load', () => {
+    const log: string[] = [];
+    let failNext = true;
+    const registry = new AccountRegistry((userId) => {
+      if (userId === 9) return null;
+      if (failNext) {
+        failNext = false;
+        throw new Error('disk full');
+      }
+      return fakeAccount(userId, log);
+    });
+    registry.startAll();
+    expect(registry.ensure(2)).toBeNull();
+    expect(registry.forUser(2)).toBeNull();
+    const loaded = registry.ensure(2);
+    expect(loaded?.userId).toBe(2);
+    expect(registry.ensure(2)).toBe(loaded);
+    expect(log).toEqual(['2:recover', '2:scheduler.start', '2:maintenance.start', '2:connection.start', '2:builtins.start', '2:notifications.start']);
+    expect(registry.ensure(9)).toBeNull();
+  });
+
+  it('loads nothing new once shutting down', async () => {
+    const registry = new AccountRegistry((userId) => fakeAccount(userId, []));
+    await registry.stopBackground();
+    expect(registry.ensure(5)).toBeNull();
   });
 
   it('starts each account in the original order', () => {

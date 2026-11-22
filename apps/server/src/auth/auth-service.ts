@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { hash, verify } from '@node-rs/argon2';
 import type { Logger } from 'pino';
+import { isEmailAddress, normalizeEmail } from '@glm/shared';
 import type { ActivityService } from '../activity/activity-service.js';
 import type { Db } from '../database/database.js';
 import type { Clock } from '../shared/clock.js';
@@ -38,11 +39,14 @@ export interface SessionInfo {
   userId: number;
   /** What to show as signed in: the username, or the email when there is none. */
   username: string;
+  /** The verified sign-in address, or null when the person has none yet. */
+  email: string | null;
+  role: 'owner' | 'member';
   csrfToken: string;
   expiresAt: string;
 }
 
-interface UserRow {
+export interface UserRow {
   id: number;
   username: string | null;
   email: string | null;
@@ -74,7 +78,13 @@ export function hashPassword(password: string): Promise<string> {
 
 /** Typed names are kept only as this hash in the throttling table. */
 export function identifierHash(identifier: string): string {
-  return crypto.createHash('sha256').update(`glm-login:${identifier.trim().toLowerCase()}`).digest('hex').slice(0, 32);
+  return crypto.createHash('sha256').update(`glm-login:${normalizeIdentifier(identifier)}`).digest('hex').slice(0, 32);
+}
+
+/** An email is matched in its normal form, so "Name@Example.com " finds the same account. */
+export function normalizeIdentifier(identifier: string): string {
+  const normalized = normalizeEmail(identifier);
+  return isEmailAddress(normalized) ? normalized : identifier.trim().toLowerCase();
 }
 
 const displayName = (user: { username: string | null; email: string | null }) => user.username ?? user.email ?? '';
@@ -137,14 +147,14 @@ export class AuthService {
     return this.config.setupCode !== null;
   }
 
-  private audit(userId: number | null, event: string, ip: string | null, details?: Record<string, unknown>): void {
+  audit(userId: number | null, event: string, ip: string | null, details?: Record<string, unknown>): void {
     this.control
       .prepare('INSERT INTO audit_events (created_at, user_id, event, ip, details_json) VALUES (?, ?, ?, ?, ?)')
       .run(this.clock.nowIso(), userId, event, ip, details ? JSON.stringify(details) : null);
   }
 
   private findUser(identifier: string): UserRow | null {
-    const name = identifier.trim();
+    const name = normalizeIdentifier(identifier);
     if (name === '') return null;
     return (
       (this.control
@@ -198,7 +208,7 @@ export class AuthService {
     } catch (error) {
       this.logger.warn({ err: error }, 'Could not finish setting up the owner account');
     }
-    return this.createSession(1, username);
+    return this.createSession(1, { username, email: null, role: 'owner' });
   }
 
   async login(identifier: string, password: string, ip: string): Promise<{ token: string; session: SessionInfo }> {
@@ -216,7 +226,7 @@ export class AuthService {
       this.activityFor(user?.id ?? null)?.record({ eventType: 'auth', outcome: 'failure', message: 'Failed login attempt.', details: { ip } });
       this.audit(user?.id ?? null, 'login_failed', ip);
       this.logger.warn({ ip }, 'Failed login attempt');
-      throw new AppError(401, 'invalid_credentials', 'That username or password is not correct.');
+      throw new AppError(401, 'invalid_credentials', 'That email, username or password is not correct.');
     }
     this.forgive(keys);
     if (user.status !== 'active') {
@@ -227,7 +237,7 @@ export class AuthService {
     this.activityFor(user.id)?.record({ eventType: 'auth', outcome: 'success', message: `${who} signed in.`, details: { ip } });
     this.audit(user.id, 'login', ip);
     this.logger.info({ ip, userId: user.id }, `${who} signed in`);
-    return this.createSession(user.id, displayName(user));
+    return this.createSession(user.id, user);
   }
 
   private getDummyHash(): Promise<string> {
@@ -235,7 +245,10 @@ export class AuthService {
     return this.dummyHash;
   }
 
-  private createSession(userId: number, display: string): { token: string; session: SessionInfo } {
+  private createSession(
+    userId: number,
+    user: { username: string | null; email: string | null; role: 'owner' | 'member' },
+  ): { token: string; session: SessionInfo } {
     const token = crypto.randomBytes(32).toString('base64url');
     const csrfToken = crypto.randomBytes(32).toString('base64url');
     const tokenHash = hashToken(token);
@@ -244,7 +257,10 @@ export class AuthService {
     this.control
       .prepare('INSERT INTO sessions (token_hash, user_id, csrf_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?)')
       .run(tokenHash, userId, csrfToken, expiresAt, new Date(now).toISOString());
-    return { token, session: { tokenHash, userId, username: display, csrfToken, expiresAt } };
+    return {
+      token,
+      session: { tokenHash, userId, username: displayName(user), email: user.email, role: user.role, csrfToken, expiresAt },
+    };
   }
 
   validateSession(token: string | undefined): SessionInfo | null {
@@ -252,12 +268,21 @@ export class AuthService {
     const tokenHash = hashToken(token);
     const row = this.control
       .prepare(
-        `SELECT s.token_hash, s.user_id, s.csrf_token, s.expires_at, u.username, u.email, u.status
+        `SELECT s.token_hash, s.user_id, s.csrf_token, s.expires_at, u.username, u.email, u.role, u.status
          FROM sessions s JOIN users u ON u.id = s.user_id
          WHERE s.token_hash = ?`,
       )
       .get(tokenHash) as
-      | { token_hash: string; user_id: number; csrf_token: string; expires_at: string; username: string | null; email: string | null; status: string }
+      | {
+          token_hash: string;
+          user_id: number;
+          csrf_token: string;
+          expires_at: string;
+          username: string | null;
+          email: string | null;
+          role: 'owner' | 'member';
+          status: string;
+        }
       | undefined;
     if (!row) return null;
     if (Date.parse(row.expires_at) <= this.clock.nowMs()) {
@@ -269,6 +294,8 @@ export class AuthService {
       tokenHash: row.token_hash,
       userId: row.user_id,
       username: displayName(row),
+      email: row.email,
+      role: row.role,
       csrfToken: row.csrf_token,
       expiresAt: row.expires_at,
     };
@@ -286,12 +313,11 @@ export class AuthService {
     this.audit(session.userId, 'logout', null);
   }
 
-  async changePassword(
-    userId: number,
-    currentPassword: string,
-    newPassword: string,
-    ip: string,
-  ): Promise<{ token: string; session: SessionInfo }> {
+  /**
+   * Checks a signed-in person's password again, before a change that needs it. Wrong answers
+   * are throttled like sign-ins, per user and per address.
+   */
+  async confirmPassword(userId: number, currentPassword: string, ip: string, purpose: string): Promise<UserRow> {
     const keys = { pair: `pair:user-${userId}:${ip}`, ip: `ip:${ip}` };
     this.assertNotLocked([keys.pair, keys.ip]);
     const user = this.userById(userId);
@@ -299,11 +325,26 @@ export class AuthService {
     this.recordFailure(keys);
     const matches = await this.hashes.run(() => verify(user.password_hash, currentPassword).catch(() => false));
     if (!matches) {
-      this.audit(userId, 'password_change_failed', ip);
+      this.audit(userId, `${purpose}_failed`, ip);
       throw new AppError(403, 'invalid_credentials', 'The current password is not correct.');
     }
     this.forgive(keys);
-    const passwordHash = await this.hashes.run(() => hashPassword(newPassword));
+    return user;
+  }
+
+  /** Hashes a new password, within the limit on how many hashes run at once. */
+  hashNewPassword(password: string): Promise<string> {
+    return this.hashes.run(() => hashPassword(password));
+  }
+
+  async changePassword(
+    userId: number,
+    currentPassword: string,
+    newPassword: string,
+    ip: string,
+  ): Promise<{ token: string; session: SessionInfo }> {
+    const user = await this.confirmPassword(userId, currentPassword, ip, 'password_change');
+    const passwordHash = await this.hashNewPassword(newPassword);
     const now = this.clock.nowIso();
     this.control.transaction(() => {
       this.control.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, userId);
@@ -315,7 +356,7 @@ export class AuthService {
     this.activityFor(userId)?.record({ eventType: 'auth', outcome: 'success', message: `${who} password changed.`, details: { ip } });
     this.audit(userId, 'password_changed', ip);
     this.logger.info({ ip, userId }, `${who} password changed`);
-    return this.createSession(userId, displayName(user));
+    return this.createSession(userId, user);
   }
 
   /** Expired sessions, and throttling rows that no longer lock anything. */

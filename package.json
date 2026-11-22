@@ -16,7 +16,7 @@
     "build": "npm run build -w @glm/shared && npm run build -w @glm/server && npm run build -w @glm/web",
     "build:shared": "npm run build -w @glm/shared",
     "dev": "npm run build:shared && concurrently -n server,web -c yellow,cyan \"npm run dev -w @glm/server\" \"npm run dev -w @glm/web\"",
-    "dev:mock": "npm run build:shared && concurrently -n mock,server,web -c magenta,yellow,cyan \"npm run mock-govee -w @glm/server\" \"npm run dev:mock -w @glm/server\" \"npm run dev -w @glm/web\"",
+    "dev:mock": "npm run build:shared && concurrently -n mock,mail,server,web -c magenta,blue,yellow,cyan \"npm run mock-govee -w @glm/server\" \"npm run fake-smtp -w @glm/server\" \"npm run dev:mock -w @glm/server\" \"npm run dev -w @glm/web\"",
     "start": "npm run start -w @glm/server",
     "test": "npm run build:shared && npm run test --workspaces --if-present",
     "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",

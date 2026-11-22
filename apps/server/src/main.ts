@@ -1,5 +1,5 @@
 import { buildApp } from './app/build-app.js';
-import { createPlatform } from './app/context.js';
+import { createPlatform, OWNER_USER_ID } from './app/context.js';
 import { ConfigError, isLoopbackHost, loadConfig, loadDotEnv } from './config/env.js';
 
 async function main(): Promise<void> {
@@ -7,7 +7,7 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const platform = createPlatform(config);
   const { logger, accounts } = platform;
-  const owner = accounts.sole();
+  const owner = accounts.forUser(OWNER_USER_ID)!;
 
   logger.info(
     {
@@ -18,6 +18,8 @@ async function main(): Promise<void> {
       aiProviders: config.ai.enabled ? config.ai.providers.map((p) => `${p.id}:${p.model}`) : 'disabled',
       database: config.databasePath,
       accounts: accounts.all().length,
+      mail: config.mail.smtp ? `${config.mail.smtp.host}:${config.mail.smtp.port} (${config.mail.smtp.security})` : 'off',
+      signupOpen: platform.signup.isOpen(),
     },
     'Starting Govee Light Manager',
   );
@@ -48,6 +50,7 @@ async function main(): Promise<void> {
   }
 
   accounts.startAll();
+  platform.outbox.start();
 
   // Background work handles its own errors. Anything reaching here is a bug, so restart clean.
   process.on('unhandledRejection', (reason) => {
@@ -68,6 +71,7 @@ async function main(): Promise<void> {
     try {
       // The same order as always, for each account, with accounts stopping side by side.
       await accounts.stopBackground();
+      await platform.outbox.stop();
       await app.close();
       await accounts.stopCore();
       platform.control.close();

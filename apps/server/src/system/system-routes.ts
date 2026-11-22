@@ -38,7 +38,8 @@ export function registerSystemRoutes(api: FastifyInstance, platform: PlatformCon
       database: {
         status: databaseOk ? 'ok' : 'error',
         schemaVersion: databaseOk ? currentSchemaVersion(db) : null,
-        path: config.databasePath,
+        // Where the server keeps its files is for the owner, not for every account.
+        path: request.session?.role === 'owner' ? config.databasePath : null,
       },
       govee: {
         keyConfigured: transport.isConfigured(),

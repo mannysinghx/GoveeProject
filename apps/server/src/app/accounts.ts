@@ -1,3 +1,4 @@
+import type { Logger } from 'pino';
 import type { AccountContext } from './context.js';
 
 /**
@@ -6,30 +7,49 @@ import type { AccountContext } from './context.js';
  */
 export class AccountRegistry {
   private readonly byUser = new Map<number, AccountContext>();
+  private started = false;
+  private stopping = false;
+
+  constructor(
+    /** Builds a member's account from the control database, or null if there is none to load. */
+    private readonly loader: ((userId: number) => AccountContext | null) | null = null,
+    private readonly logger: Logger | null = null,
+  ) {}
 
   add(account: AccountContext): void {
     if (this.byUser.has(account.userId)) throw new Error(`Account for user ${account.userId} is already loaded.`);
     this.byUser.set(account.userId, account);
+    if (this.started) {
+      // Loaded after startup, such as a new sign-up: same steps as at startup, for this one.
+      account.queue.recoverInterrupted();
+      startAccount(account);
+    }
   }
 
   forUser(userId: number): AccountContext | null {
     return this.byUser.get(userId) ?? null;
   }
 
-  all(): AccountContext[] {
-    return [...this.byUser.values()];
+  /**
+   * The account, loading it first if it is not loaded yet: at startup, after a sign-up, or
+   * when an earlier load failed. Null if it cannot be loaded; the failure is logged.
+   */
+  ensure(userId: number): AccountContext | null {
+    const loaded = this.byUser.get(userId);
+    if (loaded || !this.loader || this.stopping) return loaded ?? null;
+    try {
+      const account = this.loader(userId);
+      if (!account) return null;
+      this.add(account);
+      return account;
+    } catch (error) {
+      this.logger?.error({ err: error, userId }, 'Could not load an account');
+      return null;
+    }
   }
 
-  /**
-   * The only account, for the few public routes that cannot yet tell which account a
-   * request is for. It throws once there is more than one, so a second account cannot
-   * silently be answered from the first one's data. Phase 4 of docs/public-signup-plan.md
-   * replaces each caller with a lookup by token.
-   */
-  sole(): AccountContext {
-    const accounts = this.all();
-    if (accounts.length !== 1) throw new Error(`Expected exactly one account, found ${accounts.length}.`);
-    return accounts[0]!;
+  all(): AccountContext[] {
+    return [...this.byUser.values()];
   }
 
   /** Marks commands left in flight by a crash, before anything new is sent. */
@@ -39,13 +59,8 @@ export class AccountRegistry {
 
   /** Starts each account's background work, in the order the app always has. */
   startAll(): void {
-    for (const account of this.all()) {
-      account.scheduler.start();
-      account.maintenance.start();
-      account.connection.start();
-      account.builtins.start();
-      account.notifications.start();
-    }
+    this.started = true;
+    for (const account of this.all()) startAccount(account);
   }
 
   /**
@@ -53,6 +68,7 @@ export class AccountRegistry {
    * parallel, each in the original order, so many accounts still fit in the time limit.
    */
   async stopBackground(): Promise<void> {
+    this.stopping = true;
     await Promise.all(
       this.all().map(async (account) => {
         account.maintenance.stop();
@@ -66,6 +82,7 @@ export class AccountRegistry {
 
   /** Second half, after the HTTP server has closed: queues, schedulers, then databases. */
   async stopCore(): Promise<void> {
+    this.stopping = true;
     await Promise.all(
       this.all().map(async (account) => {
         await account.queue.stop();
@@ -74,4 +91,12 @@ export class AccountRegistry {
       }),
     );
   }
+}
+
+function startAccount(account: AccountContext): void {
+  account.scheduler.start();
+  account.maintenance.start();
+  account.connection.start();
+  account.builtins.start();
+  account.notifications.start();
 }

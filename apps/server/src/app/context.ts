@@ -6,10 +6,14 @@ import { AiService } from '../ai/ai-service.js';
 import { AskTools } from '../ai/ask-tools.js';
 import { AiLedger } from '../ai/ledger.js';
 import { AuthService } from '../auth/auth-service.js';
-import { accountFileFor, cutoverOwner, LegacyOwnerMirror, openControlDatabase } from '../auth/control.js';
+import { accountFileFor, cutoverOwner, LegacyOwnerMirror, openControlDatabase, resolveAccountFile } from '../auth/control.js';
+import { SignupService } from '../auth/signup-service.js';
 import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
 import { CommandStore } from '../commands/command-store.js';
+import { MailOutbox, type MailSender } from '../mail/outbox.js';
+import { sendSmtp } from '../mail/smtp-client.js';
+import { APP_NAME } from '../mail/templates.js';
 import { isLoopbackHost, PROJECT_ROOT, type AppConfig } from '../config/env.js';
 import { NotificationService } from '../notifications/notification-service.js';
 import { webPushSender, type PushSender } from '../notifications/push-sender.js';
@@ -30,6 +34,7 @@ import { PresetService } from '../presets/preset-service.js';
 import { ScheduleService } from '../scheduler/schedule-service.js';
 import { Scheduler } from '../scheduler/scheduler.js';
 import { CredentialStore } from '../security/credentials.js';
+import { ProofOfWork } from '../security/proof-of-work.js';
 import { systemClock, type Clock } from '../shared/clock.js';
 import { createLogger, SecretRegistry, type Logger } from '../shared/logger.js';
 import { Maintenance } from '../system/maintenance.js';
@@ -94,6 +99,10 @@ export interface PlatformContext {
   credentials: CredentialStore;
   /** Sign-in and sessions, in the control database. */
   auth: AuthService;
+  /** Sign-up, reset and address changes by email. */
+  signup: SignupService;
+  outbox: MailOutbox;
+  pow: ProofOfWork;
   /** Set when setup needs a code and the code was generated rather than configured. */
   generatedSetupCode: string | null;
   accounts: AccountRegistry;
@@ -112,9 +121,13 @@ export interface ContextOverrides {
   pushSender?: PushSender;
   /** Stands in for the AI providers in tests. */
   aiFetch?: typeof fetch;
+  /** Tests only: a certificate authority the SMTP client trusts, for the local test server. */
+  smtpCa?: string | Buffer;
+  /** Tests only: replaces the SMTP client. */
+  mailSender?: MailSender;
 }
 
-/** The owner's account belongs to user 1, the only user the database allows today. */
+/** The owner's account belongs to user 1. Everyone else is a member with their own file. */
 export const OWNER_USER_ID = 1;
 
 export function readVersion(): string {
@@ -148,13 +161,21 @@ export function configSecrets(config: AppConfig): (string | null)[] {
     config.setupToken,
     ...config.ai.providers.map((p) => p.apiKey),
     ...(config.credentialKeys?.encoded ?? []),
+    config.mail.smtp?.password ?? null,
   ];
 }
 
 interface AccountDeps {
   userId: number;
-  /** Where this account's Govee key comes from. Defaults to GOVEE_API_KEY. */
-  goveeKey?: () => string | null;
+  /** This account's own database file. */
+  databasePath: string;
+  /**
+   * Where this account's Govee key comes from. Required, with no default, so no account can
+   * end up using the owner's GOVEE_API_KEY by leaving it out.
+   */
+  goveeKey: () => string | null;
+  /** The AI providers this account may use. Only the owner's account gets the server's keys. */
+  aiProviders: AppConfig['ai']['providers'];
   logger: Logger;
   clock: Clock;
   secrets: SecretRegistry;
@@ -171,7 +192,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
   const { userId, logger, clock } = deps;
   const scrub = deps.secrets.scrub;
 
-  const db = deps.db ?? openDatabase(config.databasePath);
+  const db = deps.db ?? openDatabase(deps.databasePath);
   runMigrations(db, config.migrationsDir, logger);
 
   const system = new SystemState(db, clock);
@@ -181,7 +202,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
   const transport =
     deps.transport ??
     new GoveeCloudTransport({
-      apiKey: deps.goveeKey ?? config.govee.apiKey,
+      apiKey: deps.goveeKey,
       baseUrl: config.govee.baseUrl,
       timeoutMs: config.govee.timeoutMs,
     });
@@ -259,6 +280,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
     pushSubject,
     logger,
     clock,
+    String(userId),
   );
   actions.onRunFinished(
     (run) => notifications.handleRun(run),
@@ -287,7 +309,11 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
     scrub,
     logger,
     clock,
-    { config: config.ai, drafts: { devices, groups, presets }, ...(deps.aiFetch ? { fetchImpl: deps.aiFetch } : {}) },
+    {
+      config: { ...config.ai, providers: deps.aiProviders },
+      drafts: { devices, groups, presets },
+      ...(deps.aiFetch ? { fetchImpl: deps.aiFetch } : {}),
+    },
   );
 
   return {
@@ -411,13 +437,21 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
 
   // Sessions are in the control database, and the owner's maintenance prunes them hourly.
   let auth: AuthService | null = null;
+  let signup: SignupService | null = null;
+  const pruneSessions = () => {
+    signup?.prune();
+    return auth?.pruneExpiredSessions() ?? 0;
+  };
   const owner = createAccountContext(config, {
     userId: OWNER_USER_ID,
+    databasePath: config.databasePath,
     logger,
     clock,
     secrets,
-    pruneSessions: () => auth?.pruneExpiredSessions() ?? 0,
+    pruneSessions,
     goveeKey: goveeKey.get,
+    // Decided 21 November 2026 (P3): the server's AI keys are for the owner only.
+    aiProviders: config.ai.providers,
     ...(overrides.db ? { db: overrides.db } : {}),
     ...(overrides.transport ? { transport: overrides.transport } : {}),
     ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
@@ -428,8 +462,33 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
   cutoverOwner(control, owner.db, ownerAccountFile, clock, logger);
   goveeKey.sync();
 
-  const accounts = new AccountRegistry();
+  /**
+   * A member's account: their own file, no Govee key until they connect one (Phase 5), and no
+   * AI until they add their own key. Nothing here comes from the owner's configuration.
+   */
+  const loadMember = (userId: number): AccountContext | null => {
+    const row = control.prepare("SELECT account_file FROM users WHERE id = ? AND role = 'member' AND status = 'active'").get(userId) as
+      | { account_file: string }
+      | undefined;
+    if (!row) return null;
+    return createAccountContext(config, {
+      userId,
+      databasePath: resolveAccountFile(config, row.account_file),
+      logger: logger.child({ account: userId }),
+      clock,
+      secrets,
+      // Only the owner's account prunes the control database's sessions.
+      pruneSessions: () => 0,
+      goveeKey: () => null,
+      aiProviders: [],
+      ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
+    });
+  };
+
+  const accounts = new AccountRegistry(loadMember, logger);
   accounts.add(owner);
+  const members = control.prepare("SELECT id FROM users WHERE role = 'member' AND status = 'active' ORDER BY id").all() as { id: number }[];
+  for (const member of members) accounts.ensure(member.id);
 
   auth = new AuthService(
     control,
@@ -441,6 +500,32 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     new LegacyOwnerMirror(owner.db),
   );
 
+  const smtp = config.mail.smtp;
+  const heloName = config.mail.from?.split('@')[1] ?? 'localhost';
+  const sender: MailSender | null =
+    overrides.mailSender ??
+    (smtp ? (envelope, data) => sendSmtp({ ...smtp, heloName, ...(overrides.smtpCa ? { ca: overrides.smtpCa } : {}) }, envelope, data) : null);
+  const outbox = new MailOutbox(control, sender, clock, logger, {
+    from: config.mail.from,
+    fromName: APP_NAME,
+    hourlyLimit: config.mail.hourlyLimit,
+    pollMs: 5_000,
+  });
+  const pow = new ProofOfWork(clock, config.signup.powDifficulty);
+  signup = new SignupService({
+    control,
+    auth,
+    outbox,
+    pow,
+    clock,
+    logger,
+    publicUrl: config.publicUrl,
+    legacy: new LegacyOwnerMirror(owner.db),
+    onAccountCreated: (userId) => {
+      accounts.ensure(userId);
+    },
+  });
+
   return {
     config,
     version: readVersion(),
@@ -451,6 +536,9 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     control,
     credentials,
     auth,
+    signup,
+    outbox,
+    pow,
     generatedSetupCode: setup.generated ? setup.code : null,
     accounts,
   };
