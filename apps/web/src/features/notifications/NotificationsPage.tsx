@@ -36,10 +36,14 @@ function NotificationItem({ notification }: { notification: NotificationDto }) {
   const respond = useRespondToNotification();
   const unread = notification.readAt === null;
   return (
-    <li className={`rounded-lg p-3 ${unread ? 'border border-accent-ui/40 bg-inset' : 'bg-inset/60'}`}>
+    <li className={`rounded-2xl p-3.5 ${unread ? 'border-2 border-accent-ui bg-inset' : 'border border-transparent bg-inset/60'}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="min-w-0 font-medium break-words">{notification.title}</h3>
-        <Badge tone={SEVERITY_TONE[notification.severity]}>{SEVERITY_LABEL[notification.severity]}</Badge>
+        <h2 className={`min-w-0 break-words ${unread ? 'font-semibold' : 'font-medium'}`}>{notification.title}</h2>
+        <span className="flex flex-wrap items-center gap-1.5">
+          {/* Said in words, so unread is not only a colour or a thicker line. */}
+          {unread ? <Badge tone="amber">New</Badge> : null}
+          <Badge tone={SEVERITY_TONE[notification.severity]}>{SEVERITY_LABEL[notification.severity]}</Badge>
+        </span>
       </div>
       <p className="mt-1 text-sm whitespace-pre-line text-fg-3">{notification.body}</p>
       <div className="mt-2 flex flex-wrap items-center gap-2">

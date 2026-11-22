@@ -188,7 +188,7 @@ export function LightsCheckPage() {
                               <input
                                 type="number"
                                 aria-label="LEDs in one color block"
-                                className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
+                                className="min-h-9 w-16 rounded-lg border border-field-line bg-inset px-2 text-fg"
                                 min={1}
                                 max={100}
                                 value={blockLeds ?? ''}
@@ -260,7 +260,7 @@ export function LightsCheckPage() {
               readOnly
               aria-label="Light check report"
               rows={Math.min(10, report.split('\n').length + 1)}
-              className="w-full rounded-lg border border-line bg-inset p-2 font-mono text-xs text-fg-2"
+              className="w-full rounded-lg border border-field-line bg-inset p-2 font-mono text-xs text-fg-2"
               value={report}
             />
           </SectionCard>

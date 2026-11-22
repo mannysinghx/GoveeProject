@@ -51,6 +51,43 @@ describe('lookOfDevice', () => {
     expect(look.color).toBe('#ff0000');
   });
 
+  it('lets a newer report beat an older accepted command, so it is not always the command that wins', () => {
+    const look = lookOfDevice(
+      device({
+        connectivity: 'online',
+        states: [
+          state('powerSwitch', 1),
+          { ...state('colorRgb', 0x0000ff, '2026-11-01T10:09:00.000Z'), accepted: { value: 0xff0000, at: '2026-11-01T10:05:00.000Z' } },
+        ],
+      }),
+    );
+    expect(look.color).toBe('#0000ff');
+  });
+
+  it('uses whichever of colour and colour temperature was reported more recently, since Govee zeroes the one it is not using', () => {
+    const rgbLater = lookOfDevice(
+      device({ connectivity: 'online', states: [state('powerSwitch', 1), state('colorTemperatureK', 2700, '2026-11-01T10:00:00.000Z'), state('colorRgb', 0x00ff00, '2026-11-01T10:05:00.000Z')] }),
+    );
+    expect(rgbLater.color).toBe('#00ff00');
+    const kelvinLater = lookOfDevice(
+      device({ connectivity: 'online', states: [state('powerSwitch', 1), state('colorRgb', 0x00ff00, '2026-11-01T10:00:00.000Z'), state('colorTemperatureK', 2700, '2026-11-01T10:05:00.000Z')] }),
+    );
+    expect(kelvinLater.color).toBe(kelvinToHex(2700));
+  });
+
+  it('ignores a zero in either, which means that mode is not in use', () => {
+    const look = lookOfDevice(
+      device({ connectivity: 'online', states: [state('powerSwitch', 1), state('colorRgb', 0, '2026-11-01T10:09:00.000Z'), state('colorTemperatureK', 4000, '2026-11-01T10:00:00.000Z')] }),
+    );
+    expect(look.color).toBe(kelvinToHex(4000));
+  });
+
+  it('does not draw a light Govee no longer lists as on, however it last reported', () => {
+    const look = lookOfDevice(lit({ discoveryStatus: 'missing' }));
+    expect(look.on).toBeNull();
+    expect(look.live).toBe(false);
+  });
+
   it('falls back to colour temperature, then to warm white, when no colour is reported', () => {
     const temperature = lookOfDevice(device({ connectivity: 'online', states: [state('powerSwitch', 1), state('colorTemperatureK', 2700)] }));
     expect(temperature.color).toBe(kelvinToHex(2700));
@@ -99,8 +136,10 @@ describe('the pictures', () => {
     expect(row.children).toHaveLength(3);
   });
 
-  it('still draws something for a look with no colours, and for a single colour', () => {
-    expect(render(<Spectrum colors={[]} />).container.firstElementChild?.children).toHaveLength(1);
+  it('draws a look with no colours as an empty outline, not as an invented colour, and a single colour as one segment', () => {
+    const empty = render(<Spectrum colors={[]} />).container.firstElementChild as HTMLElement;
+    expect(empty.children).toHaveLength(0);
+    expect(empty).toHaveAttribute('aria-hidden', 'true');
     expect(render(<Spectrum colors={['#ffffff']} />).container.firstElementChild?.children).toHaveLength(1);
   });
 

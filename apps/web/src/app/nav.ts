@@ -40,3 +40,23 @@ export const DOCK_PATHS = ['/', '/presets', '/groups', '/schedules'];
 
 export const dockItems = NAV.filter((item) => DOCK_PATHS.includes(item.to));
 export const moreItems = NAV.filter((item) => !DOCK_PATHS.includes(item.to));
+
+/** Pages reached from inside other pages or from an email, which have no place in the menu but still need a tab title. */
+const OTHER_TITLES: [prefix: string, title: string][] = [
+  ['/connect', 'Connect to Govee'],
+  ['/devices/', 'Light'],
+  ['/patterns/check', 'Check my lights'],
+  ['/patterns/', 'Paint a pattern'],
+  ['/privacy', 'Privacy'],
+  ['/terms', 'Terms'],
+  ['/verify', 'Verify your email'],
+  ['/reset', 'Choose a new password'],
+  ['/confirm-email', 'Confirm your sign-in address'],
+];
+
+/** The name of the page at an address, for the tab title. Null for the dashboard, which is the app itself. */
+export function pageTitle(pathname: string): string | null {
+  const item = NAV.find((entry) => (entry.end ? pathname === entry.to : pathname.startsWith(entry.to)));
+  if (item) return item.to === '/' ? null : item.label;
+  return OTHER_TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? null;
+}

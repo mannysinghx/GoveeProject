@@ -66,9 +66,21 @@ describe.each(Object.entries(THEMES))('%s theme contrast', (_name, t) => {
     }
   });
 
+  it('draws the edge of a text field at 3:1 against the card, the field and the page (WCAG 1.4.11)', () => {
+    for (const surface of SURFACES) {
+      expect(contrast(token('field-line'), token(surface))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('draws borders that show against the page without shouting', () => {
     expect(contrast(token('line-strong'), token('canvas'))).toBeGreaterThanOrEqual(1.4);
     expect(contrast(token('line-strong'), token('surface'))).toBeGreaterThanOrEqual(1.4);
+  });
+});
+
+describe('the more-contrast preference', () => {
+  it('applies in Day as well as Night: a bare :root is less specific than the Day block and would lose', () => {
+    expect(css).toMatch(/@media \(prefers-contrast: more\) \{\s*(?:\/\*[^*]*\*\/\s*)?:root,\s*:root\[data-theme='light'\] \{/);
   });
 });
 

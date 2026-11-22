@@ -142,7 +142,7 @@ export function SegmentControl({
                   <input
                     type="color"
                     aria-label="Segment colour"
-                    className="h-11 w-14 cursor-pointer rounded-lg border border-line bg-inset p-1"
+                    className="h-11 w-14 cursor-pointer rounded-lg border border-field-line bg-inset p-1"
                     value={isHexColor(hex) ? hex : '#000000'}
                     onChange={(e) => setHex(e.target.value)}
                   />

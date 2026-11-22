@@ -8,10 +8,13 @@ import { CommandPalette, shortcutLabel } from '../components/CommandPalette';
 import { ThemeChoice, ThemeCycleButton } from '../components/ThemeToggle';
 import { Button, Dialog } from '../components/ui';
 import { glowColors } from '../components/light';
+import { InShellContext } from '../components/shell-context';
 import { useLogout } from '../features/auth/useSession';
 import { ApplyPresetDialog } from '../features/presets/ApplyPresetDialog';
+import { useDocumentTitle, withAppName } from '../lib/hooks';
+import { isApplePlatform } from '../lib/platform';
 import { useDevices, useNotifications } from '../lib/queries';
-import { dockItems, moreItems, NAV, type NavItem } from './nav';
+import { dockItems, moreItems, NAV, pageTitle, type NavItem } from './nav';
 
 function UnreadCount({ count, className = '', compact = false }: { count: number; className?: string; compact?: boolean }) {
   if (count === 0) return null;
@@ -38,7 +41,7 @@ function RailLink({ item, unread }: { item: NavItem; unread: number }) {
       className={({ isActive }) =>
         `group relative flex min-h-12 items-center justify-center gap-3 rounded-2xl px-3 text-sm font-medium transition-[background-color,color] duration-200 xl:justify-start ${
           isActive
-            ? 'bg-accent-wash text-accent-text ring-1 ring-accent-ui/25'
+            ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui'
             : 'text-fg-3 hover:bg-raised/70 hover:text-fg'
         }`
       }
@@ -58,7 +61,7 @@ function RailLink({ item, unread }: { item: NavItem; unread: number }) {
 function Rail({ username, unread }: { username: string; unread: number }) {
   const logout = useLogout();
   return (
-    <aside className="glass fixed top-3 bottom-3 left-3 z-30 hidden w-[4.75rem] flex-col rounded-[2rem] md:flex xl:w-64">
+    <aside className="glass fixed top-3 bottom-3 left-[max(0.75rem,env(safe-area-inset-left))] z-30 hidden w-[4.75rem] flex-col rounded-[2rem] md:flex xl:w-64">
       <div className="flex justify-center px-3 pt-5 pb-4 xl:justify-start xl:px-5">
         <span className="xl:hidden">
           <Brand compact />
@@ -76,11 +79,12 @@ function Rail({ username, unread }: { username: string; unread: number }) {
         <div className="flex items-center justify-center gap-3 px-1 xl:justify-start xl:px-2">
           <span
             aria-hidden
+            title={`Signed in as ${username}`}
             className="flex size-9 shrink-0 items-center justify-center rounded-full bg-raised text-sm font-semibold text-fg-2 uppercase"
           >
             {username.slice(0, 1) || '?'}
           </span>
-          <p className="hidden min-w-0 text-xs text-fg-3 xl:block">
+          <p className="sr-only min-w-0 text-xs text-fg-3 xl:not-sr-only xl:block">
             Signed in as <span className="block truncate text-sm font-medium text-fg">{username}</span>
           </p>
         </div>
@@ -88,6 +92,7 @@ function Rail({ username, unread }: { username: string; unread: number }) {
           variant="ghost"
           size="sm"
           className="w-full xl:justify-start"
+          title="Sign out"
           icon={<LogOut className="size-4" aria-hidden />}
           busy={logout.isPending}
           onClick={() => logout.mutate()}
@@ -105,16 +110,17 @@ function Dock({ moreActive, onMore }: { moreActive: boolean; onMore: () => void 
   return (
     <nav
       aria-label="Main"
-      className="glass fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 grid grid-cols-5 gap-1 rounded-[2rem] p-1.5 md:hidden"
+      className="glass fixed right-[max(0.75rem,env(safe-area-inset-right))] bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] z-40 grid grid-cols-5 gap-1 rounded-[2rem] p-1.5 md:hidden"
     >
       {dockItems.map(({ to, label, short, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end ?? false}
-          aria-label={label}
+          // The name has to contain the visible word, so someone who says "click Home" is understood.
+          aria-label={short && !label.toLowerCase().includes(short.toLowerCase()) ? `${short}, ${label}` : label}
           className={({ isActive }) =>
-            `${item} ${isActive ? 'bg-accent-wash text-accent-text ring-1 ring-accent-ui/25' : 'text-fg-3 active:bg-raised/70'}`
+            `${item} ${isActive ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-3 active:bg-raised/70'}`
           }
         >
           <Icon className="size-5" aria-hidden />
@@ -126,7 +132,7 @@ function Dock({ moreActive, onMore }: { moreActive: boolean; onMore: () => void 
         aria-label="More"
         aria-haspopup="dialog"
         onClick={onMore}
-        className={`${item} ${moreActive ? 'bg-accent-wash text-accent-text ring-1 ring-accent-ui/25' : 'text-fg-3 active:bg-raised/70'}`}
+        className={`${item} ${moreActive ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-3 active:bg-raised/70'}`}
       >
         <Ellipsis className="size-5" aria-hidden />
         <span>More</span>
@@ -148,9 +154,10 @@ function MoreSheet({ open, onClose, username, unread }: { open: boolean; onClose
               <NavLink
                 to={to}
                 onClick={onClose}
+                {...(isBell && unread > 0 ? { 'aria-label': `Notifications, ${unread} unread` } : {})}
                 className={({ isActive }) =>
                   `flex min-h-20 flex-col items-start justify-between gap-3 rounded-3xl border p-4 text-sm font-medium transition-colors ${
-                    isActive ? 'border-accent-ui/40 bg-accent-wash text-accent-text' : 'border-line bg-inset text-fg-2 active:bg-raised'
+                    isActive ? 'border-accent-ui bg-accent-wash text-accent-text ring-1 ring-accent-ui' : 'border-line bg-inset text-fg-2 active:bg-raised'
                   }`
                 }
               >
@@ -192,18 +199,17 @@ export function AppShell({ username, children }: { username: string; children: R
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [applying, setApplying] = useState<PresetDto | null>(null);
 
-  // Ctrl+K or Command+K from anywhere, and / when no field has focus.
+  // Command+K on Apple devices, Ctrl+K everywhere else, from anywhere on the page. Not with Shift or Alt: AltGr
+  // is Ctrl+Alt on Windows and types letters on some keyboards. Not Ctrl+K on a Mac, where it deletes to the end
+  // of a line in a text field. There is deliberately no single-key shortcut such as "/": a key that cannot be
+  // turned off would catch people using speech input or a switch (WCAG 2.1.4).
   useEffect(() => {
+    const apple = isApplePlatform();
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const typing = target?.matches('input, textarea, select, [contenteditable="true"]') ?? false;
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-      } else if (event.key === '/' && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        setPaletteOpen(true);
-      }
+      if (!(apple ? event.metaKey : event.ctrlKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      // Holding the keys down must not flicker it open and shut.
+      if (!event.repeat) setPaletteOpen((open) => !open);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -212,10 +218,8 @@ export function AppShell({ username, children }: { username: string; children: R
   const onMoreRoute = moreItems.some((item) => location.pathname.startsWith(item.to));
 
   // The tab title says where you are, for the tab strip, the history and screen readers.
-  const here = NAV.find((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)));
-  useEffect(() => {
-    document.title = here && here.to !== '/' ? `${here.label} · Light Manager` : 'Light Manager';
-  }, [here]);
+  const title = pageTitle(location.pathname);
+  useDocumentTitle(title ? withAppName(title) : 'Light Manager');
 
   return (
     <div className="min-h-dvh md:pl-24 xl:pl-[17.5rem]">
@@ -236,7 +240,6 @@ export function AppShell({ username, children }: { username: string; children: R
         <button
           type="button"
           onClick={() => setPaletteOpen(true)}
-          aria-label="Search pages, scenes and actions"
           className="glass hidden min-h-11 w-full max-w-md items-center gap-3 rounded-full px-4 text-sm text-fg-4 transition-colors hover:text-fg-2 md:flex"
         >
           <Search className="size-4" aria-hidden />
@@ -269,14 +272,15 @@ export function AppShell({ username, children }: { username: string; children: R
 
       <main id="main" className="min-w-0 px-4 pt-2 pb-36 sm:px-6 md:pb-14 lg:px-8">
         <div key={location.pathname} className="mx-auto max-w-6xl animate-rise">
-          {children}
+          <InShellContext value>{children}</InShellContext>
         </div>
       </main>
 
       <Dock moreActive={onMoreRoute} onMore={() => setMoreOpen(true)} />
       <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} username={username} unread={unread} />
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onApplyPreset={setApplying} />
-      {applying ? <ApplyPresetDialog preset={applying} onClose={() => setApplying(null)} /> : null}
+      {/* Keyed, so choosing a different scene from the palette starts a fresh dialog and not the last one's result. */}
+      {applying ? <ApplyPresetDialog key={applying.id} preset={applying} onClose={() => setApplying(null)} /> : null}
     </div>
   );
 }

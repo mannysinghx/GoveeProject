@@ -9,6 +9,8 @@ export interface PreferenceStore<T extends string> {
   key: string;
   read: () => T;
   write: (next: T) => void;
+  /** Reads the stored choice again and tells everyone who shows it. Used when another tab changes it. */
+  reload: () => void;
   subscribe: (listener: () => void) => () => void;
 }
 
@@ -27,8 +29,14 @@ export function createPreferenceStore<T extends string>(key: string, allowed: re
     }
   };
 
+  const reload = () => {
+    current = readStored();
+    listeners.forEach((listener) => listener());
+  };
+
   return {
     key,
+    reload,
     read: () => (current ??= readStored()),
     write: (next) => {
       current = next;
@@ -42,11 +50,8 @@ export function createPreferenceStore<T extends string>(key: string, allowed: re
     subscribe: (listener) => {
       listeners.add(listener);
       const onStorage = (event: StorageEvent) => {
-        // Another tab changed it.
-        if (event.key === key) {
-          current = readStored();
-          listener();
-        }
+        // Another tab changed it. A null key means storage was cleared.
+        if (event.key === key || event.key === null) reload();
       };
       window.addEventListener('storage', onStorage);
       return () => {

@@ -6,7 +6,9 @@ import { Badge, Button, ErrorNotice, Notice } from '../../components/ui';
 import { useDuplicatePreset, useSchedules } from '../../lib/queries';
 import { filterAndSort, isFiltering, usesEffect, type PresetFilter } from './preset-list';
 
-function FestivalCard({ preset, onApply }: { preset: PresetDto; onApply: () => void }) {
+/** `level` is one below the heading above it: an occasion heading when grouped by calendar, the section heading when not. */
+function FestivalCard({ preset, onApply, level }: { preset: PresetDto; onApply: () => void; level: 3 | 4 }) {
+  const Heading = level === 3 ? 'h3' : 'h4';
   const duplicate = useDuplicatePreset();
   const builtin = preset.builtin;
   if (!builtin) return null;
@@ -18,7 +20,7 @@ function FestivalCard({ preset, onApply }: { preset: PresetDto; onApply: () => v
       </div>
       <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <h4 className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{preset.name}</h4>
+          <Heading className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{preset.name}</Heading>
           <Badge tone={effect ? 'info' : 'neutral'}>{effect ? 'Moving effect' : 'Pattern'}</Badge>
         </div>
         <p className="text-sm text-fg-3">{preset.description}</p>
@@ -130,7 +132,7 @@ export function FestivalPresets({
               {festival
                 .filter((p) => p.builtin?.occasion === occasion)
                 .map((preset) => (
-                  <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
+                  <FestivalCard key={preset.id} preset={preset} level={4} onApply={() => onApply(preset)} />
                 ))}
             </div>
           </div>
@@ -138,7 +140,7 @@ export function FestivalPresets({
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {festival.map((preset) => (
-            <FestivalCard key={preset.id} preset={preset} onApply={() => onApply(preset)} />
+            <FestivalCard key={preset.id} preset={preset} level={3} onApply={() => onApply(preset)} />
           ))}
         </div>
       )}

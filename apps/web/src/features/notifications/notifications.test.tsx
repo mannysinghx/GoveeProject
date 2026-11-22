@@ -144,6 +144,28 @@ describe('turning on alerts', () => {
   });
 });
 
+describe('unread notifications', () => {
+  it('say so in words, not only in a border, and read ones do not', async () => {
+    mockApi(
+      routes([
+        notification({ id: 1, title: 'Diwali started' }),
+        notification({ id: 2, title: 'Fireworks ended', readAt: '2026-11-09T01:01:00.000Z' }),
+      ]),
+    );
+    renderApp(<NotificationsPage />);
+    const unread = (await screen.findByRole('heading', { name: 'Diwali started' })).closest('li') as HTMLElement;
+    const read = screen.getByRole('heading', { name: 'Fireworks ended' }).closest('li') as HTMLElement;
+    expect(within(unread).getByText('New')).toBeInTheDocument();
+    expect(within(read).queryByText('New')).not.toBeInTheDocument();
+  });
+
+  it('are headings one level under the page title, with no level skipped', async () => {
+    mockApi(routes([notification()]));
+    renderApp(<NotificationsPage />);
+    expect(await screen.findByRole('heading', { level: 2, name: 'Diwali started' })).toBeInTheDocument();
+  });
+});
+
 describe('the bell', () => {
   it('shows how many are unread, in the sidebar and on a phone', async () => {
     mockApi({ ...routes([notification(), notification({ id: 2 })]), 'POST /auth/logout': { json: {} } });

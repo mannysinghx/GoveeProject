@@ -170,7 +170,7 @@ function OwnerForm({ setupCodeRequired }: { setupCodeRequired: boolean }) {
 export function SetupPage({ setupCodeRequired }: { setupCodeRequired: boolean }) {
   const [step, setStep] = useState<'welcome' | 'owner'>('welcome');
   return (
-    <AuthLayout wide>
+    <AuthLayout wide title="Set up">
       <p className="mb-5 text-xs font-semibold tracking-[0.14em] text-accent-text uppercase">
         First-time setup, step {step === 'welcome' ? '1' : '2'} of 3
       </p>

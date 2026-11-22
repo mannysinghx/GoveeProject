@@ -70,7 +70,7 @@ export function Segmented<T extends string>({
   className?: string;
 }) {
   return (
-    <div role="group" aria-label={label} className={`inline-flex rounded-full border border-line bg-inset p-1 ${className}`}>
+    <div role="group" aria-label={label} className={`inline-flex rounded-full border border-field-line bg-inset p-1 ${className}`}>
       {options.map((option) => {
         const active = option.value === value;
         return (
@@ -80,7 +80,7 @@ export function Segmented<T extends string>({
             aria-pressed={active}
             onClick={() => onChange(option.value)}
             className={`inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-full px-3.5 text-sm font-medium transition-colors duration-200 ${
-              active ? 'bg-accent-wash text-accent-text shadow-sm ring-1 ring-accent-ui/40' : 'text-fg-3 hover:text-fg'
+              active ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-3 hover:text-fg'
             }`}
           >
             {option.icon}
@@ -220,7 +220,7 @@ export function ErrorNotice({ error, title, action }: { error: unknown; title?: 
   return (
     <Notice tone="bad" {...(title ? { title } : {})} action={action}>
       {errorMessage(error)}
-      {reference ? <span className="mt-1 block text-xs opacity-70">Reference: {reference}</span> : null}
+      {reference ? <span className="mt-1 block text-xs text-fg-3">Reference: {reference}</span> : null}
     </Notice>
   );
 }
@@ -269,7 +269,9 @@ export function EmptyState({
 /* ---------------------------------- Forms ---------------------------------- */
 
 const INPUT_CLASSES =
-  'w-full min-h-11 rounded-2xl border border-line-strong bg-inset px-4 text-sm text-fg placeholder:text-fg-4 transition-[border-color,box-shadow] duration-200 hover:border-fg-4/60 focus:border-accent-ui focus:outline-none focus:ring-4 focus:ring-accent-ui/20 disabled:opacity-50 aria-[invalid=true]:border-bad';
+  // The border is what shows where a field is, so it has its own colour at 3:1 or more (--field-line). The focus
+  // outline is hidden, not removed: Windows high-contrast mode turns it into a visible one.
+  'w-full min-h-11 rounded-2xl border border-field-line bg-inset px-4 text-sm text-fg placeholder:text-fg-4 transition-[border-color,box-shadow] duration-200 hover:border-fg-4 focus:border-accent-ui focus:outline-hidden focus:ring-4 focus:ring-accent-ui/20 disabled:opacity-50 aria-[invalid=true]:border-bad focus:aria-[invalid=true]:border-bad focus:aria-[invalid=true]:ring-bad/25';
 
 export const inputClass = INPUT_CLASSES;
 
@@ -314,21 +316,30 @@ export function Field({
 
 /* ---------------------------------- Dialog --------------------------------- */
 
-/** Opens and closes a native dialog as `open` changes. Browsers give real modal behaviour. */
+/**
+ * Opens a native dialog while `open` is true, and gives focus back to whatever had it before. The
+ * components that use this stop rendering when closed, so the dialog element is removed rather than
+ * closed, and a browser only restores focus for a dialog it closes itself. Without this a keyboard or
+ * screen-reader user would land on the top of the page after every dialog.
+ */
 export function useNativeDialog(open: boolean) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current;
-    if (!dialog) return;
-    if (open && !dialog.open) {
+    if (!dialog || !open) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (!dialog.open) {
       // jsdom lacks showModal, so it gets a plain open dialog.
       if (typeof dialog.showModal === 'function') dialog.showModal();
       else dialog.setAttribute('open', '');
     }
-    if (!open && dialog.open) {
-      if (typeof dialog.close === 'function') dialog.close();
-      else dialog.removeAttribute('open');
-    }
+    return () => {
+      if (dialog.open) {
+        if (typeof dialog.close === 'function') dialog.close();
+        else dialog.removeAttribute('open');
+      }
+      if (opener?.isConnected) opener.focus();
+    };
   }, [open]);
   return ref;
 }

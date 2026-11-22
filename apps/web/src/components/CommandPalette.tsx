@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import type { PresetDto } from '@glm/shared';
 import { NAV } from '../app/nav';
 import { useLogout } from '../features/auth/useSession';
-import { usePresets, useRefreshAll } from '../lib/queries';
+import { isApplePlatform } from '../lib/platform';
+import { usePresets } from '../lib/queries';
 import { useTheme } from '../lib/theme';
 import { useBackdropClose, useNativeDialog } from './ui';
 
@@ -34,14 +35,13 @@ const SCENES_WITHOUT_A_SEARCH = 5;
 
 /** The shortcut to show, for the platform the person is on. */
 export function shortcutLabel(): string {
-  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
-  return mac ? '⌘K' : 'Ctrl K';
+  return isApplePlatform() ? '⌘K' : 'Ctrl K';
 }
 
 /**
- * Jump anywhere, apply a scene or run an action from the keyboard: press Ctrl+K or Command+K, or
- * press / when no field is focused. It is a second way to do things that all have buttons, so
- * nothing depends on it. On a phone it opens from the search button at the top.
+ * Jump anywhere, apply a scene or run an action from the keyboard: press Ctrl+K, or Command+K on a Mac. It is
+ * a second way to do things that all have buttons, so nothing depends on it. On a phone it opens from the
+ * search button at the top.
  */
 export function CommandPalette({
   open,
@@ -56,7 +56,6 @@ export function CommandPalette({
   const backdrop = useBackdropClose(ref, onClose);
   const navigate = useNavigate();
   const logout = useLogout();
-  const checkAll = useRefreshAll();
   const presets = usePresets();
   const { setPreference } = useTheme();
   const [query, setQuery] = useState('');
@@ -84,7 +83,8 @@ export function CommandPalette({
       run: () => onApplyPreset(preset),
     }));
     const actions: Item[] = [
-      { id: 'act:check', group: 'Actions', label: 'Check lights now', icon: RefreshCw, keywords: 'refresh status online', run: () => { checkAll.mutate(); navigate('/'); } },
+      // The dashboard runs the check, so its own progress, result and any error are on screen.
+      { id: 'act:check', group: 'Actions', label: 'Check lights now', icon: RefreshCw, keywords: 'refresh status online', run: () => navigate('/', { state: { checkNow: true } }) },
       { id: 'act:night', group: 'Actions', label: 'Theme: Night', icon: Moon, keywords: 'dark appearance', run: () => setPreference('dark') },
       { id: 'act:day', group: 'Actions', label: 'Theme: Day', icon: Sun, keywords: 'light appearance', run: () => setPreference('light') },
       { id: 'act:auto', group: 'Actions', label: 'Theme: match this device', icon: SunMoon, keywords: 'auto appearance system', run: () => setPreference('auto') },
@@ -171,7 +171,7 @@ export function CommandPalette({
                   onMouseMove={() => setActive(results.indexOf(item))}
                   onClick={() => choose(item)}
                   className={`mx-2 flex min-h-12 cursor-pointer items-center gap-3 rounded-2xl px-3 text-sm transition-colors ${
-                    isActive ? 'bg-accent-wash text-accent-text ring-1 ring-accent-ui/30' : 'text-fg-2'
+                    isActive ? 'bg-accent-wash text-accent-text ring-2 ring-accent-ui' : 'text-fg-2'
                   }`}
                 >
                   <Icon className="size-4 shrink-0" aria-hidden />
@@ -219,7 +219,7 @@ export function CommandPalette({
             setActive(0);
           }}
           onKeyDown={onKeyDown}
-          className="min-h-14 w-full bg-transparent text-base text-fg placeholder:text-fg-4 focus:outline-none"
+          className="min-h-14 w-full rounded-lg bg-transparent text-base text-fg placeholder:text-fg-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent-ui"
         />
         <kbd className="hidden shrink-0 rounded-lg border border-line-strong px-1.5 py-0.5 text-[11px] text-fg-4 sm:block">esc</kbd>
       </div>

@@ -1,16 +1,26 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS, type CapabilityStateDto, type PresetDto } from '@glm/shared';
+import { DEFAULT_SETTINGS, type CapabilityStateDto, type PresetDto, type RunResultDto } from '@glm/shared';
+import { PrivacyPage } from '../features/legal/LegalPages';
 import { Appearance } from '../features/settings/Appearance';
+import { glowStore, themeStore } from '../lib/theme';
 import { device, mockApi, renderApp } from '../test/fixtures';
 import { AppShell } from './AppShell';
 
 beforeEach(() => {
   window.localStorage.clear();
   document.documentElement.removeAttribute('data-theme');
+  document.title = 'Govee Light Manager';
+  // The choices live in module-level stores, so a cleared storage has to be read again.
+  themeStore.reload();
+  glowStore.reload();
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 const preset = (name: string, overrides: Partial<PresetDto> = {}): PresetDto => ({
   id: name,
@@ -41,40 +51,75 @@ const routes = (presets: PresetDto[] = [], devices = [device()]) => ({
   'POST /auth/logout': { status: 204 },
 });
 
-function shell(route = '/') {
-  return renderApp(
-    <AppShell username="owner">
-      <p>Page</p>
-    </AppShell>,
-    { route },
-  );
+/** Shows where the router is and what it was told, so a test can see where an action sent it. */
+function Where() {
+  const location = useLocation();
+  return <output data-testid="where">{`${location.pathname} ${JSON.stringify(location.state)}`}</output>;
 }
+
+function shell(route = '/', page = <Where />) {
+  return renderApp(<AppShell username="owner">{page}</AppShell>, { route });
+}
+
+const SEARCH = { name: 'Search pages, scenes and actions' };
+const openPalette = () => userEvent.keyboard('{Control>}k{/Control}');
 
 describe('the command palette', () => {
   it('opens with Ctrl+K, lists the pages, and closes again on the same keys', async () => {
     mockApi(routes());
     shell();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    await userEvent.keyboard('{Control>}k{/Control}');
-    const input = await screen.findByRole('combobox', { name: 'Search pages, scenes and actions' });
+    await openPalette();
+    const input = await screen.findByRole('combobox', SEARCH);
     const pages = within(screen.getByRole('group', { name: 'Go to' })).getAllByRole('option');
     expect(pages.map((option) => option.textContent)).toContain('Scenes & Presets');
     expect(input).toHaveFocus();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
-  it('opens with / only when no field has focus', async () => {
+  it('does not take the / key, which would catch speech input and switch users, anywhere on the page', async () => {
     mockApi(routes());
     shell();
     await userEvent.keyboard('/');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('ignores Ctrl+Shift+K and Ctrl+Alt+K, which are other shortcuts and, on some keyboards, typing', async () => {
+    mockApi(routes());
+    shell();
+    await userEvent.keyboard('{Control>}{Shift>}k{/Shift}{/Control}');
+    await userEvent.keyboard('{Control>}{Alt>}k{/Alt}{/Control}');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('does not flicker when the keys are held down', async () => {
+    mockApi(routes());
+    shell();
+    await openPalette();
+    await screen.findByRole('combobox');
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, repeat: true, bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, repeat: true, bubbles: true }));
+    });
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+  });
+
+  it('uses Command+K on a Mac, where Ctrl+K deletes to the end of a line in a text field', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)');
+    mockApi(routes());
+    shell();
+    await userEvent.keyboard('{Control>}k{/Control}');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await userEvent.keyboard('{Meta>}k{/Meta}');
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
+    expect(screen.getByText('⌘K')).toBeInTheDocument();
   });
 
   it('finds a scene by what it is called, and by words from its description, and says when nothing matches', async () => {
     mockApi(routes([preset('Christmas: Candy Cane', { description: 'Red and white stripes.' }), preset('Halloween: Pumpkin')]));
     shell();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     const input = await screen.findByRole('combobox');
     await userEvent.type(input, 'candy');
     expect(within(screen.getByRole('group', { name: 'Scenes' })).getAllByRole('option')).toHaveLength(1);
@@ -86,33 +131,128 @@ describe('the command palette', () => {
     expect(screen.getByText(/Nothing matches/)).toBeInTheDocument();
   });
 
-  it('moves with the arrow keys, and Enter on a scene asks before applying it, like every other way in', async () => {
-    mockApi(routes([preset('Halloween: Pumpkin')]));
+  it('moves with the arrow keys, Home and End, and keeps aria-activedescendant pointing at the highlighted option', async () => {
+    mockApi(routes([preset('Aurora One'), preset('Aurora Two'), preset('Aurora Three')]));
     shell();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     const input = await screen.findByRole('combobox');
-    await userEvent.type(input, 'pumpkin');
-    expect(input).toHaveAttribute('aria-activedescendant');
-    expect(screen.getByRole('option', { name: /Halloween: Pumpkin/ })).toHaveAttribute('aria-selected', 'true');
-    await userEvent.keyboard('{Enter}');
-    expect(await screen.findByRole('dialog', { name: 'Apply "Halloween: Pumpkin"' })).toBeInTheDocument();
+    await userEvent.type(input, 'aurora');
+    const options = () => screen.getAllByRole('option');
+    const selected = () => options().findIndex((option) => option.getAttribute('aria-selected') === 'true');
+    const activeIsSelected = () => expect(input.getAttribute('aria-activedescendant')).toBe(options()[selected()]?.id);
+
+    expect(options()).toHaveLength(3);
+    expect(selected()).toBe(0);
+    activeIsSelected();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(selected()).toBe(1);
+    activeIsSelected();
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+    expect(selected()).toBe(0); // wraps round
+    await userEvent.keyboard('{ArrowUp}');
+    expect(selected()).toBe(2); // and back
+    await userEvent.keyboard('{Home}');
+    expect(selected()).toBe(0);
+    await userEvent.keyboard('{End}');
+    expect(selected()).toBe(2);
+    activeIsSelected();
+  });
+
+  it('Enter on a scene asks before applying it, like every other way in', async () => {
+    const { calls } = mockApi(routes([preset('Aurora One'), preset('Aurora Two')]));
+    shell();
+    await openPalette();
+    await userEvent.type(await screen.findByRole('combobox'), 'aurora');
+    await userEvent.keyboard('{ArrowDown}{Enter}');
+    expect(await screen.findByRole('dialog', { name: 'Apply "Aurora Two"' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+
+  it('starts a fresh dialog when a second scene is chosen, and does not show the first one\'s result under it', async () => {
+    const run: RunResultDto = {
+      runId: 'r1',
+      sourceType: 'preset',
+      sourceId: 'aurora-one',
+      sourceName: 'Aurora One',
+      status: 'all_accepted',
+      startedAt: '2026-11-01T10:00:00.000Z',
+      completedAt: '2026-11-01T10:00:01.000Z',
+      outcomes: [
+        { deviceId: 'dev-1', deviceName: 'Front Eaves', actionType: 'power', summary: 'Turn on', status: 'accepted', commandId: 'c1', verification: 'unverified', reason: null, errorCategory: null },
+      ],
+    };
+    mockApi({ ...routes([preset('Aurora One', { id: 'aurora-one' }), preset('Aurora Two', { id: 'aurora-two' })]), 'POST /presets/aurora-one/apply': { json: run } });
+    shell();
+
+    await openPalette();
+    await userEvent.type(await screen.findByRole('combobox'), 'aurora one');
+    await userEvent.keyboard('{Enter}');
+    await userEvent.click(await screen.findByRole('button', { name: 'Apply preset' }));
+    expect(await screen.findByText(/All accepted by Govee/)).toBeInTheDocument();
+
+    await openPalette();
+    await userEvent.type(await screen.findByRole('combobox'), 'aurora two');
+    await userEvent.keyboard('{Enter}');
+    expect(await screen.findByRole('dialog', { name: 'Apply "Aurora Two"' })).toBeInTheDocument();
+    expect(screen.queryByText(/All accepted by Govee/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Apply preset' })).toBeEnabled();
   });
 
   it('runs an action from the list: here, signing out', async () => {
     const { calls } = mockApi(routes());
     shell();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     await userEvent.type(await screen.findByRole('combobox'), 'sign out');
     await userEvent.keyboard('{Enter}');
     await waitFor(() => expect(calls.some((c) => c.path === '/auth/logout')).toBe(true));
   });
 
+  it('sends "Check lights now" to the dashboard, which runs it where its progress, result and errors show', async () => {
+    mockApi(routes());
+    shell('/settings');
+    await openPalette();
+    await userEvent.type(await screen.findByRole('combobox'), 'check lights');
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/ {"checkNow":true}'));
+  });
+
   it('can be opened from the search button, which is how a phone reaches it', async () => {
     mockApi(routes());
     shell();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Search pages, scenes and actions' })[0]!);
+    // The phone's icon button has the full name. The wide screen's bar names itself by what it says.
+    await userEvent.click(screen.getByRole('button', SEARCH));
     expect(await screen.findByRole('combobox')).toBeInTheDocument();
+  });
+
+  it("names the wide screen's search bar by the words on it, so a voice command for them works", () => {
+    mockApi(routes());
+    shell();
+    expect(screen.getByRole('button', { name: /^Search or jump to/ })).toBeInTheDocument();
+  });
+});
+
+describe('where focus goes when a dialog closes', () => {
+  it('returns to the button that opened the command palette', async () => {
+    mockApi(routes());
+    shell();
+    const button = screen.getByRole('button', SEARCH);
+    await userEvent.click(button);
+    const dialog = await screen.findByRole('dialog', { name: 'Search and commands' });
+    await userEvent.click(dialog);
+    await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
+    expect(button).toHaveFocus();
+  });
+
+  it('returns to the More button after the More sheet', async () => {
+    mockApi(routes());
+    shell();
+    const more = screen.getByRole('button', { name: 'More' });
+    await userEvent.click(more);
+    const sheet = await screen.findByRole('dialog', { name: 'More' });
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'More' })).not.toBeInTheDocument());
+    expect(more).toHaveFocus();
   });
 });
 
@@ -120,7 +260,7 @@ describe('closing a dialog from the dim area around it', () => {
   it('closes when the dim area is clicked', async () => {
     mockApi(routes());
     shell();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     const dialog = await screen.findByRole('dialog', { name: 'Search and commands' });
     await userEvent.click(dialog);
     await waitFor(() => expect(screen.queryByRole('combobox')).not.toBeInTheDocument());
@@ -129,10 +269,30 @@ describe('closing a dialog from the dim area around it', () => {
   it('stays open when a drag starts inside it and lets go on the dim area, as selecting text does', async () => {
     mockApi(routes());
     shell();
-    await userEvent.keyboard('{Control>}k{/Control}');
+    await openPalette();
     const dialog = await screen.findByRole('dialog', { name: 'Search and commands' });
     await userEvent.pointer([{ keys: '[MouseLeft>]', target: screen.getByRole('combobox') }, { keys: '[/MouseLeft]', target: dialog }]);
     expect(screen.getByRole('combobox')).toBeInTheDocument();
+  });
+});
+
+describe('the phone dock', () => {
+  it('names each place with the word on it, so "Home" and "Timers" work as voice commands', () => {
+    mockApi(routes());
+    shell();
+    const dock = screen.getAllByRole('navigation', { name: 'Main' }).at(-1)!;
+    expect(within(dock).getByRole('link', { name: 'Home, Dashboard' })).toHaveAttribute('href', '/');
+    expect(within(dock).getByRole('link', { name: 'Timers, Schedules' })).toHaveAttribute('href', '/schedules');
+    expect(within(dock).getByRole('link', { name: 'Scenes & Presets' })).toHaveAttribute('href', '/presets');
+    expect(within(dock).getByRole('link', { name: 'Groups' })).toHaveAttribute('href', '/groups');
+  });
+
+  it('says how many notifications are unread on the More sheet too, like the other bells', async () => {
+    mockApi({ ...routes(), 'GET /notifications': { json: { items: [], unread: 3 } } });
+    shell();
+    await userEvent.click(screen.getByRole('button', { name: 'More' }));
+    const sheet = await screen.findByRole('dialog', { name: 'More' });
+    expect(await within(sheet).findByRole('link', { name: 'Notifications, 3 unread' })).toHaveAttribute('href', '/notifications');
   });
 });
 
@@ -148,9 +308,54 @@ describe('the tab title', () => {
     shell('/');
     await waitFor(() => expect(document.title).toBe('Light Manager'));
   });
+
+  it('names pages that are not in the menu: a light, painting a pattern, connecting', async () => {
+    mockApi(routes());
+    const { unmount } = shell('/devices/abc');
+    await waitFor(() => expect(document.title).toBe('Light · Light Manager'));
+    unmount();
+    shell('/patterns/new');
+    await waitFor(() => expect(document.title).toBe('Paint a pattern · Light Manager'));
+  });
+
+  it('goes back to what it was when the shell goes away, so the sign-in page is not left with the last page\'s name', async () => {
+    mockApi(routes());
+    const { unmount } = shell('/settings');
+    await waitFor(() => expect(document.title).toBe('Settings · Light Manager'));
+    unmount();
+    expect(document.title).toBe('Govee Light Manager');
+  });
+});
+
+describe('pages that email links open', () => {
+  it('draw only their card inside the shell: one page landmark, not two', async () => {
+    mockApi(routes());
+    shell('/privacy', <PrivacyPage />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Privacy' })).toBeInTheDocument();
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(document.querySelectorAll('.ambient')).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: /^Theme:/ })).toHaveLength(1);
+  });
+
+  it('bring their own landmark, glow and title when seen signed out', async () => {
+    mockApi(routes());
+    renderApp(<PrivacyPage />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Privacy' })).toBeInTheDocument();
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+    expect(document.querySelectorAll('.ambient')).toHaveLength(1);
+    await waitFor(() => expect(document.title).toBe('Privacy · Light Manager'));
+  });
 });
 
 describe('the theme', () => {
+  const deviceSays = (light: boolean) =>
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: light && query.includes('light'),
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+
   it('cycles from following the device to Day, to Night, and remembers the choice', async () => {
     mockApi(routes());
     shell();
@@ -166,6 +371,27 @@ describe('the theme', () => {
     expect(window.localStorage.getItem('glm.theme')).toBe('auto');
   });
 
+  it('on Auto, follows what the device says: Day on a light device, Night on a dark one', async () => {
+    deviceSays(true);
+    mockApi(routes());
+    const first = shell();
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'light'));
+    first.unmount();
+
+    deviceSays(false);
+    shell();
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+  });
+
+  it('a choice beats the device: Night stays Night on a light device', async () => {
+    deviceSays(true);
+    window.localStorage.setItem('glm.theme', 'dark');
+    themeStore.reload();
+    mockApi(routes());
+    shell();
+    await waitFor(() => expect(document.documentElement).toHaveAttribute('data-theme', 'dark'));
+  });
+
   it('works when storage is blocked: the choice applies, it just is not kept', async () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new DOMException('blocked', 'SecurityError');
@@ -174,7 +400,6 @@ describe('the theme', () => {
     shell();
     await userEvent.click(screen.getByRole('button', { name: /^Theme:/ }));
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
-    vi.restoreAllMocks();
   });
 
   it('can be chosen outright in Settings', async () => {

@@ -17,7 +17,7 @@ function HolidayRow({ holiday, onEdit }: { holiday: HolidayDto; onEdit: () => vo
   return (
     <li className="rounded-3xl bg-inset p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{holiday.name}</h4>
+        <h3 className="min-w-0 font-display text-base font-semibold tracking-tight break-words">{holiday.name}</h3>
         {!holiday.enabled ? <Badge>Off</Badge> : holiday.skipped ? <Badge tone="warn">Skipping next</Badge> : <Badge tone="good">On</Badge>}
       </div>
       <p className="mt-0.5 text-sm text-fg-2">

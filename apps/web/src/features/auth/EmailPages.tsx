@@ -23,7 +23,7 @@ export interface LoginNotice {
 
 export function AuthCard({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <AuthLayout>
+    <AuthLayout title={title}>
       <h1 className="mb-6 font-display text-2xl font-semibold tracking-tight">{title}</h1>
       {children}
     </AuthLayout>

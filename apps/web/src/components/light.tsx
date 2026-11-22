@@ -31,24 +31,32 @@ export interface LightLook {
   live: boolean;
 }
 
-/** The newest value Govee reported or accepted, for drawing only. The words beside it say which. */
-function newestValue(device: DeviceDto, instance: string): unknown {
+/** The newest value Govee reported or accepted, and when, for drawing only. The words beside a picture say which. */
+function newestReport(device: DeviceDto, instance: string): { value: unknown; at: string } | null {
   const state = device.states.find((s) => s.instance === instance);
-  if (!state) return undefined;
+  if (!state) return null;
   const candidates = [state.reported, state.accepted].filter((v): v is NonNullable<typeof v> => Boolean(v));
-  return candidates.sort((a, b) => b.at.localeCompare(a.at))[0]?.value;
+  return candidates.sort((a, b) => b.at.localeCompare(a.at))[0] ?? null;
 }
 
-export function lookOfDevice(device: DeviceDto): LightLook {
-  const power = newestValue(device, 'powerSwitch');
-  const on = power === 1 ? true : power === 0 ? false : null;
-  const rgb = newestValue(device, 'colorRgb');
-  const kelvin = newestValue(device, 'colorTemperatureK');
-  const brightness = newestValue(device, 'brightness');
+const positive = (report: { value: unknown } | null): report is { value: number; at: string } =>
+  typeof report?.value === 'number' && report.value > 0;
 
+export function lookOfDevice(device: DeviceDto): LightLook {
+  // A light Govee no longer lists cannot be said to be on, whatever it last reported.
+  const missing = device.discoveryStatus === 'missing';
+  const power = newestReport(device, 'powerSwitch')?.value;
+  const on = missing ? null : power === 1 ? true : power === 0 ? false : null;
+  const brightness = newestReport(device, 'brightness')?.value;
+
+  // A light shows a colour or a colour temperature, and Govee reports 0 for the one it is not using. If both
+  // look set, the more recent report is the one in use.
+  const rgb = newestReport(device, 'colorRgb');
+  const kelvin = newestReport(device, 'colorTemperatureK');
   let color = WARM_WHITE;
-  if (typeof rgb === 'number' && rgb > 0) color = intToHex(rgb);
-  else if (typeof kelvin === 'number' && kelvin > 0) color = kelvinToHex(kelvin);
+  if (positive(rgb) && positive(kelvin)) color = rgb.at >= kelvin.at ? intToHex(rgb.value) : kelvinToHex(kelvin.value);
+  else if (positive(rgb)) color = intToHex(rgb.value);
+  else if (positive(kelvin)) color = kelvinToHex(kelvin.value);
 
   const lit = typeof brightness === 'number' ? 0.35 + 0.65 * Math.min(Math.max(brightness, 0), 100) / 100 : 0.85;
   const reachable = device.connectivity !== 'offline' && device.connectivity !== 'checking';
@@ -121,9 +129,13 @@ export function HouseStrip({ looks, count = 60, className = '' }: { looks: Light
   );
 }
 
-/** A row of the colours a look uses, with a soft glow of them underneath. */
+/** A row of the colours a look uses, with a soft glow of them underneath. Empty and hollow when it uses none. */
 export function Spectrum({ colors, className = '', height = 'h-6' }: { colors: string[]; className?: string; height?: string }) {
-  const shown = colors.length > 0 ? colors : [WARM_WHITE];
+  // A look with no colour in it (a preset that only turns lights on, say) is drawn empty, not as an invented colour.
+  if (colors.length === 0) {
+    return <div aria-hidden className={`rounded-full border border-dashed border-field-line ${height} ${className}`} />;
+  }
+  const shown = colors;
   const stops = shown.length > 1 ? shown : [shown[0] as string, shown[0] as string];
   const style: CssVars = { '--spectrum': `linear-gradient(90deg in oklab, ${stops.join(', ')})` };
   return (

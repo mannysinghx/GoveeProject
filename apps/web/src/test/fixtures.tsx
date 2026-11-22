@@ -107,13 +107,16 @@ export function mockApi(routes: Record<string, Route | { status?: number; json?:
 
 export const settingsRoute = { 'GET /settings': { json: DEFAULT_SETTINGS } };
 
-export function renderApp(ui: ReactElement, { route = '/' }: { route?: string } = {}) {
+export function renderApp(ui: ReactElement, { route = '/', state }: { route?: string; state?: unknown } = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchInterval: false }, mutations: { retry: false } },
   });
+  // A string keeps its query ("/verify?token=x"). With router state it has to be an object, so split it.
+  const [pathname = '/', query] = route.split('?');
+  const entry = state === undefined ? route : { pathname, search: query ? `?${query}` : '', state };
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+      <MemoryRouter initialEntries={[entry]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   );
 }

@@ -12,7 +12,7 @@ export type ResolvedTheme = 'light' | 'dark';
 const THEME_COLOR: Record<ResolvedTheme, string> = { dark: '#0a0a14', light: '#f5f2ec' };
 
 export const THEME_VALUES = ['auto', 'light', 'dark'] as const;
-const themeStore = createPreferenceStore<ThemePreference>('glm.theme', THEME_VALUES, 'auto');
+export const themeStore = createPreferenceStore<ThemePreference>('glm.theme', THEME_VALUES, 'auto');
 
 export function resolveTheme(preference: ThemePreference, deviceIsLight: boolean): ResolvedTheme {
   if (preference === 'auto') return deviceIsLight ? 'light' : 'dark';
@@ -54,7 +54,7 @@ export function useTheme(): {
 /** What colours the glow behind the app: the lights themselves, a steady warm tone, or nothing. */
 export type GlowPreference = 'lights' | 'warm' | 'off';
 export const GLOW_VALUES = ['lights', 'warm', 'off'] as const;
-const glowStore = createPreferenceStore<GlowPreference>('glm.glow', GLOW_VALUES, 'lights');
+export const glowStore = createPreferenceStore<GlowPreference>('glm.glow', GLOW_VALUES, 'lights');
 
 export function useGlowPreference(): [GlowPreference, (next: GlowPreference) => void] {
   return usePreference(glowStore, 'lights');

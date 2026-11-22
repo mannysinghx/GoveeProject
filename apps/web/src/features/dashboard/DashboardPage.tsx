@@ -1,6 +1,6 @@
 import { ArrowRight, CalendarClock, Lightbulb, Power, PowerOff, RefreshCw, Sparkles, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { DeviceDto, DiagnosticsDto, PresetDto, RefreshAllResultDto } from '@glm/shared';
 import { HouseStrip, LightStrip, lookOfDevice, OnlineRing, Spectrum } from '../../components/light';
 import { CommandResultLine, ConnectivityBadge, FreshnessBadge } from '../../components/status';
@@ -78,7 +78,8 @@ function DeviceCard({ device }: { device: DeviceDto }) {
   const brightness = reportedValue(device, 'brightness');
   const historical = device.connectivity === 'offline' || device.connectivity === 'checking';
   const look = lookOfDevice(device);
-  const known = power === 'On' || power === 'Off';
+  // A last-known value from a light that is offline is history, so it is not drawn or announced as the current state.
+  const known = (power === 'On' || power === 'Off') && !historical;
 
   return (
     <article className="tile flex flex-col gap-4 rounded-3xl p-5">
@@ -274,6 +275,9 @@ function Hero({
   const present = devices.filter((d) => d.discoveryStatus === 'present');
   const lights = present.filter((d) => !d.isGoveeGroup);
   const online = present.filter((d) => d.connectivity === 'online').length;
+  // The ring counts lights only. A group made in the Govee app is never polled for status, so it can never be
+  // "online", and counting it would leave the ring short on a setup where every light is up.
+  const lightsOnline = lights.filter((d) => d.connectivity === 'online').length;
   const looks = lights.map(lookOfDevice);
   const reached = diagnostics?.govee.lastSuccessfulConnectionAt ?? null;
 
@@ -301,7 +305,7 @@ function Hero({
             </Button>
           </div>
         </div>
-        {present.length > 0 ? <OnlineRing online={online} total={present.length} className="size-[4.75rem] sm:size-32" /> : null}
+        {lights.length > 0 ? <OnlineRing online={lightsOnline} total={lights.length} className="size-[4.75rem] sm:size-32" /> : null}
       </div>
       {looks.length > 0 ? <HouseStrip looks={looks} className="mt-8" /> : null}
     </section>
@@ -316,6 +320,19 @@ export function DashboardPage() {
   const settings = useSettings();
   const checkAll = useRefreshAll();
   const refreshDue = useRefreshDue();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // The command palette's "Check lights now" lands here with a note to run the check, so progress, the result and
+  // any error show on this page, where the button of the same name shows them.
+  const checkNow = (location.state as { checkNow?: boolean } | null)?.checkNow === true;
+  useEffect(() => {
+    if (!checkNow) return;
+    checkAll.mutate();
+    navigate(location.pathname, { replace: true, state: null });
+    // Once per request: the note is cleared from the address as soon as it is used.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkNow]);
 
   // Status is only polled while this page is open and visible, at a modest configurable rate.
   const pollMs = (settings.data?.statusPollSeconds ?? 60) * 1000;

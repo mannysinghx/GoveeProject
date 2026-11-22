@@ -88,7 +88,7 @@ function LedCountInput({ string, onCommit }: { string: PatternString; onCommit: 
         key={`${string.ledSource}-${string.ledCount}`}
         type="number"
         aria-label={`LEDs on ${string.name}`}
-        className="min-h-9 w-20 rounded-lg border border-line bg-inset px-2 text-sm text-fg"
+        className="min-h-9 w-20 rounded-lg border border-field-line bg-inset px-2 text-sm text-fg"
         min={string.segments.length}
         max={1000}
         placeholder="Count"
@@ -112,7 +112,7 @@ function ColorChoice({ label, value, onChange }: { label: string; value: string;
       <input
         type="color"
         aria-label={label}
-        className="h-11 w-14 cursor-pointer rounded-lg border border-line bg-inset p-1"
+        className="h-11 w-14 cursor-pointer rounded-lg border border-field-line bg-inset p-1"
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
@@ -673,7 +673,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                   <input
                     type="number"
                     aria-label="Segments left blank between repeats"
-                    className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
+                    className="min-h-9 w-16 rounded-lg border border-field-line bg-inset px-2 text-fg"
                     min={0}
                     max={Math.max(0, cells.length)}
                     value={repeatGap}
@@ -684,7 +684,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 <label className="flex items-center gap-2 text-sm text-fg-3">
                   <select
                     aria-label="Where Repeat fills"
-                    className="min-h-9 rounded-lg border border-line bg-inset px-2 text-fg"
+                    className="min-h-9 rounded-lg border border-field-line bg-inset px-2 text-fg"
                     value={repeatDirection}
                     onChange={(e) => setRepeatDirection(e.target.value as RepeatDirection)}
                   >
@@ -720,7 +720,7 @@ function Editor({ devices, presetId }: { devices: DeviceDto[]; presetId?: string
                 <input
                   type="number"
                   aria-label="Segments in each run of alternating colors"
-                  className="min-h-9 w-16 rounded-lg border border-line bg-inset px-2 text-fg"
+                  className="min-h-9 w-16 rounded-lg border border-field-line bg-inset px-2 text-fg"
                   min={1}
                   max={Math.max(1, cells.length)}
                   value={runLength}

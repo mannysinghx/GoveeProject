@@ -170,7 +170,7 @@ function GroupCard({
 
   return (
     <article className="tile flex flex-col gap-4 rounded-3xl p-5">
-      <h3 className="font-display text-lg font-semibold tracking-tight">{group.name}</h3>
+      <h2 className="font-display text-lg font-semibold tracking-tight">{group.name}</h2>
       <ImportedBadge from={group.importedFrom} />
       {members.some((device) => !device.isGoveeGroup) ? (
         <HouseStrip looks={members.filter((device) => !device.isGoveeGroup).map(lookOfDevice)} count={30} />

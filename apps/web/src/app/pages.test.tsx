@@ -240,6 +240,64 @@ describe('dashboard', () => {
     renderApp(<DashboardPage />);
     expect(await screen.findByText(/not Govee\. The devices below are test data/)).toBeInTheDocument();
   });
+
+  it('counts only lights in the ring: a group made in the Govee app is never polled, so it can never be online', async () => {
+    mockApi({
+      ...dashboardRoutes,
+      'GET /devices': {
+        json: {
+          devices: [
+            device({ id: 'a', name: 'Front', connectivity: 'online' }),
+            device({ id: 'b', name: 'Back', connectivity: 'online' }),
+            device({ id: 'g', name: 'All strings', sku: 'SameModeGroup', isGoveeGroup: true, connectivity: 'unknown' }),
+          ],
+        },
+      },
+    });
+    renderApp(<DashboardPage />);
+    expect(await screen.findByRole('img', { name: '2 of 2 lights online' })).toBeInTheDocument();
+    // The sentence keeps counting devices, as it always did, and says so.
+    expect(screen.queryByText(/3 device\(s\) discovered/)).toBeInTheDocument();
+  });
+
+  it('marks On or Off as pressed from a current report, and never from what an offline light last said', async () => {
+    const reported = { instance: 'powerSwitch', requested: null, accepted: null, reported: { value: 1, at: '2026-11-01T10:00:00.000Z', historical: false }, notQueryable: false, verification: null };
+    mockApi({
+      ...dashboardRoutes,
+      'GET /devices': {
+        json: {
+          devices: [
+            device({ id: 'a', name: 'Live', connectivity: 'online', states: [reported] }),
+            device({ id: 'b', name: 'Gone quiet', connectivity: 'offline', states: [{ ...reported, reported: { ...reported.reported, historical: true } }] }),
+          ],
+        },
+      },
+    });
+    renderApp(<DashboardPage />);
+    expect(await screen.findByRole('button', { name: 'Turn Live on' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Turn Live off' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Turn Gone quiet on' })).not.toHaveAttribute('aria-pressed');
+    expect(screen.getByRole('button', { name: 'Turn Gone quiet off' })).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('runs the check the command palette asked for, once, and shows what it found', async () => {
+    const lit = device({ connectivity: 'online' });
+    const { calls } = mockApi({
+      ...dashboardRoutes,
+      'GET /devices': { json: { devices: [lit] } },
+      'POST /devices/refresh-all': { json: { checked: 1, listError: null, failures: [], devices: [lit] } },
+    });
+    renderApp(<DashboardPage />, { state: { checkNow: true } });
+    expect(await screen.findByText('Asked Govee just now: all 1 lights are online.')).toBeInTheDocument();
+    expect(calls.filter((c) => c.path === '/devices/refresh-all')).toHaveLength(1);
+  });
+
+  it('does not run a check on its own when it is opened the ordinary way', async () => {
+    const { calls } = mockApi({ ...dashboardRoutes, 'GET /devices': { json: { devices: [device()] } } });
+    renderApp(<DashboardPage />);
+    await screen.findByRole('link', { name: 'Front Eaves' });
+    expect(calls.some((c) => c.path === '/devices/refresh-all')).toBe(false);
+  });
 });
 
 describe('device page', () => {

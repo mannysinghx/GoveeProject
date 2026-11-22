@@ -203,7 +203,7 @@ function ColorInput({ value, onChange }: { value: string; onChange: (hex: string
       <input
         type="color"
         aria-label="Pick a colour"
-        className="h-11 w-14 cursor-pointer rounded-lg border border-line bg-inset p-1"
+        className="h-11 w-14 cursor-pointer rounded-lg border border-field-line bg-inset p-1"
         value={isHexColor(value) ? value : '#000000'}
         onChange={(e) => onChange(e.target.value)}
       />

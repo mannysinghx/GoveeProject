@@ -2,7 +2,9 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Ambient } from '../../components/Ambient';
 import { BrandMark } from '../../components/Brand';
+import { useInShell } from '../../components/shell-context';
 import { Card, Notice } from '../../components/ui';
+import { useDocumentTitle, withAppName } from '../../lib/hooks';
 
 /*
  * The privacy page says what the code does, and nothing it does not. Keep it in step with the
@@ -13,9 +15,13 @@ import { Card, Notice } from '../../components/ui';
 const CONTACT = 'info@lightup.ink';
 
 function LegalPage({ title, children }: { title: string; children: ReactNode }) {
+  // Signed in, the page is drawn inside the app's shell, which supplies the page landmark, glow and tab title.
+  const inShell = useInShell();
+  useDocumentTitle(inShell ? null : withAppName(title));
+  const Frame = inShell ? 'div' : 'main';
   return (
-    <main className="relative mx-auto max-w-2xl p-4 py-8 sm:p-6 sm:py-10">
-      <Ambient colors={[]} />
+    <Frame className="relative mx-auto max-w-2xl p-4 py-8 sm:p-6 sm:py-10">
+      {inShell ? null : <Ambient colors={[]} />}
       <Card className="space-y-4 rounded-[2rem] p-6 text-sm leading-relaxed text-fg-2 sm:p-9">
         <div className="flex items-center gap-3">
           <BrandMark size={36} />
@@ -32,7 +38,7 @@ function LegalPage({ title, children }: { title: string; children: ReactNode }) 
           </Link>
         </p>
       </Card>
-    </main>
+    </Frame>
   );
 }
 

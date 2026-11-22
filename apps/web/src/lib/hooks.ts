@@ -16,6 +16,23 @@ export function useVisibleInterval(callback: () => void, delayMs: number | null)
   }, [delayMs]);
 }
 
+/** Names the tab, and puts the previous name back when the page goes away or the title changes. */
+export function useDocumentTitle(title: string | null): void {
+  useEffect(() => {
+    if (!title) return;
+    const previous = document.title;
+    document.title = title;
+    return () => {
+      document.title = previous;
+    };
+  }, [title]);
+}
+
+/** "Schedules · Light Manager": a page's name with the app's, unless it already says it. */
+export function withAppName(title: string): string {
+  return title.includes('Light Manager') ? title : `${title} · Light Manager`;
+}
+
 /** The current time, refreshed every so often, for things that read "this evening" or "in 3 days". */
 export function useNow(intervalMs = 60_000): number {
   const [now, setNow] = useState(() => Date.now());

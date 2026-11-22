@@ -87,7 +87,7 @@ export function DailySchemeCard({ presets, onApply }: { presets: PresetDto[]; on
               <input
                 type="time"
                 aria-label="Time the color scheme changes each day"
-                className="min-h-9 rounded-xl border border-line-strong bg-inset px-2.5 text-fg"
+                className="min-h-9 rounded-xl border border-field-line bg-inset px-2.5 text-fg"
                 value={time}
                 disabled={set.isPending || presetId === null}
                 onChange={(event) => setDraftTime(event.target.value)}

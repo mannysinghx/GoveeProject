@@ -24,7 +24,9 @@ export function greeting(date: Date): string {
   const hour = date.getHours();
   if (hour >= 5 && hour < 12) return 'Good morning';
   if (hour >= 12 && hour < 17) return 'Good afternoon';
-  return 'Good evening';
+  if (hour >= 17 && hour < 21) return 'Good evening';
+  // From nine at night to five in the morning "Good evening" is wrong and "Good night" is a goodbye.
+  return 'Hello';
 }
 
 /** "Sunday evening": where in the week and the day it is. */
