@@ -114,12 +114,15 @@ describe('own AI keys in Settings', () => {
     });
     renderApp(<AiSettings />);
     expect(await screen.findByText(/AI is off until you add a key of your own/)).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Where to get a key, and which model to pick'));
+    expect(screen.getByRole('link', { name: 'Google Gemini: create a key' })).toHaveAttribute('href', 'https://aistudio.google.com/apikey');
+    expect(screen.queryByText(/Add the key after signing in/)).not.toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText('Provider'), 'gemini');
     expect(screen.getByLabelText('Model')).toHaveValue('gemini-2.5-flash-lite');
     await userEvent.type(screen.getByLabelText('Google Gemini API key'), AI_KEY);
     await userEvent.click(screen.getByRole('button', { name: 'Add key' }));
 
-    expect(await screen.findByRole('listitem')).toHaveTextContent('Google Geminigemini-2.5-flash-lite');
+    expect((await screen.findByRole('button', { name: 'Remove' })).closest('li')).toHaveTextContent('Google Geminigemini-2.5-flash-lite');
     expect(screen.getByLabelText('Google Gemini API key')).toHaveValue('');
     expect(calls.find((c) => c.method === 'PUT')).toMatchObject({
       path: '/account/ai/keys/gemini',
@@ -262,6 +265,7 @@ describe('getting started', () => {
     });
     renderApp(<ConnectPage />);
     expect(await screen.findByLabelText('Govee API key')).toBeInTheDocument();
+    expect(screen.getByText(/Choose Apply for API Key/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Test connection and find devices' })).toBeDisabled();
     expect(await screen.findByText('Europe/London')).toBeInTheDocument();
     // jsdom's own zone differs from Europe/London, so the page offers to use it.

@@ -1,10 +1,11 @@
 import { ExternalLink } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { GOVEE_KEY_HELP_URL } from '@glm/shared';
 import { Button, ErrorNotice, Field, inputClass, Loading, Notice, SectionCard } from '../../components/ui';
 import { dateTime } from '../../lib/format';
 import { useConnectGovee, useGoveeKey, useRemoveGovee } from './queries';
 
-export const GOVEE_KEY_HELP = 'https://developer.govee.com/reference/apply-you-govee-api-key';
+export const GOVEE_KEY_HELP = GOVEE_KEY_HELP_URL;
 
 function HowToGetKey() {
   return (

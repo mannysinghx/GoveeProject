@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_SETTINGS, type SessionDto, type SignupSettingsDto } from '@glm/shared';
+import { DEFAULT_SETTINGS, GOVEE_KEY_HELP_URL, type SessionDto, type SignupSettingsDto } from '@glm/shared';
 import { App } from '../../app/App';
 import { mockApi, renderApp } from '../../test/fixtures';
 import { leadingZeroBits, solveChallenge } from './proof-of-work';
@@ -72,6 +72,32 @@ describe('creating an account', () => {
     expect(meetsDifficulty(sent, 4)).toBe(true);
     // One email a minute: sending again waits.
     expect(screen.getByRole('button', { name: /Send again in \d+s/ })).toBeDisabled();
+  });
+
+  it('says how to get a Govee key and an AI key, with the low-cost models to pick', async () => {
+    mockApi({ 'GET /auth/session': { json: signedOut() } });
+    renderApp(<App />, { route: '/register' });
+    expect(await screen.findByRole('heading', { name: 'What you will need' })).toBeInTheDocument();
+    await userEvent.click(screen.getByText('A Govee API key, to control your lights'));
+    expect(screen.getByText(/Choose Apply for API Key/)).toBeVisible();
+    expect(screen.getByRole('link', { name: /Govee's guide/ })).toHaveAttribute('href', GOVEE_KEY_HELP_URL);
+    await userEvent.click(screen.getByText(/An AI key, if you want AI/));
+    const providers = screen.getAllByRole('link', { name: /: create a key/ });
+    // Lowest cost first, each to its own provider's site, in a new tab.
+    expect(providers.map((link) => link.textContent)).toEqual(['Z.ai GLM: create a key', 'Google Gemini: create a key', 'DeepSeek: create a key']);
+    expect(providers.map((link) => new URL(link.getAttribute('href')!).host)).toEqual(['z.ai', 'aistudio.google.com', 'platform.deepseek.com']);
+    for (const link of providers) expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('glm-4.7-flash')).toBeInTheDocument();
+    expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.getByText('$0.10 in, $0.40 out, per million tokens')).toBeInTheDocument();
+    expect(screen.getByText(/Add the key after signing in, in Settings under AI/)).toBeInTheDocument();
+  });
+
+  it('does not show the key guide when asking for a password reset', async () => {
+    mockApi({ 'GET /auth/session': { json: signedOut() } });
+    renderApp(<App />, { route: '/forgot' });
+    await screen.findByLabelText('Email');
+    expect(screen.queryByText('What you will need')).not.toBeInTheDocument();
   });
 
   it('keeps the bot trap out of sight and out of the tab order', async () => {

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Badge, Button, Card, ErrorNotice, Loading, Notice, PageHeader } from '../../components/ui';
 import { useDiagnostics, useDiscover, useSettings, useUpdateSettings } from '../../lib/queries';
 import { GOVEE_KEY_HELP, GoveeKeyForm } from '../account/GoveeKey';
+import { GoveeKeySteps } from '../account/KeyGuide';
 import { useGoveeKey } from '../account/queries';
 import { useSession } from '../auth/useSession';
 
@@ -49,10 +50,10 @@ export function ConnectPage() {
             </Notice>
           ) : status.canChange ? (
             <>
-              <p className="text-sm text-ink-300">
-                In the Govee Home app, open Settings and choose Apply for API Key. Govee emails the key to you. It is checked
-                with Govee before it is saved, and stored encrypted.
-              </p>
+              <div className="space-y-2 text-sm text-ink-300">
+                <GoveeKeySteps />
+                <p>Paste it below. It is checked with Govee before it is saved, and stored encrypted.</p>
+              </div>
               <GoveeKeyForm onConnected={() => discover.mutate()} />
             </>
           ) : (

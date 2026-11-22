@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { aiProviderIds, type AiProviderId, type PersonalAiDto } from '@glm/shared';
 import { Button, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
 import { dateTime } from '../../lib/format';
+import { AiKeyGuideList } from './KeyGuide';
 import { useConnectAiKey, usePersonalAi, useRemoveAiKey, useSetAiLimit } from './queries';
 
 const LABELS: Record<AiProviderId, string> = { deepseek: 'DeepSeek', gemini: 'Google Gemini', glm: 'Z.ai GLM' };
@@ -147,6 +148,14 @@ export function PersonalAiKeys() {
         <Notice tone="info">AI is off until you add a key of your own from DeepSeek, Google Gemini or Z.ai.</Notice>
       )}
       {remove.isError ? <ErrorNotice error={remove.error} /> : null}
+      {data.canAddKeys ? (
+        <details className="text-sm text-ink-300">
+          <summary className="cursor-pointer select-none font-medium text-ink-100">Where to get a key, and which model to pick</summary>
+          <div className="pt-2">
+            <AiKeyGuideList signedIn />
+          </div>
+        </details>
+      ) : null}
       {data.canAddKeys ? <AddKeyForm data={data} /> : null}
       {!data.canAddKeys ? <Notice tone="warn">This server cannot store keys yet. Its owner needs to set CREDENTIAL_KEYS.</Notice> : null}
       <MonthlyLimit data={data} />

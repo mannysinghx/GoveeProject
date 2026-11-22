@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PASSWORD_MIN_LENGTH } from '@glm/shared';
 import { Button, Card, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
+import { WhatYouNeed } from '../account/KeyGuide';
 import { LegalLinks } from '../legal/LegalPages';
 import {
   useCompleteSignup,
@@ -96,6 +97,7 @@ function EmailRequestPage({
   sentBody,
   mutation,
   legal,
+  help,
 }: {
   title: string;
   intro: string;
@@ -105,6 +107,8 @@ function EmailRequestPage({
   mutation: ReturnType<typeof useRegister>;
   /** A line under the button, such as what creating an account agrees to. */
   legal?: ReactNode;
+  /** Shown under the form, such as what to have ready. */
+  help?: ReactNode;
 }) {
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
@@ -154,6 +158,7 @@ function EmailRequestPage({
         </Button>
       </form>
       {legal ? <p className="mt-3 text-xs text-ink-400">{legal}</p> : null}
+      {help}
       <BackToSignIn />
       <LegalLinks />
     </AuthCard>
@@ -182,6 +187,7 @@ export function RegisterPage() {
           says.
         </>
       }
+      help={<WhatYouNeed />}
     />
   );
 }

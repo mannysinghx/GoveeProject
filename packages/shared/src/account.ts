@@ -115,6 +115,55 @@ export const adminAccountUpdateSchema = z.object({
 });
 export type AdminAccountUpdate = z.infer<typeof adminAccountUpdateSchema>;
 
+/* ------------------------------ where to get keys ------------------------------ */
+
+export const GOVEE_KEY_HELP_URL = 'https://developer.govee.com/reference/apply-you-govee-api-key';
+
+export interface AiKeyGuide {
+  provider: AiProviderId;
+  label: string;
+  /** Where the person creates a key, on the provider's own site. */
+  keyUrl: string;
+  /** The lowest-cost model this app offers for that provider. */
+  recommendedModel: string;
+  /** Listed paid price in USD per million tokens; 0 when the provider lists it as free. */
+  price: { input: number; output: number };
+  /** One line on cost and data, shown under the steps. */
+  note: string;
+}
+
+/**
+ * Cheapest first. Prices are the providers' own listings, checked on 22 November 2026, and
+ * match what the server counts against the monthly limit (apps/server/src/ai/providers.ts;
+ * a server test fails if they drift apart). DeepSeek is shown at its peak rate, as counted.
+ */
+export const AI_KEY_GUIDES: readonly AiKeyGuide[] = [
+  {
+    provider: 'glm',
+    label: 'Z.ai GLM',
+    keyUrl: 'https://z.ai/manage-apikey/apikey-list',
+    recommendedModel: 'glm-4.7-flash',
+    price: { input: 0, output: 0 },
+    note: 'Free on Z.ai. Data is processed in Singapore.',
+  },
+  {
+    provider: 'gemini',
+    label: 'Google Gemini',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    recommendedModel: 'gemini-2.5-flash-lite',
+    price: { input: 0.1, output: 0.4 },
+    note: 'Has a free tier. On the free tier, Google may use what you send to improve its products.',
+  },
+  {
+    provider: 'deepseek',
+    label: 'DeepSeek',
+    keyUrl: 'https://platform.deepseek.com/api_keys',
+    recommendedModel: 'deepseek-flash',
+    price: { input: 0.3, output: 1.2 },
+    note: 'Paid from a balance you top up, at half this price outside peak hours. Data is processed in China.',
+  },
+];
+
 /* ---------------------------------- limits ----------------------------------- */
 
 /** What one member's account may hold. The owner has no caps. */
