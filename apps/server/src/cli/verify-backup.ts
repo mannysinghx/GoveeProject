@@ -1,5 +1,5 @@
 import { loadConfig, loadDotEnv } from '../config/env.js';
-import { verifyBackup } from '../database/backup.js';
+import { migrationsDirFor, verifyBackup } from '../database/backup.js';
 
 /**
  * Checks a backup without changing it: its manifest (hash, size, row counts) when one is next
@@ -16,7 +16,8 @@ async function main(): Promise<void> {
   }
   loadDotEnv();
   const config = loadConfig();
-  const result = await verifyBackup(file, { migrationsDir: config.migrationsDir });
+  // The account file and the control database follow different migrations.
+  const result = await verifyBackup(file, { migrationsDir: migrationsDirFor(file, config.migrationsDir) });
   const rows = Object.values(result.report.tables).reduce((sum, n) => sum + n, 0);
 
   console.log(`File:        ${file}`);

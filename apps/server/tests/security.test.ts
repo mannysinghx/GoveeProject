@@ -31,7 +31,7 @@ describe('authentication', () => {
       const second = await inject(h.app, 'POST', '/api/v1/auth/setup', { username: 'attacker', password: 'another-long-password' });
       expect(second.statusCode).toBe(409);
       expect(second.json().error.code).toBe('setup_complete');
-      const rows = h.ctx.db.prepare('SELECT username FROM users').all();
+      const rows = h.platform.control.prepare('SELECT username FROM users').all();
       expect(rows).toEqual([{ username: 'owner' }]);
     });
 
@@ -41,7 +41,7 @@ describe('authentication', () => {
         inject(h.app, 'POST', '/api/v1/auth/setup', { username: 'b', password: PASSWORD }),
       ]);
       expect(results.map((r) => r.statusCode).sort()).toEqual([201, 409]);
-      expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM users').get()).toEqual({ n: 1 });
+      expect(h.platform.control.prepare('SELECT COUNT(*) AS n FROM users').get()).toEqual({ n: 1 });
     });
 
     it('rejects a short password', async () => {
@@ -98,17 +98,18 @@ describe('authentication', () => {
   describe('passwords', () => {
     it('stores an Argon2id hash, never the plaintext', async () => {
       await authedClient(h.app, PASSWORD);
-      const row = h.ctx.db.prepare('SELECT password_hash FROM users').get() as { password_hash: string };
+      const row = h.platform.control.prepare('SELECT password_hash FROM users').get() as { password_hash: string };
       expect(row.password_hash).toMatch(/^\$argon2id\$/);
       expect(row.password_hash).not.toContain(PASSWORD);
       const dump = JSON.stringify(h.ctx.db.prepare('SELECT * FROM activity_events').all());
       expect(dump).not.toContain(PASSWORD);
+      expect(JSON.stringify(h.platform.control.prepare('SELECT * FROM audit_events').all())).not.toContain(PASSWORD);
       expect(h.logs()).not.toContain(PASSWORD);
     });
 
     it('stores session tokens only as hashes', async () => {
       const client = await authedClient(h.app);
-      const rows = h.ctx.db.prepare('SELECT token_hash FROM sessions').all() as { token_hash: string }[];
+      const rows = h.platform.control.prepare('SELECT token_hash FROM sessions').all() as { token_hash: string }[];
       expect(rows).toHaveLength(1);
       expect(rows[0]?.token_hash).not.toBe(client.cookies.glm_session);
     });
@@ -163,7 +164,7 @@ describe('authentication', () => {
       expect((await client.get('/api/v1/devices')).statusCode).toBe(200);
       h.clock.advance(169 * 3600 * 1000); // TTL is 168 hours.
       expect((await client.get('/api/v1/devices')).statusCode).toBe(401);
-      expect(h.ctx.db.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 0 });
+      expect(h.platform.control.prepare('SELECT COUNT(*) AS n FROM sessions').get()).toEqual({ n: 0 });
     });
 
     it('ends the session on logout', async () => {

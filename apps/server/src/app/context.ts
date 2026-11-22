@@ -6,6 +6,7 @@ import { AiService } from '../ai/ai-service.js';
 import { AskTools } from '../ai/ask-tools.js';
 import { AiLedger } from '../ai/ledger.js';
 import { AuthService } from '../auth/auth-service.js';
+import { accountFileFor, cutoverOwner, LegacyOwnerMirror, openControlDatabase } from '../auth/control.js';
 import { ActionService } from '../commands/action-service.js';
 import { CommandQueue } from '../commands/command-queue.js';
 import { CommandStore } from '../commands/command-store.js';
@@ -28,6 +29,7 @@ import { GroupService } from '../groups/group-service.js';
 import { PresetService } from '../presets/preset-service.js';
 import { ScheduleService } from '../scheduler/schedule-service.js';
 import { Scheduler } from '../scheduler/scheduler.js';
+import { CredentialStore } from '../security/credentials.js';
 import { systemClock, type Clock } from '../shared/clock.js';
 import { createLogger, SecretRegistry, type Logger } from '../shared/logger.js';
 import { Maintenance } from '../system/maintenance.js';
@@ -87,10 +89,10 @@ export interface PlatformContext {
   logger: Logger;
   clock: Clock;
   secrets: SecretRegistry;
-  /**
-   * Sign-in and sessions. For now these live in the owner's database file, as they always
-   * have. Phase 3 of docs/public-signup-plan.md moves them to a control database.
-   */
+  /** Users, sessions, login attempts, encrypted credentials and the audit log. */
+  control: Db;
+  credentials: CredentialStore;
+  /** Sign-in and sessions, in the control database. */
   auth: AuthService;
   /** Set when setup needs a code and the code was generated rather than configured. */
   generatedSetupCode: string | null;
@@ -102,6 +104,8 @@ export interface ContextOverrides {
   clock?: Clock;
   /** The registry the logger scrubs with. Tests pass the one their logger was built with. */
   secrets?: SecretRegistry;
+  /** The control database. Tests may pass their own. */
+  controlDb?: Db;
   /** These apply to the owner's account. */
   transport?: LightTransport;
   db?: Db;
@@ -139,11 +143,18 @@ function resolveSetupCode(config: AppConfig): { code: string | null; generated: 
 
 /** Every secret the server's own configuration holds, so none can reach a log line or activity record. */
 export function configSecrets(config: AppConfig): (string | null)[] {
-  return [config.govee.apiKey, config.setupToken, ...config.ai.providers.map((p) => p.apiKey)];
+  return [
+    config.govee.apiKey,
+    config.setupToken,
+    ...config.ai.providers.map((p) => p.apiKey),
+    ...(config.credentialKeys?.encoded ?? []),
+  ];
 }
 
 interface AccountDeps {
   userId: number;
+  /** Where this account's Govee key comes from. Defaults to GOVEE_API_KEY. */
+  goveeKey?: () => string | null;
   logger: Logger;
   clock: Clock;
   secrets: SecretRegistry;
@@ -170,7 +181,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
   const transport =
     deps.transport ??
     new GoveeCloudTransport({
-      apiKey: config.govee.apiKey,
+      apiKey: deps.goveeKey ?? config.govee.apiKey,
       baseUrl: config.govee.baseUrl,
       timeoutMs: config.govee.timeoutMs,
     });
@@ -218,7 +229,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
   const maintenance = new Maintenance(db, deps.pruneSessions, activity, commands, devices, system, logger, clock, {
     historyRetentionDays: config.historyRetentionDays,
     discoveryRefreshHours: config.discoveryRefreshHours,
-    apiKeyConfigured: transport.isConfigured(),
+    apiKeyConfigured: () => transport.isConfigured(),
   });
 
   const connection = new ConnectionMonitor(
@@ -313,8 +324,78 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
 }
 
 /**
- * Builds the platform and the owner's account, which uses the existing database file at
- * DATABASE_PATH, unchanged. Tests pass overrides for the clock, transport and database.
+ * Where the owner's Govee key comes from, during the move from a Railway variable to an
+ * encrypted credential:
+ * - While GOVEE_API_KEY is set it is used, and the stored copy is kept the same, so changing
+ *   the variable in Railway still works as it always has, and removing it later is safe.
+ * - Without it, the stored copy is used, if CREDENTIAL_KEYS can read it.
+ * sync() runs once the owner exists in the control database: after the cutover at startup,
+ * and after first-run setup, because a stored key belongs to a user row.
+ */
+class OwnerGoveeKey {
+  private current: string | null;
+
+  constructor(
+    private readonly config: AppConfig,
+    private readonly credentials: CredentialStore,
+    private readonly secrets: SecretRegistry,
+    private readonly control: Db,
+    private readonly logger: Logger,
+    private readonly clock: Clock,
+  ) {
+    this.current = config.govee.apiKey;
+  }
+
+  readonly get = (): string | null => this.current;
+
+  sync(): void {
+    const fromVariable = this.config.govee.apiKey;
+    const ownerExists = this.control.prepare('SELECT 1 FROM users WHERE id = ?').get(OWNER_USER_ID) !== undefined;
+    if (!this.credentials.enabled()) {
+      if (fromVariable) this.logger.warn('CREDENTIAL_KEYS is not set, so the Govee key is not stored encrypted. It stays in GOVEE_API_KEY.');
+      this.current = fromVariable;
+      return;
+    }
+    if (!ownerExists) {
+      // Nothing to store a key against until setup makes the owner.
+      this.current = fromVariable;
+      return;
+    }
+    const stored = this.credentials.get(OWNER_USER_ID, 'govee');
+    if (fromVariable) {
+      if (!stored || 'error' in stored || stored.secret !== fromVariable) {
+        try {
+          this.credentials.put(OWNER_USER_ID, 'govee', fromVariable);
+          this.control
+            .prepare("INSERT INTO audit_events (created_at, user_id, event, ip, details_json) VALUES (?, 1, 'govee_key_stored', NULL, ?)")
+            .run(this.clock.nowIso(), JSON.stringify({ replaced: stored !== null }));
+          this.logger.info({ replaced: stored !== null }, 'Stored the Govee key encrypted, from GOVEE_API_KEY');
+        } catch (error) {
+          this.logger.warn({ err: error }, 'Could not store the Govee key encrypted. GOVEE_API_KEY is still used.');
+        }
+      }
+      this.current = fromVariable;
+      return;
+    }
+    if (!stored) {
+      this.current = null;
+      return;
+    }
+    if ('error' in stored) {
+      this.logger.error({ problem: stored.error }, 'The stored Govee key cannot be read. Set GOVEE_API_KEY, or restore CREDENTIAL_KEYS.');
+      this.current = null;
+      return;
+    }
+    this.secrets.add(stored.secret);
+    this.logger.info('Using the stored, encrypted Govee key');
+    this.current = stored.secret;
+  }
+}
+
+/**
+ * Builds the platform, the control database and the owner's account, which uses the existing
+ * database file at DATABASE_PATH, unchanged. On first start after this version, the owner's
+ * sign-in moves into the control database (see cutoverOwner). Tests pass overrides.
  */
 export function createPlatform(config: AppConfig, overrides: ContextOverrides = {}): PlatformContext {
   const secrets = overrides.secrets ?? new SecretRegistry();
@@ -323,8 +404,12 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
   const clock = overrides.clock ?? systemClock;
   const setup = resolveSetupCode(config);
 
-  // Sessions sit in the owner's file for now, so the owner's maintenance prunes them. The
-  // service is created just after the account, because it records to the account's activity.
+  const control = openControlDatabase(config, logger, overrides.controlDb);
+  const credentials = new CredentialStore(control, config.credentialKeys, clock);
+
+  const goveeKey = new OwnerGoveeKey(config, credentials, secrets, control, logger, clock);
+
+  // Sessions are in the control database, and the owner's maintenance prunes them hourly.
   let auth: AuthService | null = null;
   const owner = createAccountContext(config, {
     userId: OWNER_USER_ID,
@@ -332,18 +417,29 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     clock,
     secrets,
     pruneSessions: () => auth?.pruneExpiredSessions() ?? 0,
+    goveeKey: goveeKey.get,
     ...(overrides.db ? { db: overrides.db } : {}),
     ...(overrides.transport ? { transport: overrides.transport } : {}),
     ...(overrides.pushSender ? { pushSender: overrides.pushSender } : {}),
     ...(overrides.aiFetch ? { aiFetch: overrides.aiFetch } : {}),
   });
-  auth = new AuthService(owner.db, owner.activity, logger, clock, {
-    sessionTtlHours: config.sessionTtlHours,
-    setupCode: setup.code,
-  });
+
+  const ownerAccountFile = accountFileFor(config);
+  cutoverOwner(control, owner.db, ownerAccountFile, clock, logger);
+  goveeKey.sync();
 
   const accounts = new AccountRegistry();
   accounts.add(owner);
+
+  auth = new AuthService(
+    control,
+    // An attempt under a name nobody has goes to the owner's activity, as it always has.
+    (userId) => accounts.forUser(userId ?? OWNER_USER_ID)?.activity ?? null,
+    logger,
+    clock,
+    { sessionTtlHours: config.sessionTtlHours, setupCode: setup.code, ownerAccountFile, onOwnerCreated: () => goveeKey.sync() },
+    new LegacyOwnerMirror(owner.db),
+  );
 
   return {
     config,
@@ -352,6 +448,8 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     logger,
     clock,
     secrets,
+    control,
+    credentials,
     auth,
     generatedSetupCode: setup.generated ? setup.code : null,
     accounts,

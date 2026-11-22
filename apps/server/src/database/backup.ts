@@ -137,6 +137,28 @@ export function compareMigrations(applied: MigrationEntry[], available: Migratio
   };
 }
 
+/** The control database's backup sits next to the account file's, with ".control" before the extension. */
+export function controlBackupPathFor(accountBackup: string): string {
+  return accountBackup.endsWith('.sqlite') ? `${accountBackup.slice(0, -'.sqlite'.length)}.control.sqlite` : `${accountBackup}.control.sqlite`;
+}
+
+/**
+ * Which migrations a database file follows, judged from its tables rather than its name: the
+ * control database has credentials and an audit log, and no lights.
+ */
+export function migrationsDirFor(file: string, accountMigrationsDir: string): string {
+  const db = new Database(file, { readonly: true, fileMustExist: true });
+  try {
+    const names = new Set(
+      (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((r) => r.name),
+    );
+    const isControl = names.has('credentials') && names.has('audit_events') && !names.has('devices');
+    return isControl ? path.join(accountMigrationsDir, 'control') : accountMigrationsDir;
+  } finally {
+    db.close();
+  }
+}
+
 export function readManifest(file: string): BackupManifest | null {
   const manifestPath = manifestPathFor(file);
   if (!fs.existsSync(manifestPath)) return null;

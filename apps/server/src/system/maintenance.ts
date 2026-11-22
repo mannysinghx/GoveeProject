@@ -22,7 +22,8 @@ export class Maintenance {
     private readonly system: SystemState,
     private readonly logger: Logger,
     private readonly clock: Clock,
-    private readonly config: { historyRetentionDays: number; discoveryRefreshHours: number; apiKeyConfigured: boolean },
+    /** apiKeyConfigured is asked each time, because the key can arrive after startup. */
+    private readonly config: { historyRetentionDays: number; discoveryRefreshHours: number; apiKeyConfigured: () => boolean },
   ) {}
 
   start(): void {
@@ -43,7 +44,7 @@ export class Maintenance {
       this.logger.warn({ err: error }, 'History pruning failed');
     }
     const { discoveryRefreshHours, apiKeyConfigured } = this.config;
-    if (!apiKeyConfigured || discoveryRefreshHours <= 0) return;
+    if (!apiKeyConfigured() || discoveryRefreshHours <= 0) return;
     try {
       const last = this.system.lastDiscovery();
       // Discovery stays manual until the owner has run it once.

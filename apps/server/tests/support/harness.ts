@@ -123,6 +123,7 @@ export async function createHarness(
       await ctx.scheduler.stop();
       await app.close();
       ctx.db.close();
+      platform.control.close();
       await mock.stop();
     },
   };

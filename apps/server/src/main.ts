@@ -70,6 +70,7 @@ async function main(): Promise<void> {
       await accounts.stopBackground();
       await app.close();
       await accounts.stopCore();
+      platform.control.close();
       logger.info('Shutdown complete');
       process.exit(0);
     } catch (error) {

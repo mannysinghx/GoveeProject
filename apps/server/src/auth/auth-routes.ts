@@ -45,14 +45,16 @@ export function registerAuthRoutes(api: FastifyInstance, platform: PlatformConte
   });
 
   api.post('/auth/logout', async (request, reply) => {
-    if (request.session) auth.logout(request.session.tokenHash);
+    if (request.session) auth.logout(request.session);
     clearSessionCookie(reply, request, config);
     return reply.status(204).send();
   });
 
   api.post('/auth/change-password', async (request, reply) => {
     const body = parseInput(changePasswordRequestSchema, request.body);
+    // A signed-in route: the hook has already refused any request without a session.
     const { token, session } = await auth.changePassword(
+      request.session!.userId,
       body.currentPassword,
       body.newPassword,
       clientIp(request),

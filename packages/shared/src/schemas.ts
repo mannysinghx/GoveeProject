@@ -73,7 +73,8 @@ export const setupRequestSchema = z.object({
 export type SetupRequest = z.infer<typeof setupRequestSchema>;
 
 export const loginRequestSchema = z.object({
-  username: z.string().max(64),
+  /** A username or an email address, whichever the account has. */
+  username: z.string().max(254),
   password: z.string().max(256),
 });
 export type LoginRequest = z.infer<typeof loginRequestSchema>;

@@ -126,7 +126,7 @@ if [ "$BUILD_IMAGE" = true ]; then
   # The same script the owner runs against Railway, with docker exec in place of railway ssh.
   PULLED="$WORK/pulled"
   bash "$WORK/scripts/pull-backup.sh" --docker "$NAME" --out "$PULLED"
-  PULLED_FILE="$(find "$PULLED" -name '*.sqlite' | head -1)"
+  PULLED_FILE="$(find "$PULLED" -name '*.sqlite' ! -name '*.control.sqlite' | head -1)"
   [ -n "$PULLED_FILE" ] || { echo "No backup was saved" >&2; exit 1; }
   # Written through the app's own user. docker cp would keep this computer's owner, and the
   # read-only image's /tmp is a tmpfs that docker cp cannot reach.
@@ -138,9 +138,20 @@ if [ "$BUILD_IMAGE" = true ]; then
     exit 1
   fi
   grep "Manifest:    found" "$WORK/verify.txt" >/dev/null || { cat "$WORK/verify.txt" >&2; echo "The manifest did not come back" >&2; exit 1; }
+  # The control database: users, sessions and encrypted keys. It must come back too.
+  PULLED_CONTROL="${PULLED_FILE%.sqlite}.control.sqlite"
+  [ -f "$PULLED_CONTROL" ] || { echo "The control database backup did not come back" >&2; exit 1; }
+  docker exec -i "$NAME" sh -c 'cat > /data/ci-check.control.sqlite' < "$PULLED_CONTROL"
+  docker exec -i "$NAME" sh -c 'cat > /data/ci-check.control.sqlite.manifest.json' < "$PULLED_CONTROL.manifest.json"
+  if ! docker exec "$NAME" node apps/server/dist/cli/verify-backup.js /data/ci-check.control.sqlite >"$WORK/verify-control.txt" 2>&1; then
+    cat "$WORK/verify-control.txt" >&2
+    echo "The pulled control database backup did not verify" >&2
+    exit 1
+  fi
+  grep "latest 001_control.sql" "$WORK/verify-control.txt" >/dev/null || { cat "$WORK/verify-control.txt" >&2; echo "The control backup was not checked against the control migrations" >&2; exit 1; }
   LEFT="$(docker exec "$NAME" sh -c 'ls -A /data/backups 2>/dev/null || true')"
   [ -z "$LEFT" ] || { echo "Temporary backup files were left on the server: $LEFT" >&2; exit 1; }
-  echo "    pulled, hash matched, verified against its manifest and this build's migrations, nothing left behind"
+  echo "    pulled both databases, hashes matched, each verified against its manifest and migrations, nothing left behind"
 
   docker rm -f "$NAME" >/dev/null
   docker volume rm "glm-ci-data-${SHA:0:12}" >/dev/null

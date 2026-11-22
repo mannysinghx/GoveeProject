@@ -56,6 +56,10 @@ const envSchema = z.object({
   SETUP_TOKEN: optionalString,
 
   DATABASE_PATH: z.preprocess(emptyToUndefined, z.string().default('./data/govee-light-manager.sqlite')),
+  // Accounts, sessions and encrypted keys. Defaults to control.sqlite next to DATABASE_PATH.
+  CONTROL_DATABASE_PATH: optionalString,
+  // Master keys for stored credentials, newest first: "2:<base64 of 32 bytes>,1:<base64>".
+  CREDENTIAL_KEYS: optionalString,
   MIGRATIONS_DIR: optionalString,
   WEB_DIST_DIR: optionalString,
   LOG_LEVEL: z.preprocess(
@@ -125,7 +129,15 @@ export interface AppConfig {
   /** How many proxies are in front of the app. The client address is taken from that far along. */
   trustProxyHops: number;
   setupToken: string | null;
+  /** The owner's account file. */
   databasePath: string;
+  /** Accounts, sessions, login attempts, encrypted credentials and the audit log. */
+  controlDatabasePath: string;
+  /**
+   * Master keys for stored credentials, by version. Null when CREDENTIAL_KEYS is not set,
+   * in which case nothing is stored encrypted and the Govee key stays in GOVEE_API_KEY.
+   */
+  credentialKeys: CredentialKeys | null;
   migrationsDir: string;
   webDistDir: string;
   logLevel: string;
@@ -195,6 +207,34 @@ function resolveAiProviders(e: z.infer<typeof envSchema>): AiProviderConfig[] {
 
 export class ConfigError extends Error {}
 
+export interface CredentialKeys {
+  /** The version new credentials are encrypted with: the highest one given. */
+  current: number;
+  keys: Map<number, Buffer>;
+  /** The base64 text of each key, so the scrubber can hide them. */
+  encoded: string[];
+}
+
+/** Never puts a key's value in an error message. */
+export function parseCredentialKeys(raw: string): CredentialKeys {
+  const keys = new Map<number, Buffer>();
+  const encoded: string[] = [];
+  const entries = raw.split(',').map((e) => e.trim()).filter(Boolean);
+  if (entries.length === 0) throw new ConfigError('CREDENTIAL_KEYS is empty.');
+  entries.forEach((entry, index) => {
+    const match = /^(\d{1,4}):([A-Za-z0-9+/]+={0,2})$/.exec(entry);
+    if (!match) throw new ConfigError(`CREDENTIAL_KEYS entry ${index + 1} is not in the form <version>:<base64>.`);
+    const version = Number(match[1]);
+    const key = Buffer.from(match[2]!, 'base64');
+    if (version < 1) throw new ConfigError(`CREDENTIAL_KEYS entry ${index + 1}: versions start at 1.`);
+    if (key.length !== 32) throw new ConfigError(`CREDENTIAL_KEYS version ${version} must be 32 bytes, base64 encoded. It is ${key.length}.`);
+    if (keys.has(version)) throw new ConfigError(`CREDENTIAL_KEYS lists version ${version} twice.`);
+    keys.set(version, key);
+    encoded.push(match[2]!);
+  });
+  return { current: Math.max(...keys.keys()), keys, encoded };
+}
+
 /**
  * The API key is sent to whatever base URL is configured, so only the official
  * host is accepted, plus loopback for the local test server. A typo or a hostile
@@ -231,6 +271,17 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const { baseUrl, local } = validateGoveeBaseUrl(e.GOVEE_API_BASE_URL);
 
   const resolveFromRoot = (p: string) => (path.isAbsolute(p) ? p : path.resolve(PROJECT_ROOT, p));
+  const databasePath = e.DATABASE_PATH === ':memory:' ? ':memory:' : resolveFromRoot(e.DATABASE_PATH);
+  const controlDatabasePath = e.CONTROL_DATABASE_PATH
+    ? e.CONTROL_DATABASE_PATH === ':memory:'
+      ? ':memory:'
+      : resolveFromRoot(e.CONTROL_DATABASE_PATH)
+    : databasePath === ':memory:'
+      ? ':memory:'
+      : path.join(path.dirname(databasePath), 'control.sqlite');
+  if (controlDatabasePath !== ':memory:' && controlDatabasePath === databasePath) {
+    throw new ConfigError('CONTROL_DATABASE_PATH must be a different file from DATABASE_PATH.');
+  }
 
   return {
     env: e.NODE_ENV,
@@ -245,7 +296,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     trustProxy: e.TRUST_PROXY > 0,
     trustProxyHops: e.TRUST_PROXY,
     setupToken: e.SETUP_TOKEN ?? null,
-    databasePath: e.DATABASE_PATH === ':memory:' ? ':memory:' : resolveFromRoot(e.DATABASE_PATH),
+    databasePath,
+    controlDatabasePath,
+    credentialKeys: e.CREDENTIAL_KEYS ? parseCredentialKeys(e.CREDENTIAL_KEYS) : null,
     migrationsDir: resolveFromRoot(e.MIGRATIONS_DIR ?? './migrations'),
     webDistDir: resolveFromRoot(e.WEB_DIST_DIR ?? './apps/web/dist'),
     logLevel: e.LOG_LEVEL,

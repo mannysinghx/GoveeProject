@@ -8,7 +8,8 @@
 #   bash scripts/pull-backup.sh --docker CONTAINER   A local container instead of Railway (used by the CI)
 #
 # What it does on the server: makes a backup with the app's own backup command (SQLite's online
-# backup, safe while the app runs) under /data/backups, sends it back compressed and base64
+# backup, safe while the app runs) of the account file and, when there is one, the control
+# database (users, sessions, encrypted keys), under /data/backups, sends it back compressed and base64
 # encoded with its SHA-256 and size, then deletes that temporary copy. Nothing else on the server
 # changes, and the live database is only read.
 #
@@ -43,15 +44,17 @@ node apps/server/dist/cli/backup.js "$f" >&2
 node -e '
 const fs = require("fs"), zlib = require("zlib"), crypto = require("crypto");
 const f = process.argv[1];
+const control = f.replace(/\.sqlite$/, ".control.sqlite");
 const send = (tag, buf) => process.stdout.write(
   "GLM-" + tag + "-BEGIN " + crypto.createHash("sha256").update(buf).digest("hex") + " " + buf.length + "\n" +
   zlib.gzipSync(buf).toString("base64").replace(/.{1,76}/g, "$&\n") + "GLM-" + tag + "-END\n");
 try {
   send("DB", fs.readFileSync(f));
   if (fs.existsSync(f + ".manifest.json")) send("MANIFEST", fs.readFileSync(f + ".manifest.json"));
+  if (fs.existsSync(control)) send("CONTROL", fs.readFileSync(control));
+  if (fs.existsSync(control + ".manifest.json")) send("CONTROLMANIFEST", fs.readFileSync(control + ".manifest.json"));
 } finally {
-  fs.rmSync(f, { force: true });
-  fs.rmSync(f + ".manifest.json", { force: true });
+  for (const file of [f, f + ".manifest.json", control, control + ".manifest.json"]) fs.rmSync(file, { force: true });
 }
 ' "$f"
 SH
@@ -101,18 +104,32 @@ const manifest = take("MANIFEST");
 if (manifest) fs.writeFileSync(dest + ".manifest.json", manifest.buf, { flag: "wx", mode: 0o600 });
 console.log("Saved " + dest + " (" + db.buf.length + " bytes, sha256 " + db.sha + ", matches the server)");
 if (manifest) console.log("Saved " + dest + ".manifest.json");
+// Users, sessions and encrypted keys. There is none on a server older than the control database.
+const controlDest = dest.replace(/\.sqlite$/, ".control.sqlite");
+const control = take("CONTROL");
+if (control) {
+  fs.writeFileSync(controlDest, control.buf, { flag: "wx", mode: 0o600 });
+  console.log("Saved " + controlDest + " (" + control.buf.length + " bytes, sha256 " + control.sha + ", matches the server)");
+  const controlManifest = take("CONTROLMANIFEST");
+  if (controlManifest) fs.writeFileSync(controlDest + ".manifest.json", controlManifest.buf, { flag: "wx", mode: 0o600 });
+} else {
+  console.log("No control database came back (expected on a server older than it).");
+}
 ' "$RAW" "$DEST"
 
 if command -v sqlite3 >/dev/null 2>&1; then
-  # Opened as immutable: read-only, no locks, and no -wal or -shm files created beside it,
-  # even for a copy still in WAL mode. Characters with meaning in a URI are escaped.
-  URI_PATH="${DEST//%/%25}"; URI_PATH="${URI_PATH//\?/%3f}"; URI_PATH="${URI_PATH//#/%23}"
-  RESULT="$(sqlite3 "file:${URI_PATH}?immutable=1" 'PRAGMA integrity_check;')"
-  if [ "$RESULT" != "ok" ]; then
-    echo "SQLite's integrity check FAILED on the copy: $RESULT" >&2
-    exit 1
-  fi
-  echo "SQLite integrity check: ok"
+  for FILE in "$DEST" "${DEST%.sqlite}.control.sqlite"; do
+    [ -f "$FILE" ] || continue
+    # Opened as immutable: read-only, no locks, and no -wal or -shm files created beside it,
+    # even for a copy still in WAL mode. Characters with meaning in a URI are escaped.
+    URI_PATH="${FILE//%/%25}"; URI_PATH="${URI_PATH//\?/%3f}"; URI_PATH="${URI_PATH//#/%23}"
+    RESULT="$(sqlite3 "file:${URI_PATH}?immutable=1" 'PRAGMA integrity_check;')"
+    if [ "$RESULT" != "ok" ]; then
+      echo "SQLite's integrity check FAILED on $FILE: $RESULT" >&2
+      exit 1
+    fi
+    echo "SQLite integrity check: ok ($(basename "$FILE"))"
+  done
 else
   echo "sqlite3 is not installed here, so the integrity check was skipped. Run: npm run db:verify -- $DEST"
 fi

@@ -1,5 +1,5 @@
 import { loadConfig, loadDotEnv } from '../config/env.js';
-import { restoreBackup } from '../database/backup.js';
+import { migrationsDirFor, restoreBackup } from '../database/backup.js';
 
 /**
  * Restores a backup. The app must be stopped: the restore refuses while anything has the
@@ -22,7 +22,9 @@ async function main(): Promise<void> {
   }
   loadDotEnv();
   const config = loadConfig();
-  const result = await restoreBackup({ backup, target, replace, migrationsDir: config.migrationsDir });
+  // The account file and the control database follow different migrations. Restore each
+  // to its own file: the account backup to DATABASE_PATH, the .control one to the control database.
+  const result = await restoreBackup({ backup, target, replace, migrationsDir: migrationsDirFor(backup, config.migrationsDir) });
   console.log(`Restored ${backup} to ${result.target}.`);
   console.log(`Checked: integrity ok, row counts match the backup in all ${Object.keys(result.verified.report.tables).length} tables.`);
   if (result.movedAside.length > 0) {

@@ -23,7 +23,11 @@ const PATHS = {
 } as const;
 
 export interface CloudTransportOptions {
-  apiKey: string | null;
+  /**
+   * The key, or a function that returns the current one. A function lets the key come from the
+   * account's encrypted credential and change without rebuilding the transport.
+   */
+  apiKey: string | null | (() => string | null);
   baseUrl: string;
   timeoutMs: number;
   fetchImpl?: typeof fetch;
@@ -159,8 +163,13 @@ export class GoveeCloudTransport implements LightTransport {
     this.fetchImpl = options.fetchImpl ?? fetch;
   }
 
+  private currentKey(): string | null {
+    const { apiKey } = this.options;
+    return typeof apiKey === 'function' ? apiKey() : apiKey;
+  }
+
   isConfigured(): boolean {
-    return this.options.apiKey !== null;
+    return this.currentKey() !== null;
   }
 
   async discoverDevices(context?: RequestContext): Promise<RawDevice[]> {
@@ -234,7 +243,8 @@ export class GoveeCloudTransport implements LightTransport {
   }
 
   private async request(method: 'GET' | 'POST', path: string, body?: unknown): Promise<HttpResult> {
-    const { apiKey, baseUrl, timeoutMs, onRateLimitInfo } = this.options;
+    const { baseUrl, timeoutMs, onRateLimitInfo } = this.options;
+    const apiKey = this.currentKey();
     if (!apiKey) {
       throw new TransportError(
         'not_configured',

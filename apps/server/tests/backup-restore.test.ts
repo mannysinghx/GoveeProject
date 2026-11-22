@@ -9,6 +9,8 @@ import { PROJECT_ROOT } from '../src/config/env.js';
 import { openDatabase } from '../src/database/database.js';
 import {
   BackupError,
+  controlBackupPathFor,
+  migrationsDirFor,
   createVerifiedBackup,
   databaseInUse,
   inspectDatabase,
@@ -22,6 +24,7 @@ import { authedClient, createHarness, type Harness } from './support/harness.js'
 import { mockBasicDevice, mockFullDevice } from './support/mock-govee.js';
 
 const MIGRATIONS = path.join(PROJECT_ROOT, 'migrations');
+const CONTROL_MIGRATIONS = path.join(MIGRATIONS, 'control');
 const PASSWORD = 'correct-horse-battery';
 
 /** A restore drill: real app, real file, backed up while running, restored, and run again. */
@@ -98,7 +101,9 @@ describe('backup and restore', () => {
     expect(manifest.integrity).toBe('ok');
     expect(manifest.sha256).toBe(await sha256File(file));
     expect(manifest.latestMigration).toBe(fs.readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort().at(-1));
-    expect(manifest.tables).toMatchObject({ users: 1, sessions: 1, groups: 1, schedules: 1 });
+    expect(manifest.tables).toMatchObject({ groups: 1, schedules: 1 });
+    // Sign-in lives in the control database now. The owner's file keeps its old, empty tables.
+    expect(manifest.tables).toMatchObject({ users: 0, sessions: 0 });
     expect(manifest.tables.devices).toBe(2);
     expect(manifest.tables.presets).toBeGreaterThanOrEqual(1);
     expect(manifest.tables.command_history).toBeGreaterThanOrEqual(1);
@@ -106,22 +111,42 @@ describe('backup and restore', () => {
     const verified = await verifyBackup(file, { migrationsDir: MIGRATIONS });
     expect(verified.problems).toEqual([]);
     expect(verified.compatibility).toEqual({ unknown: [], changed: [], pending: [] });
-    // One self-contained file and its manifest: no -wal, -shm or partial files, even after checking it.
-    expect(fs.readdirSync(path.join(dir, 'backups')).sort()).toEqual(['one.sqlite', 'one.sqlite.manifest.json']);
+
+    // The control database, with the owner and their session, checked against its own migrations.
+    const control = await createVerifiedBackup(path.join(dir, 'control.sqlite'), controlBackupPathFor(file));
+    expect(control.file).toBe(path.join(dir, 'backups', 'one.control.sqlite'));
+    expect(control.manifest.tables).toMatchObject({ users: 1, sessions: 1 });
+    expect(migrationsDirFor(control.file, MIGRATIONS)).toBe(CONTROL_MIGRATIONS);
+    expect(migrationsDirFor(file, MIGRATIONS)).toBe(MIGRATIONS);
+    expect((await verifyBackup(control.file, { migrationsDir: CONTROL_MIGRATIONS })).problems).toEqual([]);
+    // Checked against the wrong migrations, it is refused rather than passed.
+    expect((await verifyBackup(control.file, { migrationsDir: MIGRATIONS })).problems.join(' ')).toContain('newer version');
+
+    // Self-contained files and their manifests: no -wal, -shm or partial files, even after checking them.
+    expect(fs.readdirSync(path.join(dir, 'backups')).sort()).toEqual([
+      'one.control.sqlite',
+      'one.control.sqlite.manifest.json',
+      'one.sqlite',
+      'one.sqlite.manifest.json',
+    ]);
   });
 
   it('restores a copy the app runs on: same rows, same next run times, and the same password signs in', async () => {
     const original = await seededApp();
     const { file, manifest } = await createVerifiedBackup(live, path.join(dir, 'one.sqlite'));
+    const control = await createVerifiedBackup(path.join(dir, 'control.sqlite'), controlBackupPathFor(file));
     const runsBefore = nextRuns(file);
     await stopApp(original);
 
     const restoredPath = path.join(dir, 'restored', 'db.sqlite');
+    const restoredControl = path.join(dir, 'restored', 'control.sqlite');
     const result = await restoreBackup({ backup: file, target: restoredPath, replace: false, migrationsDir: MIGRATIONS });
+    await restoreBackup({ backup: control.file, target: restoredControl, replace: false, migrationsDir: CONTROL_MIGRATIONS });
     expect(result.movedAside).toEqual([]);
     expect(inspectDatabase(restoredPath).tables).toEqual(manifest.tables);
+    expect(inspectDatabase(restoredControl).tables).toEqual(control.manifest.tables);
     expect(nextRuns(restoredPath)).toEqual(runsBefore);
-    expect(fs.readdirSync(path.dirname(restoredPath))).toEqual(['db.sqlite']);
+    expect(fs.readdirSync(path.dirname(restoredPath)).sort()).toEqual(['control.sqlite', 'db.sqlite']);
 
     const restored = await startApp(restoredPath);
     expect(restored.logs()).toContain('"applied":0');
