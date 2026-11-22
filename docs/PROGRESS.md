@@ -297,6 +297,8 @@ bash scripts/ci-local.sh --image
 
 ## Proposals not started
 
+- **Sharing designs between accounts** (asked 22 November 2026): [the plan](sharing-plan.md). Decisions D1 to D4 made by the owner (copies of designs, live with owner moderation, display names, match then confirm). Nothing built; phases S1 to S4 wait for the owner's go-ahead.
+
 - **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Being built: Phases 1 to 5 are done, see "Public sign-up" under "In flight". Still open: P8 (terms and privacy policy, the owner's).
 - Letting other people sign up, invite-only: [the plan](multi-user-plan.md). On 9 November 2026 the owner said no sign-up was needed. The 21 November request above supersedes that, and reuses its design.
 - AI features for the owner's own account, free to use, with a monthly spending cap: [the plan](ai-features-plan.md). It is waiting on the decisions listed in it, and nothing is built.
