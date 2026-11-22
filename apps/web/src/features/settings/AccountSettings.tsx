@@ -110,7 +110,7 @@ export function SignupSettings() {
       <div className="space-y-4">
         {!data.mailConfigured ? (
           <Notice tone="warn">
-            Email is not set up on the server, so sign-up cannot be turned on. Set SMTP_HOST, SMTP_USER and SMTP_PASSWORD.
+            Email is not set up yet, so sign-up cannot be turned on.
           </Notice>
         ) : null}
         <p className="text-sm text-ink-300">

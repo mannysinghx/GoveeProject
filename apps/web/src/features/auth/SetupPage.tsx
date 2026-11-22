@@ -44,9 +44,7 @@ function Welcome({ onContinue }: { onContinue: () => void }) {
               </a>
             </p>
             <p className="mt-2 text-sm text-ink-300">
-              Set it on the server as <code className="font-mono text-ink-100">GOVEE_API_KEY</code> in your{' '}
-              <code className="font-mono text-ink-100">.env</code> file and restart the app, or connect it after setup on the
-              Connect page. A key connected there is checked with Govee, stored encrypted, and never shown again.
+              Connect it after setup, on the Connect page. It is checked with Govee, stored encrypted, and never shown again.
             </p>
           </div>
         </li>
@@ -105,7 +103,7 @@ function OwnerForm({ setupCodeRequired }: { setupCodeRequired: boolean }) {
         {setupCodeRequired ? (
           <Field
             label="Setup code"
-            hint="This app is reachable from other computers, so a code is required. Find it in the server log, or use your SETUP_TOKEN."
+            hint="The one-time code given when this app was installed."
           >
             {(props) => (
               <input

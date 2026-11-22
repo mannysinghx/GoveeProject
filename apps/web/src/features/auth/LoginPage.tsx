@@ -78,10 +78,6 @@ export function LoginPage({ signupOpen }: { signupOpen: boolean }) {
           </p>
         ) : null}
       </div>
-      <p className="mt-4 text-xs text-ink-400">
-        If your account has no email address yet, reset the password on the server with{' '}
-        <code className="font-mono">npm run reset-password</code>. See docs/security.md.
-      </p>
       <LegalLinks />
     </AuthCard>
   );

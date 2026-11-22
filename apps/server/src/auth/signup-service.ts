@@ -92,7 +92,7 @@ export class SignupService {
   updateSettings(update: SignupSettingsUpdate, userId: number, ip: string): SignupSettingsDto {
     const next = { ...this.settings(), ...update };
     if (next.enabled && !this.deps.outbox.configured()) {
-      throw new AppError(409, 'mail_not_configured', 'Sign-up needs email. Set SMTP_HOST, SMTP_USER and SMTP_PASSWORD first.');
+      throw new AppError(409, 'mail_not_configured', 'Sign-up needs email, which is not set up yet.');
     }
     this.control
       .prepare(

@@ -68,7 +68,7 @@ export class CredentialStore {
    * itself, such as an AI key stored with its model.
    */
   put(userId: number, kind: CredentialKind, secret: string, identity: string = secret): void {
-    if (!this.keys) throw new AppError(503, 'credentials_unavailable', 'Keys cannot be stored on this server yet.');
+    if (!this.keys) throw new AppError(503, 'credentials_unavailable', 'Keys cannot be added right now. Please try again later.');
     const version = this.keys.current;
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv('aes-256-gcm', this.keys.keys.get(version)!, iv);

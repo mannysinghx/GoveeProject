@@ -88,7 +88,7 @@ export class AccountService {
 
   private requireStorage(): void {
     if (!this.deps.credentials.enabled()) {
-      throw new AppError(503, 'credentials_unavailable', 'This server cannot store keys yet. Ask its owner to set CREDENTIAL_KEYS.');
+      throw new AppError(503, 'credentials_unavailable', 'Keys cannot be added right now. Please try again later.');
     }
   }
 
@@ -116,7 +116,7 @@ export class AccountService {
         source: 'server',
         connectedAt: null,
         canChange: false,
-        note: 'The key is set on the server as GOVEE_API_KEY. Change it there.',
+        note: "Your key is set in the app's hosting settings. Change it there.",
       };
     }
     const stored = this.deps.credentials.list(session.userId).find((info) => info.kind === 'govee');
@@ -126,14 +126,14 @@ export class AccountService {
       source: stored ? 'account' : null,
       connectedAt: stored?.updatedAt ?? null,
       canChange,
-      note: canChange ? null : 'This server cannot store keys yet. Its owner needs to set CREDENTIAL_KEYS.',
+      note: canChange ? null : 'Keys cannot be added right now. Please try again later.',
     };
   }
 
   async connectGovee(session: SessionInfo, apiKey: string, ip: string): Promise<GoveeKeyStatusDto> {
     const { userId } = session;
     if (session.role === 'owner' && this.deps.config.govee.apiKey) {
-      throw new AppError(409, 'govee_key_on_server', 'Your key is set on the server as GOVEE_API_KEY. Change it there.');
+      throw new AppError(409, 'govee_key_on_server', "Your key is set in the app's hosting settings. Change it there.");
     }
     this.requireStorage();
     this.limitKeyChecks(userId);
@@ -158,7 +158,7 @@ export class AccountService {
 
   removeGovee(session: SessionInfo, ip: string): GoveeKeyStatusDto {
     if (session.role === 'owner' && this.deps.config.govee.apiKey) {
-      throw new AppError(409, 'govee_key_on_server', 'Your key is set on the server as GOVEE_API_KEY. Remove it there.');
+      throw new AppError(409, 'govee_key_on_server', "Your key is set in the app's hosting settings. Remove it there.");
     }
     this.deps.credentials.remove(session.userId, 'govee');
     this.keyChanged(session);
@@ -196,7 +196,7 @@ export class AccountService {
 
   private requireMember(session: SessionInfo): void {
     if (session.role !== 'member') {
-      throw new AppError(409, 'ai_keys_on_server', 'Your AI keys and limit are set on the server, in its variables.');
+      throw new AppError(409, 'ai_keys_on_server', "Your AI keys and limit are set in the app's hosting settings.");
     }
   }
 

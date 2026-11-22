@@ -386,7 +386,7 @@ export function ScheduleEditor({ schedule, onClose }: { schedule: ScheduleDto | 
                 />
               )}
             </Field>
-            <Field label="Latitude" hint="Entered by hand and calculated on this server. No location service is used.">
+            <Field label="Latitude" hint="Entered by hand. No location service is used.">
               {(props) => (
                 <input {...props} type="number" step="any" min={-90} max={90} className={inputClass} required value={latitude} onChange={(e) => setLatitude(e.target.value)} />
               )}

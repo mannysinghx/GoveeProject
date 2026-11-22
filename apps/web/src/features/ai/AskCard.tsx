@@ -13,8 +13,8 @@ const SUGGESTIONS = [
 ];
 
 const UNAVAILABLE: Record<NonNullable<AiStatusDto['reason']>, string> = {
-  disabled: 'AI is turned off on this server.',
-  no_providers: 'No AI provider is set up yet. Add a DeepSeek, Gemini or GLM key on the server to turn this on.',
+  disabled: 'AI is turned off.',
+  no_providers: 'AI is not set up yet.',
   no_key: 'Add your own DeepSeek, Gemini or GLM key in Settings, under AI, to turn this on.',
   limit_reached: "This month's AI spending limit has been reached. It resets on the 1st.",
 };

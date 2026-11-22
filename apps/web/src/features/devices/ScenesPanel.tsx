@@ -7,7 +7,7 @@ import { timeAgo } from '../../lib/format';
 import { useApplyScene, useRefreshScenes, useScenes } from '../../lib/queries';
 
 export const SCENE_KIND_LABEL: Record<SceneKind, { label: string; description: string }> = {
-  dynamic: { label: 'Govee scene', description: 'A Govee-provided scene from the scenes endpoint.' },
+  dynamic: { label: 'Govee scene', description: 'A scene provided by Govee.' },
   static: { label: 'Govee scene', description: 'A Govee-provided scene listed with the device.' },
   diy: { label: 'Govee DIY scene', description: 'A DIY scene made in the Govee Home app. It can be activated here, not edited.' },
   snapshot: { label: 'Govee snapshot', description: 'A saved snapshot from the Govee Home app.' },

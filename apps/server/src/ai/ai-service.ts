@@ -229,9 +229,9 @@ export class AiService {
 
   private assertCanAsk(): void {
     const status = this.status();
-    if (status.reason === 'disabled') throw new AppError(503, 'ai_disabled', 'AI features are turned off on this server.');
+    if (status.reason === 'disabled') throw new AppError(503, 'ai_disabled', 'AI is turned off.');
     if (status.reason === 'no_providers') {
-      throw new AppError(503, 'ai_not_configured', 'No AI provider is set up. Add a DeepSeek, Gemini or GLM key on the server.');
+      throw new AppError(503, 'ai_not_configured', 'AI is not set up yet.');
     }
     if (status.reason === 'no_key') {
       throw new AppError(503, 'ai_no_key', 'Add your own DeepSeek, Gemini or GLM key in Settings to use AI.');
@@ -289,7 +289,7 @@ export class AiService {
     }
     const gate = this.options.gate;
     if (gate && !gate.tryEnter()) {
-      throw new AppError(503, 'ai_server_busy', 'The server is answering many AI requests right now. Try again in a minute.', undefined, 30);
+      throw new AppError(503, 'ai_server_busy', 'AI is busy right now. Try again in a minute.', undefined, 30);
     }
     this.recent.push(now);
     this.busy = true;

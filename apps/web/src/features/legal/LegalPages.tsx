@@ -45,7 +45,7 @@ export function PrivacyPage() {
 
       <H2>What is stored</H2>
       <ul className="list-disc space-y-1 pl-5">
-        <li>Your email address, and your password as an Argon2id hash. The password itself is never stored.</li>
+        <li>Your email address, and a secure one-way hash of your password. The password itself is never stored.</li>
         <li>Sign-in history: when you signed in and from which network address, kept to protect your account.</li>
         <li>Your Govee API key and any AI keys you add, encrypted. They are never shown again, not even to you.</li>
         <li>Your lights as Govee reports them, and the groups, presets and schedules you make.</li>
@@ -63,12 +63,12 @@ export function PrivacyPage() {
           your Govee key, sign-in history or location. DeepSeek processes data in China; on Gemini&apos;s free tier Google may
           use it to improve its products; Z.ai processes data in Singapore.
         </li>
-        <li>Sign-up, password and address emails, sent through our mailbox at Namecheap Private Email.</li>
+        <li>Sign-up, password and address emails, sent through our email provider.</li>
         <li>Phone alerts, if you turn them on, through your browser&apos;s push service.</li>
       </ul>
       <p>
         There are no ads, no analytics, and no scripts from anyone else. The only cookie is the one that keeps you signed in. Each
-        account&apos;s lights and records are kept in a file of its own.
+        account&apos;s lights and records are kept apart from every other account&apos;s.
       </p>
 
       <H2>Your choices</H2>

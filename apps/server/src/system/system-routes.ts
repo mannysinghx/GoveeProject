@@ -32,7 +32,8 @@ export function registerSystemRoutes(api: FastifyInstance, platform: PlatformCon
     const counts = devices.repository.counts();
     return {
       version,
-      nodeVersion: process.version,
+      // Runtime and service details are for the owner only.
+      nodeVersion: request.session?.role === 'owner' ? process.version : null,
       uptimeSeconds: Math.floor((clock.nowMs() - platform.startedAt) / 1000),
       backend: 'ok',
       database: {
@@ -44,7 +45,7 @@ export function registerSystemRoutes(api: FastifyInstance, platform: PlatformCon
       govee: {
         keyConfigured: transport.isConfigured(),
         usingLocalTestEndpoint: config.govee.usingLocalTestEndpoint,
-        baseUrl: config.govee.baseUrl,
+        baseUrl: request.session?.role === 'owner' ? config.govee.baseUrl : null,
         lastSuccessfulConnectionAt: system.lastSuccessfulConnection(),
         lastErrorCategory: system.lastErrorCategory(),
         lastErrorAt: system.lastErrorAt(),

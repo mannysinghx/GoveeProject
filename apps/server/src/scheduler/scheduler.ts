@@ -171,7 +171,7 @@ export class Scheduler {
           this.activity.record({
             eventType: 'schedule',
             outcome: 'failure',
-            message: `Schedule "${row.name}" could not be processed. See the server log.`,
+            message: `Schedule "${row.name}" could not be processed.`,
           });
         }
       }

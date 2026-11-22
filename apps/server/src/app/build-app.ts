@@ -123,7 +123,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
     reply.header('x-request-id', request.id);
     if (request.routeOptions.config.anyHost) return;
     if (allowedHosts && !allowedHosts.has(hostnameOf(request.headers.host))) {
-      throw new AppError(421, 'host_not_allowed', 'This host name is not allowed. Set ALLOWED_HOSTS on the server.');
+      throw new AppError(421, 'host_not_allowed', 'This address is not served here.');
     }
   });
 
@@ -170,7 +170,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
     request.log.error({ err: error }, 'Unhandled error');
     void reply
       .status(500)
-      .send(errorBody(request, 'internal_error', 'Something went wrong on the server. See the server log.'));
+      .send(errorBody(request, 'internal_error', 'Something went wrong. Please try again.'));
   });
 
   await app.register(
@@ -186,7 +186,7 @@ export async function buildApp(platform: PlatformContext): Promise<FastifyInstan
           throw new AppError(401, 'unauthenticated', 'Sign in to continue.');
         }
         if (request.routeOptions.config.owner && request.session.role !== 'owner') {
-          throw new AppError(404, 'not_found', 'That endpoint does not exist.');
+          throw new AppError(404, 'not_found', 'Not found.');
         }
         if (!request.account) {
           throw new AppError(503, 'account_unavailable', 'Your account is not available right now. Try again in a minute.');
@@ -248,7 +248,7 @@ async function registerFrontend(app: FastifyInstance, platform: PlatformContext)
       if (!platform.auth.validateSession(request.cookies[SESSION_COOKIE])) {
         return reply.status(401).send(errorBody(request, 'unauthenticated', 'Sign in to continue.'));
       }
-      return reply.status(404).send(errorBody(request, 'not_found', 'That endpoint does not exist.'));
+      return reply.status(404).send(errorBody(request, 'not_found', 'Not found.'));
     }
     // Page addresses get the app. A missing file gets a real 404, not HTML posing as a script.
     const isFile = /\.[a-z0-9]+$/i.test(request.url.split('?')[0] ?? '');
@@ -257,6 +257,6 @@ async function registerFrontend(app: FastifyInstance, platform: PlatformContext)
     }
     return reply
       .status(404)
-      .send(errorBody(request, 'not_found', hasFrontend ? 'Not found.' : 'The web app has not been built. Run npm run build.'));
+      .send(errorBody(request, 'not_found', 'Not found.'));
   });
 }

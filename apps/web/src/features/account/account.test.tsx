@@ -94,7 +94,7 @@ describe('Govee API key in Settings', () => {
       'GET /account/govee': { json: keyStatus({ connected: true, source: 'server', canChange: false, note: 'Set on the server.' }) },
     });
     renderApp(<GoveeKeySettings />);
-    expect(await screen.findByText(/is set on the server as/)).toBeInTheDocument();
+    expect(await screen.findByText(/is set in the app's hosting settings/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Govee API key')).not.toBeInTheDocument();
   });
 });

@@ -29,7 +29,7 @@ const OUTCOME_LABEL: Record<ActivityOutcome, string> = {
 const TROUBLESHOOTING: Partial<Record<NonNullable<DiagnosticsDto['govee']['lastErrorCategory']>, string>> = {
   auth: 'Govee rejected the key. Check it in Settings, under Govee API key. Applying for a new key may replace the old one.',
   not_configured: 'Connect a Govee API key in Settings, under Govee API key.',
-  network: "This server could not reach Govee. Check its internet connection and DNS.",
+  network: 'The app could not reach Govee. This is usually temporary.',
   timeout: 'Govee did not answer in time. This is often temporary. Try again shortly.',
   rate_limited: 'Too many requests. The app slows down by itself. Wait a minute before trying again.',
   server_error: 'The Govee service returned an error. This is usually temporary.',
@@ -47,7 +47,7 @@ function Diagnostics() {
       {d.govee.usingLocalTestEndpoint ? (
         <div className="mb-4">
           <Notice tone="warn" title="Test mode">
-            This server uses a local test endpoint ({d.govee.baseUrl}), not the Govee cloud.
+            This app is not connected to the Govee cloud.
           </Notice>
         </div>
       ) : null}
@@ -81,7 +81,6 @@ function Diagnostics() {
         <Detail label="Enabled schedules">{d.scheduler.enabledSchedules}</Detail>
         <Detail label="Scheduler last ran">{d.scheduler.lastTickAt ? timeAgo(d.scheduler.lastTickAt) : 'Not yet'}</Detail>
         <Detail label="App version">{d.version}</Detail>
-        <Detail label="Node.js">{d.nodeVersion}</Detail>
       </dl>
       {hint ? (
         <div className="mt-4">

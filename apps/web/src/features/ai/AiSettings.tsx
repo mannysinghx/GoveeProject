@@ -12,19 +12,16 @@ export function AiSettings() {
   return (
     <SectionCard
       title="AI"
-      description="Used by Ask, on the Connections and Activity pages. Providers take turns, one question each, and the next one is tried if one fails."
+      description="Used by Ask and Describe."
     >
       {status.isPending ? <Loading label="Loading AI status" /> : null}
       {status.isError ? <ErrorNotice error={status.error} /> : null}
       {data ? (
         <div className="space-y-4">
-          {data.reason === 'disabled' ? <Notice tone="info">AI is turned off on this server (AI_ENABLED=false).</Notice> : null}
+          {data.reason === 'disabled' ? <Notice tone="info">AI is turned off.</Notice> : null}
           {isMember ? <PersonalAiKeys /> : null}
           {data.reason === 'no_providers' ? (
-            <Notice tone="info">
-              No provider is set up. Add one or more of DEEPSEEK_API_KEY, GEMINI_API_KEY and GLM_API_KEY to the server&apos;s
-              settings and restart the app.
-            </Notice>
+            <Notice tone="info">No AI provider is set up yet.</Notice>
           ) : null}
           {data.providers.length > 0 ? (
             <ul className="space-y-2">

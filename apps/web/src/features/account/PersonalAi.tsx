@@ -157,7 +157,7 @@ export function PersonalAiKeys() {
         </details>
       ) : null}
       {data.canAddKeys ? <AddKeyForm data={data} /> : null}
-      {!data.canAddKeys ? <Notice tone="warn">This server cannot store keys yet. Its owner needs to set CREDENTIAL_KEYS.</Notice> : null}
+      {!data.canAddKeys ? <Notice tone="warn">Keys cannot be added right now. Please try again later.</Notice> : null}
       <MonthlyLimit data={data} />
     </div>
   );

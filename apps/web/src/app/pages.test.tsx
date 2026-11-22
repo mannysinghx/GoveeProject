@@ -70,7 +70,7 @@ describe('authentication flow', () => {
       'href',
       'https://developer.govee.com/reference/apply-you-govee-api-key',
     );
-    expect(screen.getByText(/or connect it after setup on the Connect page/)).toBeInTheDocument();
+    expect(screen.getByText(/Connect it after setup, on the Connect page/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/api key/i)).not.toBeInTheDocument();
   });
 

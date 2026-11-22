@@ -272,7 +272,7 @@ describe('account settings', () => {
       'GET /admin/signup': { json: { ...signup, mailConfigured: false } },
     });
     renderApp(<App />, { route: '/settings' });
-    expect(await screen.findByText(/Email is not set up on the server/)).toBeInTheDocument();
+    expect(await screen.findByText(/Email is not set up yet/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Turn sign-up on' })).toBeDisabled();
   });
 

@@ -52,10 +52,10 @@ export function diagnose(devices: DeviceHealthDto[], global: Set<IncidentKind>):
       severity: 'problem',
       title: 'The app cannot reach Govee',
       explanation:
-        'Status checks for every light are failing, so this is not about one light. Either Govee is having trouble, or this server cannot reach the internet. The last known status below may be out of date.',
+        'Status checks for every light are failing, so this is not about one light. Govee may be having trouble, or the app may be unable to reach it for a while. The last known status below may be out of date.',
       steps: [
         'Wait a few minutes. The app keeps checking and recovers by itself when Govee answers.',
-        'If your lights work in the Govee Home app, the problem is with this server’s connection.',
+        'If your lights work in the Govee Home app, the problem is on our side and is usually temporary.',
       ],
     });
     return advice;

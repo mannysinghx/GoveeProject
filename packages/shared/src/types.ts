@@ -520,7 +520,8 @@ export interface HealthDto {
 
 export interface DiagnosticsDto {
   version: string;
-  nodeVersion: string;
+  /** Shown to the owner only. */
+  nodeVersion: string | null;
   uptimeSeconds: number;
   backend: 'ok';
   database: { status: 'ok' | 'error'; schemaVersion: string | null; /** Shown to the owner only. */ path: string | null };
@@ -528,7 +529,8 @@ export interface DiagnosticsDto {
     keyConfigured: boolean;
     /** Only true when the base URL was overridden for local testing. */
     usingLocalTestEndpoint: boolean;
-    baseUrl: string;
+    /** Shown to the owner only. */
+    baseUrl: string | null;
     lastSuccessfulConnectionAt: string | null;
     lastErrorCategory: ErrorCategory | null;
     lastErrorAt: string | null;

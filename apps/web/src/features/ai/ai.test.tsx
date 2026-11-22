@@ -75,7 +75,7 @@ describe('Ask', () => {
       'GET /ai/questions': { json: { questions: [] } },
     });
     renderApp(<AskCard />);
-    expect(await screen.findByText(/No AI provider is set up yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/AI is not set up yet/)).toBeInTheDocument();
     expect(screen.queryByLabelText('Your question')).not.toBeInTheDocument();
   });
 

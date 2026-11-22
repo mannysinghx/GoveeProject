@@ -26,7 +26,7 @@ export function setUnauthenticatedHandler(handler: (() => void) | null): void {
   onUnauthenticated = handler;
 }
 
-const NETWORK_MESSAGE = 'Could not reach the app server. Check that it is running.';
+const NETWORK_MESSAGE = 'Could not connect. Check your internet connection and try again.';
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';

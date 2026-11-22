@@ -183,7 +183,7 @@ export class AuthService {
       if (!setupCode || !constantTimeEqual(setupCode.trim(), this.config.setupCode)) {
         this.activityFor(null)?.record({ eventType: 'auth', outcome: 'failure', message: 'Owner setup: wrong setup code.', details: { ip } });
         this.audit(null, 'setup_wrong_code', ip);
-        throw new AppError(403, 'invalid_setup_code', 'That setup code is not correct. It is in the server log.');
+        throw new AppError(403, 'invalid_setup_code', 'That setup code is not correct.');
       }
     }
     const passwordHash = await this.hashes.run(() => hashPassword(password));

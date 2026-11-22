@@ -228,7 +228,7 @@ export function ConnectionPage() {
         <div className="space-y-5">
           <Notice tone={OVERALL[data.overall].tone} title={OVERALL[data.overall].title}>
             {data.monitor.status === 'disabled'
-              ? 'Background checks are turned off on this server.'
+              ? 'Background checks are turned off.'
               : `Last checked ${timeAgo(data.monitor.lastCheckAt)}. Checks about every ${minutes(data.monitor.intervalSeconds)}.`}
           </Notice>
 

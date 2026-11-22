@@ -78,8 +78,8 @@ export function GoveeKeySettings() {
         <div className="space-y-4">
           {status.data.source === 'server' ? (
             <Notice tone="good">
-              A key is set on the server as <code className="font-mono">GOVEE_API_KEY</code>. To change it, edit it there and
-              restart the app. Applying for a new key in the Govee app may replace the old one.
+              Your key is set in the app&apos;s hosting settings. Change it there. Applying for a new key in the Govee app may
+              replace the old one.
             </Notice>
           ) : status.data.connected ? (
             <Notice tone="good">Connected{status.data.connectedAt ? ` on ${dateTime(status.data.connectedAt)}` : ''}.</Notice>

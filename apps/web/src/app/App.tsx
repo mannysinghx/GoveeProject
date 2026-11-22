@@ -44,7 +44,7 @@ export function App() {
   if (session.isError || !session.data) {
     return (
       <main className="mx-auto max-w-lg p-6">
-        <ErrorNotice error={session.error} title="Could not reach the app server" />
+        <ErrorNotice error={session.error} title="Could not connect" />
       </main>
     );
   }

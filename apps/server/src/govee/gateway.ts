@@ -70,7 +70,7 @@ export class GoveeGateway {
         eventType: 'rate_limit',
         outcome: 'warning',
         deviceId: context.deviceId,
-        message: `Rate limit on ${context.endpoint}: ${error.message}`,
+        message: `Govee asked the app to slow down: ${error.message}`,
         details: { retryAfterMs: error.retryAfterMs ?? null },
       });
     }

@@ -273,12 +273,9 @@ export class GoveeCloudTransport implements LightTransport {
       if (controller.signal.aborted) {
         throw new TransportError('timeout', `Govee did not respond within ${timeoutMs} ms.`);
       }
-      // Network errors can carry the URL, never headers. The message stays generic anyway.
-      const cause = error instanceof Error && 'cause' in error ? (error.cause as { code?: string })?.code : undefined;
-      throw new TransportError(
-        'network',
-        `Could not reach the Govee service${cause ? ` (${cause})` : ''}. Check this server's internet connection.`,
-      );
+      // Shown to people, so it says nothing about this server or its network.
+      void error;
+      throw new TransportError('network', 'Could not reach the Govee service. This is usually temporary.');
     } finally {
       clearTimeout(timer);
     }

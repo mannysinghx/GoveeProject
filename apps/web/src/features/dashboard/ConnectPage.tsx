@@ -45,7 +45,7 @@ export function ConnectPage() {
       <Card className="max-w-2xl space-y-6 p-5">
         <Step number={1} title="Your Govee API key">
           {govee.keyConfigured ? (
-            <Notice tone="good" title={status.source === 'server' ? 'A key is set on the server' : 'Your key is connected'}>
+            <Notice tone="good" title="Your key is connected">
               It is never shown here or sent to this browser. To change it, go to Settings.
             </Notice>
           ) : status.canChange ? (
@@ -58,12 +58,7 @@ export function ConnectPage() {
             </>
           ) : (
             <Notice tone="warn" title="A key cannot be connected here yet">
-              {status.note ?? 'This server cannot store keys.'}{' '}
-              {!isMember ? (
-                <>
-                  Or add <code className="font-mono">GOVEE_API_KEY=your-key</code> to the server&apos;s environment and restart.{' '}
-                </>
-              ) : null}
+              {status.note ?? 'Keys cannot be added right now. Please try again later.'}{' '}
               <a href={GOVEE_KEY_HELP} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
                 How to get a key
                 <ExternalLink className="size-3" aria-hidden />
