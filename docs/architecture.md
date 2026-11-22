@@ -270,3 +270,7 @@ scripts/ci-local.sh  The project's CI
 ```
 
 Tests sit next to the code they cover in `apps/web` and `packages/shared`, and in `apps/server/tests` for the backend, rather than in one top-level `tests/` directory.
+
+## Sharing
+
+`apps/server/src/sharing/`: `bundle.ts` builds a share's snapshot from the sharer's account (lights to slots, refs from hashed ids, no place); `importer.ts` previews an import (slot suggestions, scene steps, what will be made) and runs it in the importer's account in one transaction (segment fitting by position, scene rules, the app's own group mapped to theirs, repeated steps merged, schedules off); `sharing-service.ts` keeps shares in the control database (`shared_items`, migration `control/003_sharing.sql`) with display names and the owner's moderation. Imported presets, groups and schedules carry `imported_from` and `imported_share` (account migration `007_imports.sql`). The web app has the Shared page (`apps/web/src/features/sharing/`), share buttons on presets, groups and schedules, and the owner's list in Settings. The format is in `packages/shared/src/sharing.ts`.

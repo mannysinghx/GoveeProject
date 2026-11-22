@@ -2,7 +2,7 @@
 
 Asked on 22 November 2026: share the owner's lights and schedules with every user, let people import them into their own space independently of the owner's, let users share their own creations too, and give everyone a Shared space in the menu.
 
-Nothing here is built yet.
+**Built on 22 November 2026** (`d8888a9` server, `cada5c5` web), not deployed. Differences from the plan below: the app's own "All light strings" group is not shareable, and an import maps it to the importer's own; when two of the sharer's lights are matched to one of the importer's, repeated steps are merged; on a phone, Activity leaves the bottom bar (kept at seven) for Shared, and is reached from the dashboard and Settings.
 
 ## Decisions (owner, 22 November 2026)
 

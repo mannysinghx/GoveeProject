@@ -246,3 +246,14 @@ Ask, on the Connections and Activity pages, answers questions using up to three 
 ## Nothing internal on pages or in responses
 
 Pages and API responses never name a server setting, a command, a docs path, the hosting or mail provider, or the tools the service is built with. Pages for the owner follow the same rule, because the web app's code ships to every visitor. Members do not get the server's Node.js version or Govee's API address in diagnostics. Error messages say what happened in plain words ("Keys cannot be added right now"), and the detail goes to the server log. Two tests enforce this: `apps/web/src/public-text.test.ts` over the web app's source, and `apps/server/tests/public-text.test.ts` over the messages the server sends; the word list is `packages/shared/src/public-text.ts`.
+
+## Sharing between accounts
+
+How it works: [sharing-plan.md](sharing-plan.md). What matters for safety:
+
+- A share is a snapshot in the control database (`shared_items`), never a link into anyone's account. Lights become slots (model, segment numbers, a label); presets and groups get refs that are hashes of ids; sunrise and sunset schedules lose their latitude and longitude. Light names, ids, time zone and email are never stored in it. The bundle is checked against `sharedBundleSchema` when stored and again whenever it is read.
+- A share is built only from the sharer's own account, and an import writes only to the importer's own account. The original's id (`source_id`) goes back only to the sharer. The two-person test covers every sharing route with the owner's real ids.
+- Imported schedules start switched off, so importing can never change anyone's lights by itself. An import is checked against the member's caps first and runs as one transaction: any failure writes nothing.
+- Shared text (titles, descriptions, slot labels, the names of everything in the bundle) refuses web addresses, and is shown as plain text. Members share up to 25 items and 30 times an hour, and need a unique display name. Email addresses are never shown; the owner's items show as Light Manager.
+- The owner can hide, show and remove any item, stop a person sharing and reset a display name. Hidden items are seen only by the sharer and the owner, and cannot be imported by anyone else. Moderation is after the fact: nothing is reviewed before it appears (decision D2).
+- Deleting an account removes its shares; copies others imported stay theirs, as the privacy page says. The export lists what a person shared.

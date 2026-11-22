@@ -31,3 +31,9 @@ python3 phase5-mutations.py.txt
 ```bash
 python3 phase5-mutations-paired.py.txt
 ```
+
+**Sharing mutation checks, 22 November 2026.** `sharing-mutations.py.txt` breaks one guarantee of sharing at a time (docs/sharing-plan.md): light names kept out of shares; links refused; built-in presets and the app's own group not shareable; display names required and unique; members capped and the owner not; blocked people refused; hidden items unlisted and not importable; only the sharer can update; update without refresh keeps the snapshot; imported schedules off, in the importer's time zone, and needing their location; the same model preferred; patterns fitted to the target's segments; scenes the target lacks, and DIY scenes, needing a choice; the import all-or-nothing and inside the caps; each preset made once per import; share-all not sharing twice; the importer's own built-in group used; repeated steps merged; shares going with a deleted account. All 27 caught (`sharing-mutations-result.txt`). Two tests were tightened before the run, by reading them, not by a failed run: the pattern-fitting check also passed unfitted, and the matching check had the same model and the same segment count on one light, so it could not tell which one won.
+
+```bash
+python3 sharing-mutations.py.txt
+```

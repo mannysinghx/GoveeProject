@@ -1,0 +1,27 @@
+CAUGHT: light names shared
+CAUGHT: links allowed
+CAUGHT: built-in presets shareable
+CAUGHT: no display name needed
+CAUGHT: display names not unique
+CAUGHT: members not capped
+CAUGHT: owner capped too
+CAUGHT: blocked people can share
+CAUGHT: hidden items listed for everyone
+CAUGHT: hidden items importable
+CAUGHT: anyone can update a share
+CAUGHT: update ignores refresh
+CAUGHT: imported schedules switched on
+CAUGHT: member time zone ignored
+CAUGHT: same model not preferred
+CAUGHT: segments not fitted
+CAUGHT: missing scene copied anyway
+CAUGHT: DIY scene copied without a choice
+CAUGHT: no location check
+CAUGHT: import not all-or-nothing
+CAUGHT: import caps not checked
+CAUGHT: presets made twice in one import
+CAUGHT: share-all shares twice
+CAUGHT: shares outlive a deleted account
+CAUGHT: built-in group shared
+CAUGHT: importer's own built-in group ignored
+CAUGHT: repeated steps not merged
