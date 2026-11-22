@@ -81,6 +81,14 @@ railway ssh node apps/server/dist/cli/backup.js /data/backups/manual.sqlite
 
 After the next deploy, this also writes `manual.sqlite.manifest.json`, and it refuses to overwrite an existing file.
 
+## Encrypted keys and the control database
+
+From the version with Phase 3 of `docs/public-signup-plan.md`, sign-in lives in `/data/control.sqlite`, next to the existing database on the same volume. It is created and filled on the first start, and the existing file is not rewritten. See `docs/security.md`, "Where accounts live".
+
+To store the Govee key encrypted, set `CREDENTIAL_KEYS` in the service's variables, made as in `docs/security.md`, "Encrypted keys". Keep `GOVEE_API_KEY` set for about two weeks after that, as the way back. **Never call Railway's `list-variables` tool for this project from a Claude session**, because it returns values.
+
+**Rolling back** to a version before the control database is a redeploy. That version reads the old tables in the owner's file, which have been kept in step: the current password works, and signed-out sessions stay signed out. Sessions made after the upgrade are not in those tables, so the owner signs in again. `control.sqlite` stays on the volume, unused, and is picked up again when rolling forward.
+
 ## Password reset
 
 ```bash

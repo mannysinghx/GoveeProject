@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# Rehearses the Phase 3 cutover and rollback with real code: the deployed version (/old, 19166b3)
+# and the new build (/app), on one data folder, against the Govee mock. Test data only.
+set -uo pipefail
+DATA=/tmp/reh; rm -rf "$DATA"; mkdir -p "$DATA"
+PASS1='first-owner-password'; PASS2='changed-in-new-version'; PASS3='changed-in-old-version'
+# A throwaway master key for this rehearsal, never printed.
+export CREDENTIAL_KEYS_TEST="1:$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64'))")"
+COMMON="GOVEE_API_BASE_URL=http://127.0.0.1:8788 DATABASE_PATH=$DATA/govee.sqlite PORT=8790 SCHEDULER_ENABLED=false CONNECTION_MONITOR_ENABLED=false"
+
+(cd /app/apps/server && npx tsx scripts/mock-govee.ts >/tmp/reh-mock.log 2>&1 &)
+for i in $(seq 1 40); do node -e "fetch('http://127.0.0.1:8788/').then(()=>process.exit(0)).catch(()=>process.exit(1))" && break; sleep 0.5; done
+
+APP=""
+up() { # $1 = old|new, rest = extra env
+  local which=$1; shift
+  local dir=/app; [ "$which" = old ] && dir=/old
+  env $COMMON "$@" node $dir/apps/server/dist/main.js >"$DATA/$which-$(date +%s%N).log" 2>&1 &
+  APP=$!
+  for i in $(seq 1 40); do node -e "fetch('http://127.0.0.1:8790/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" && return 0; sleep 0.25; done
+  echo "FAILED to start $which"; exit 1
+}
+down() { kill -TERM "$APP"; wait "$APP"; echo "    stopped, exit=$?"; }
+api() { node /tmp/reh-api.mjs "$@"; }
+
+cat > /tmp/reh-api.mjs <<'JS'
+// node reh-api.mjs <action> [args]: prints a short result, saves the session in /tmp/reh/cookie.json
+import fs from 'node:fs';
+const base = 'http://127.0.0.1:8790/api/v1';
+const [action, a, b] = process.argv.slice(2);
+const saved = () => JSON.parse(fs.readFileSync('/tmp/reh/cookie.json', 'utf8'));
+const save = (res, body) => fs.writeFileSync('/tmp/reh/cookie.json', JSON.stringify({ cookie: res.headers.get('set-cookie').split(';')[0], csrf: body.csrfToken }));
+const json = { 'content-type': 'application/json' };
+if (action === 'setup' || action === 'login') {
+  const res = await fetch(`${base}/auth/${action}`, { method: 'POST', headers: json, body: JSON.stringify({ username: 'owner', password: a }) });
+  const body = await res.json();
+  if (res.ok && b === 'save') save(res, body);
+  console.log(`    ${action} with ${a}: ${res.status}`);
+} else if (action === 'session') {
+  const { cookie } = saved();
+  const body = await (await fetch(`${base}/auth/session`, { headers: { cookie } })).json();
+  console.log(`    saved session authenticated: ${body.authenticated}`);
+} else if (action === 'discover') {
+  const { cookie, csrf } = saved();
+  const res = await fetch(`${base}/devices/discover`, { method: 'POST', headers: { ...json, cookie, 'x-csrf-token': csrf }, body: '{}' });
+  const body = await res.json();
+  console.log(`    discover: ${res.status}, ${body.total ?? body.error?.code} lights`);
+} else if (action === 'devices') {
+  const { cookie } = saved();
+  const res = await fetch(`${base}/devices`, { headers: { cookie } });
+  const body = await res.json();
+  console.log(`    devices: ${res.status}, ${body.devices?.length ?? body.error?.code}`);
+} else if (action === 'change') {
+  const { cookie, csrf } = saved();
+  const res = await fetch(`${base}/auth/change-password`, { method: 'POST', headers: { ...json, cookie, 'x-csrf-token': csrf }, body: JSON.stringify({ currentPassword: a, newPassword: b }) });
+  const body = await res.json();
+  if (res.ok) save(res, body);
+  console.log(`    change password: ${res.status}`);
+}
+JS
+
+echo "1. Deployed version: set up, discover, keep the session"
+up old GOVEE_API_KEY=dev-mock-key
+api setup "$PASS1" save; api discover; cp "$DATA/cookie.json" "$DATA/old-session.json"
+down
+
+echo "2. New version on the same files, with CREDENTIAL_KEYS"
+up new GOVEE_API_KEY=dev-mock-key CREDENTIAL_KEYS="$CREDENTIAL_KEYS_TEST"
+api session; api devices; api discover
+node -e "
+const D=require('/app/node_modules/better-sqlite3'); const c=new D('$DATA/control.sqlite',{readonly:true});
+console.log('    control users', JSON.stringify(c.prepare('SELECT id, username, role, account_file FROM users').all()));
+console.log('    control events', JSON.stringify(c.prepare('SELECT event FROM audit_events ORDER BY id').all().map(r=>r.event)));
+const cred=c.prepare('SELECT kind, key_version, status FROM credentials').all(); console.log('    credentials', JSON.stringify(cred));
+const raw=require('fs').readFileSync('$DATA/control.sqlite'); console.log('    key readable in control file:', raw.includes(Buffer.from('dev-mock-key')));"
+api change "$PASS1" "$PASS2"
+down
+
+echo "3. Roll back to the deployed version"
+up old GOVEE_API_KEY=dev-mock-key
+cp "$DATA/old-session.json" "$DATA/cookie.json"; api session
+api login "$PASS1"; api login "$PASS2" save; api devices
+echo "   ... and the deployed version changes the password"
+api change "$PASS2" "$PASS3"
+down
+
+echo "4. Roll forward again"
+up new GOVEE_API_KEY=dev-mock-key CREDENTIAL_KEYS="$CREDENTIAL_KEYS_TEST"
+api login "$PASS2"; api login "$PASS3" save; api devices
+node -e "const D=require('/app/node_modules/better-sqlite3'); const c=new D('$DATA/control.sqlite',{readonly:true}); console.log('    control events', JSON.stringify(c.prepare('SELECT event FROM audit_events ORDER BY id').all().map(r=>r.event).filter(e=>e.startsWith('cutover')||e.startsWith('govee'))))"
+down
+
+echo "5. New version without GOVEE_API_KEY: the stored key is used"
+up new GOVEE_API_KEY= CREDENTIAL_KEYS="$CREDENTIAL_KEYS_TEST"
+api login "$PASS3" save; api discover
+down
+echo "   errors or fatal lines in all logs: $(cat $DATA/*.log | grep -c '"level":5[0-9]\|"level":60')"
+echo "   key in any log: $(cat $DATA/*.log | grep -c 'dev-mock-key')"
+
+for p in /proc/[0-9]*; do grep -qa "scripts/mock-govee.ts" $p/cmdline 2>/dev/null && [ "${p#/proc/}" != "$$" ] && kill "${p#/proc/}" 2>/dev/null; done
+echo "done"

@@ -210,7 +210,7 @@ Measured cost from the earlier plan: about 1.3 MB of memory per account after a 
 
 ## Build order
 
-**Progress:** Phase 1 done (`0b04d18`), Phase 2 done (`d0c3cfe`), both on `claude/public-registration-email-verify-d03096`, not pushed. See `docs/PROGRESS.md`.
+**Progress:** Phase 1 done (`0b04d18`), Phase 2 done (`d0c3cfe`), Phase 3 done (`b4cd681`), on `claude/public-registration-email-verify-d03096`, not pushed. P5 changed in Phase 3: the owner keeps signing in by username, and adds a verified email through the Phase 4 flow, rather than an unverified one at cutover. See `docs/PROGRESS.md`.
 
 Each phase is built and tested in full, run through `bash scripts/ci-local.sh --image` on the exact commit, and then proposed as **one** push for approval. Sizes are rough.
 

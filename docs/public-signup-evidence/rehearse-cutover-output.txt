@@ -1,0 +1,36 @@
+1. Deployed version: set up, discover, keep the session
+    setup with first-owner-password: 201
+    discover: 200, 3 lights
+    stopped, exit=0
+2. New version on the same files, with CREDENTIAL_KEYS
+    saved session authenticated: true
+    devices: 200, 3
+    discover: 200, 3 lights
+    control users [{"id":1,"username":"owner","role":"owner","account_file":"govee.sqlite"}]
+    control events ["cutover","govee_key_stored"]
+    credentials [{"kind":"govee","key_version":1,"status":"active"}]
+    key readable in control file: false
+    change password: 200
+    stopped, exit=0
+3. Roll back to the deployed version
+    saved session authenticated: false
+    login with first-owner-password: 401
+    login with changed-in-new-version: 200
+    devices: 200, 3
+   ... and the deployed version changes the password
+    change password: 200
+    stopped, exit=0
+4. Roll forward again
+    login with changed-in-new-version: 401
+    login with changed-in-old-version: 200
+    devices: 200, 3
+    control events ["cutover","govee_key_stored","cutover_newer_password"]
+    stopped, exit=0
+5. New version without GOVEE_API_KEY: the stored key is used
+    login with changed-in-old-version: 200
+    discover: 200, 3 lights
+    stopped, exit=0
+   errors or fatal lines in all logs: 0
+   key in any log: 0
+done
+Terminated

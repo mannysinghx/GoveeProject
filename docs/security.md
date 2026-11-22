@@ -4,11 +4,11 @@
 
 | Area | What the app does |
 |---|---|
-| Govee API key | Server environment only. Never sent to the browser, logged or stored in the database. |
+| Govee API key | From `GOVEE_API_KEY`. With `CREDENTIAL_KEYS` set, also stored encrypted (AES-256-GCM) in the control database, bound to its user. Never sent to the browser or logged. |
 | Passwords | Argon2id, using OWASP's minimum parameters (19 MiB, 2 iterations) |
-| Sessions | Random token in an HttpOnly, SameSite=Strict cookie. Only its SHA-256 hash is stored. Expires after 7 days. |
+| Sessions | Random token in an HttpOnly, SameSite=Strict cookie. Only its SHA-256 hash is stored, in the control database. Expires after 7 days. |
 | CSRF | A per-session token is required in a header on every state-changing request |
-| Login throttling | Lockouts per address that grow with repeated failures, plus a limit across all addresses. Holds up under parallel requests and survives restarts. |
+| Login throttling | Counted per name and address, per address, and per name. Lockouts grow with repeated failures. No lockout is shared by every account, and a successful sign-in clears only its own counter. Typed names are stored only as hashes. Password hashing runs 4 at a time. Holds up under parallel requests and survives restarts. |
 | First-run setup | Can complete once, enforced by a database constraint. Needs a code unless the app is bound to loopback with no proxy or outside host name configured. |
 | Network | Binds to `127.0.0.1` by default. No CORS headers. Unknown Host headers are rejected on loopback binds and in the Docker Compose setup, which blocks DNS rebinding. |
 | Headers | A restrictive Content-Security-Policy with no inline or third-party scripts, plus the Helmet defaults |
@@ -73,9 +73,30 @@ Do not forward a port directly to the app. Use one of these:
 
 No particular tunnel or hosted service is needed.
 
+## Where accounts live
+
+Users, sessions, login attempts, encrypted keys and an audit log are in the control database, `control.sqlite` next to the owner's database file (`CONTROL_DATABASE_PATH` changes it). On the first start of a version with it, the owner's account and live sessions are copied in from the owner's file, in one transaction. Nobody is signed out.
+
+The owner's file keeps its old `users` and `sessions` tables, so an earlier version still works after a rollback. While they exist, a password change or sign-out also updates them, so a rollback never accepts an old password or a signed-out session. If an earlier version changes the password after a rollback, that newer password is used when rolling forward. Removing the old tables is a later, separate step.
+
+## Encrypted keys
+
+Set `CREDENTIAL_KEYS` to turn on encrypted storage. It lists master keys by version, newest used for new rows: `2:<base64>,1:<base64>`, each 32 random bytes. Make one in your own terminal, and paste it straight into Railway's variables. Never put it in a file in the repo or a chat:
+
+```bash
+node -e "console.log('1:' + require('crypto').randomBytes(32).toString('base64'))"
+```
+
+- Each row has a random nonce, and its user id and kind are bound into the encryption, so a row copied to another account does not decrypt.
+- A keyed fingerprint stops one Govee key being connected to two accounts.
+- While `GOVEE_API_KEY` is set, it is used, and the stored copy is kept the same. Once it is removed, the stored copy is used.
+- **Keep a copy of `CREDENTIAL_KEYS` in your password manager, away from the backups.** Without it, stored keys cannot be read. The app still starts, and says the stored key cannot be read.
+- What this protects: a leaked database file, backup or dump. What it does not: someone with the Railway variables as well as the volume, or code running inside the app.
+- Rotating: add a new version in front (`2:<new>,1:<old>`) and restart. Old rows still read, and new ones use version 2. A command to re-encrypt old rows is not built yet, so keep version 1 until it is.
+
 ## Account recovery
 
-There is no email reset. If you can run commands on the server, you own the data anyway, so recovery happens there. This signs out every session, clears login lockouts and records the reset in Activity.
+There is no email reset yet. If you can run commands on the server, you own the data anyway, so recovery happens there. This signs out that user's sessions only, clears their sign-in lockouts and records the reset in the audit log, and in Activity for the owner. `--user <username or email>` picks someone other than the owner.
 
 Direct install, after `npm run build`:
 
@@ -97,7 +118,9 @@ If you would rather start over, stop the app and delete the database. This erase
 
 **What to back up**
 
-- The SQLite database: account, devices, presets, groups, schedules and history
+- The SQLite database: devices, presets, groups, schedules and history
+- The control database, `control.sqlite` next to it: users, sessions and encrypted keys. `npm run db:backup` copies both
+- `CREDENTIAL_KEYS`, kept apart from the backups, in a password manager. The encrypted keys in a backup cannot be read without it
 - `.env`: your Govee key and settings. Store it as carefully as the key itself.
 
 The database holds your password hash, device identifiers and activity history, but no API key and no usable session tokens. Treat backups as private anyway.
