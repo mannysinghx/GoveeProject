@@ -110,7 +110,38 @@ Railway's documentation says: "SMTP is only available on the Pro plan and above"
 | B. Send straight to each recipient's mail server | `node:dns` looks up the recipient's MX records, the app connects on port 25 and signs with its own DKIM key | **Poor and unpredictable.** It needs a static outbound address (Railway Pro), plus reverse DNS for that address, which Railway may not let you set (unverified). Large providers such as Gmail expect it (from their sender guidelines, not re-checked today), and a new address has no reputation, so mail is likely to go to spam or be refused | Not recommended, even though it is the most "in-house" option |
 | C. Run a mail server elsewhere, such as a VPS that allows reverse DNS | Postfix or similar, and the app hands mail to it | Better than B after warming up | Another server to run, patch and keep off spam blocklists. Not worth it at this size |
 
-Option A keeps all the code in-house, and only the last hop goes through a mailbox the owner already controls. **The owner should decide whether that meets "no third party".**
+Option A keeps all the code in-house, and only the last hop goes through a mailbox the owner already controls.
+
+### Decided: option A, through `info@lightup.ink` on Namecheap Private Email (owner, 21 November 2026)
+
+**What `lightup.ink`'s DNS already has** (looked up with `dig` on 21 November 2026):
+
+| Record | Found | Needed |
+|---|---|---|
+| MX | `mx1.privateemail.com`, `mx2.privateemail.com` | Nothing to change |
+| SPF (`TXT lightup.ink`) | `v=spf1 include:spf.privateemail.com ~all` | Nothing to change, because the app sends through Private Email's servers, not from Railway's address |
+| DKIM | Nothing at `default._domainkey.lightup.ink`. Other selectors were not checked | **Owner:** turn on DKIM in the Private Email panel, and add the TXT record it gives |
+| DMARC (`_dmarc.lightup.ink`) | None | **Owner:** add one, starting with `v=DMARC1; p=none; rua=mailto:info@lightup.ink`, and tighten it to `quarantine` once mail is seen passing |
+
+**Connection**, from [Namecheap's mail client settings](https://www.namecheap.com/support/knowledgebase/article.aspx/1179/2175/general-private-email-configuration-for-mail-clients-and-mobile-devices/) and [IMAP/SMTP details](https://www.namecheap.com/support/knowledgebase/article.aspx/10820/2179/private-email-caldavcardav-and-imapsmtp-details/):
+- Host `mail.privateemail.com`, port **465 with TLS from the start** (port 587 with STARTTLS also works). Only encrypted connections are accepted.
+- The username is the full address, `info@lightup.ink`. Authentication is required.
+- "Connect third-party apps" (SMTP access) has to be on in Private Email's settings. Namecheap mentions an application password, so a separate password for the app is preferable to the mailbox's main one.
+
+**Limits**, from [Namecheap's sending limits](https://www.namecheap.com/support/knowledgebase/article.aspx/10719/2179/email-sending-and-usage-limits-for-private-email/):
+- 500 emails an hour per mailbox on paid plans, and 20 an hour on a trial. At most 50 recipients per message.
+- Namecheap says the service is not built for mass mailing, and can lower limits.
+- The app sends one message per recipient, and only transactional mail: verify, already registered, reset, email changed. So the outbox must stay under the hourly limit, for example at most 300 an hour, leaving room for the owner's own mail. Anything past that waits in the outbox, rather than failing.
+- That limit also caps sign-ups at a few hundred an hour, which is above the planned launch cap of 50 a day.
+
+**How it is wired into the app**:
+- New Railway variables: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER=info@lightup.ink`, `SMTP_PASSWORD` and `MAIL_FROM`.
+- **The owner sets `SMTP_PASSWORD` in Railway themselves.** It is never pasted into a chat or a file, and is added to the log scrubber like the other keys.
+- `SMTP_HOST` is accepted only if it is `mail.privateemail.com`, `smtp.privateemail.com`, or loopback for the test server. That is the same guard `GOVEE_API_BASE_URL` has (`apps/server/src/config/env.ts:203`), so a typo or a hostile variable cannot send the mailbox password anywhere else.
+- The client supports TLS from the start on 465 as well as STARTTLS on 587, always checks certificates, and refuses to send the password over an unencrypted connection.
+- Mail is sent **as `info@lightup.ink`**, so replies and bounces land in that inbox. A `no-reply@lightup.ink` alias on the same mailbox is optional.
+
+**Still to confirm:** that Railway lets connections out to port 465 or 587. That needs the Pro plan (P2). One test send from Railway will settle it, once the client is built.
 
 ## Bring your own AI key
 
@@ -168,7 +199,7 @@ Measured cost from the earlier plan: about 1.3 MB of memory per account after a 
 
 | # | Decision | Recommendation |
 |---|---|---|
-| P1 | How email leaves the server: A, B or C above | **A**, an in-house SMTP client handing mail to a mailbox you already run for `lightup.ink` |
+| P1 | How email leaves the server: A, B or C above | **Decided 21 November 2026: A, through `info@lightup.ink` on Namecheap Private Email.** See above |
 | P2 | Is the Railway account on Pro? Without Pro, no SMTP leaves Railway at all | Confirm in Railway → Workspace → Plan. If not Pro, upgrade, or accept an HTTP email service, which breaks the no-third-party rule |
 | P3 | Your own AI keys in the server variables: only for you, or shared with everyone? | **Only you.** Shared keys mean you pay for strangers' questions |
 | P4 | AI providers: fixed list, or any URL? | **Fixed list** (SSRF risk above) |
@@ -199,8 +230,8 @@ Stopping after any phase leaves a working site.
 ## Not verified
 
 - Whether the Railway account is on Pro, so whether SMTP can leave Railway at all
-- Whether `lightup.ink` already has a mail host, MX records, SPF or DKIM. Nothing was looked up
-- Whether Railway lets you set reverse DNS on a static outbound address (option B)
+- DKIM under any selector other than `default`. MX and SPF were looked up, and DMARC is missing
+- Namecheap's hourly limit counts emails in its main article, but recipients on its newer MCP tools page. One recipient per message makes the two the same
 - Gmail's and Outlook's current requirements for senders were not re-checked today
 - Govee's terms on hosting other people's keys
 - All sizes. None of this has been built

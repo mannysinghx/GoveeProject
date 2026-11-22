@@ -138,6 +138,6 @@ bash scripts/ci-local.sh --image
 
 ## Proposals not started
 
-- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Written against `cca931a`, documents only, nothing built. It needs the per-account split from the multi-user plan first. Waiting on decisions P1 to P8 in that file, chiefly how email leaves the server and whether the Railway account is on Pro, since Railway blocks SMTP below Pro.
+- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Written against `cca931a`, documents only, nothing built. It needs the per-account split from the multi-user plan first. Email decided (P1, 21 November): an in-house SMTP client sending through info@lightup.ink on Namecheap Private Email. Still waiting on P2 to P8, chiefly whether the Railway account is on Pro, since Railway blocks SMTP below Pro. The owner must also add DKIM and DMARC records.
 - Letting other people sign up, invite-only: [the plan](multi-user-plan.md). On 9 November 2026 the owner said no sign-up was needed. The 21 November request above supersedes that, and reuses its design.
 - AI features for the owner's own account, free to use, with a monthly spending cap: [the plan](ai-features-plan.md). It is waiting on the decisions listed in it, and nothing is built.
