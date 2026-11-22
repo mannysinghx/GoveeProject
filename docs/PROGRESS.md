@@ -4,7 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
-- **Newest work, 22 November 2026: Phase 1 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`, commit `0b04d18`. It adds verified backups, restore and a way to copy a backup off Railway. See "Public sign-up" under "In flight". Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
+- **Newest work, 22 November 2026: Phases 1 and 2 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`: Phase 1 (`0b04d18`) adds verified backups, restore, and a way to copy a backup off Railway. Phase 2 (`d0c3cfe`) splits the server into a platform and one context per account, with no visible change. See "Public sign-up" under "In flight". Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
 - **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
@@ -52,7 +52,21 @@ Phase 1, the safety net, is done:
 
 **Owner to do:** turn on DKIM in Private Email and add its DNS record; add a DMARC record (`v=DMARC1; p=none; rua=mailto:info@lightup.ink`); turn on SMTP access for `info@lightup.ink`. Later, when the email code exists, set `SMTP_PASSWORD` in Railway yourself.
 
-**Next:** Phase 2, splitting the app into a platform part and one part per account, with no visible change (`docs/public-signup-plan.md`, "Build order"). Then Phases 3 to 5 before one push, as the plan says.
+Phase 2, the split with no visible change, is done (`d0c3cfe`). How it works is in `docs/architecture.md`, "Platform and accounts".
+
+| Piece | How it was checked |
+|---|---|
+| `PlatformContext` with no account services, and `AccountContext` per person, wired as before | Type check. A test file reaching `platform.devices` fails to compile (`TS2339`). It was tried, then removed |
+| 75 routes get their services from `accountOf(request)` | The 481 existing server tests pass unchanged. A route census in `apps/server/tests/accounts.test.ts` lists all 75, 5 of them public |
+| A valid session with no loaded account gets 503, never another account's data | Test, which fails when that check is removed (tried) |
+| Secrets added after startup are scrubbed | Test, which fails when the logger's scrubber is fixed at startup again (tried) |
+| Accounts stop in parallel, each in the original order | Test, which fails when shutdown runs one account at a time (tried) |
+| The real server process | Built server against the Govee mock in Node 26: health, setup, discovery (3 lights), a group, a power command accepted, status, 401 when signed out, then SIGTERM: "Shutdown complete", exit 0, no error lines |
+| Everything together | `bash scripts/ci-local.sh --image d0c3cfe`: passed, 774 tests, 0 vulnerabilities. See `docs/OPS_LOG.md` |
+
+Known limits, by design for now: sign-in still lives in the owner's file (Phase 3 moves it). `/notification-actions` uses `accounts.sole()`, which throws once a second account exists (Phase 4). Log lines are not yet tagged with an account.
+
+**Next:** Phase 3, the control database and the owner's cutover: users by email, sessions per user, new sign-in throttling, encrypted credentials (`docs/public-signup-plan.md`, "Build order"). Then Phases 4 and 5 before one push, as the plan says.
 
 **Light status, daily color schemes, pattern search, one brightness (13 November 2026).** `459c84f` (light status) and `b2ee3c2` (the three features), with two test and CI fixes after them. **Deployed** on 14 November 2026 at 02:53 UTC as `19166b3`, with the owner's approval ("Yes, deploy"): Railway deployment `1f11c53f` succeeded, the log shows `006_light_status.sql` applied and no warnings or errors at startup, health is OK, the three new routes return 401 without a session, and the live bundle contains the new screens. Roll back by redeploying `adab10a` (deployment `458df907`) in Railway; the two new columns can stay. **Not yet seen after the deploy:** a background check's result, the 19 new built-in presets, or anything on real lights. The owner has not switched on the daily change, so no new schedule exists.
 

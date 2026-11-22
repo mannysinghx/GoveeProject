@@ -34,6 +34,22 @@ Official Govee cloud API --> your Govee devices
 - **Controls are data-driven.** `govee/capabilities.ts` normalizes raw capabilities, and the UI renders from the result. Nothing checks a model number, apart from a cosmetic highlight for the H805C.
 - **Authentication is deny by default.** A hook attached to every route under `/api/v1` requires a session unless the route declares itself public. It does not look at URL text, so no spelling of a path can avoid it.
 
+## Platform and accounts
+
+The server is split into two kinds of context, in `apps/server/src/app/context.ts`. This is Phase 2 of [public-signup-plan.md](public-signup-plan.md), and today there is still exactly one account, the owner's.
+
+| | `PlatformContext`, one per process | `AccountContext`, one per person |
+|---|---|---|
+| Holds | Config, logger, clock, `SecretRegistry`, sign-in (`auth`), `AccountRegistry` | Database, Govee transport and rate limiter, queue, devices, groups, presets, schedules and scheduler, monitor, notifications, AI, maintenance |
+| Today | Sign-in still uses the owner's database file. Phase 3 moves it to a control database | The owner's account uses the existing file at `DATABASE_PATH`, unchanged |
+
+- **Routes are given only the platform.** Each handler gets the signed-in person's services from `accountOf(request)` (`app/request-account.ts`). Because the platform has no account services, a route that tries to capture them at startup does not compile.
+- **One place turns a session into an account:** the deny-by-default hook in `build-app.ts` calls `accounts.forUser(session.userId)`. A valid session whose account is not loaded gets 503 `account_unavailable`. It never falls back to another account.
+- **Public routes:** `/health` checks every account's database and reports the first scheduler that is not running. `/notification-actions` has no session, so it uses `accounts.sole()`, which throws once a second account exists. Phase 4 replaces that with a lookup from the token.
+- **Secrets:** `SecretRegistry` (`shared/logger.ts`) holds every secret the process knows, and the logger, activity log and AI notes all scrub through it. A key connected later is hidden from then on, without a restart.
+- **Start and stop:** `AccountRegistry.startAll()` starts each account's timers in the original order. Shutdown runs `stopBackground()`, closes the HTTP server, then runs `stopCore()`. Accounts stop in parallel, each in the original order, so the 15-second limit does not grow with the number of accounts.
+- **Kept true by tests:** `apps/server/tests/accounts.test.ts` lists all 75 routes and the 5 public ones, so a new route fails until someone classifies it. It also checks the 503 rule, late secrets, and the registry's order and parallel stop.
+
 ## Command lifecycle
 
 ```
