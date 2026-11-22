@@ -8,7 +8,8 @@
 #   scripts/ci-local.sh <commit>   Checks a specific commit.
 #   scripts/ci-local.sh --image    Also builds the production image and smoke tests it.
 #
-# Requires Docker. No Govee key or physical light is needed.
+# Requires Docker, and with --image also node on this computer (for the backup round trip).
+# No Govee key or physical light is needed.
 set -euo pipefail
 
 BUILD_IMAGE=false
@@ -120,6 +121,27 @@ if [ "$BUILD_IMAGE" = true ]; then
     echo "Setup code was not logged" >&2
     exit 1
   fi
+
+  echo "==> Backup round trip: pull a copy out of the running image, then verify it with the image's own tools"
+  # The same script the owner runs against Railway, with docker exec in place of railway ssh.
+  PULLED="$WORK/pulled"
+  bash "$WORK/scripts/pull-backup.sh" --docker "$NAME" --out "$PULLED"
+  PULLED_FILE="$(find "$PULLED" -name '*.sqlite' | head -1)"
+  [ -n "$PULLED_FILE" ] || { echo "No backup was saved" >&2; exit 1; }
+  # Written through the app's own user. docker cp would keep this computer's owner, and the
+  # read-only image's /tmp is a tmpfs that docker cp cannot reach.
+  docker exec -i "$NAME" sh -c 'cat > /data/ci-check.sqlite' < "$PULLED_FILE"
+  docker exec -i "$NAME" sh -c 'cat > /data/ci-check.sqlite.manifest.json' < "$PULLED_FILE.manifest.json"
+  if ! docker exec "$NAME" node apps/server/dist/cli/verify-backup.js /data/ci-check.sqlite >"$WORK/verify.txt" 2>&1; then
+    cat "$WORK/verify.txt" >&2
+    echo "The pulled backup did not verify" >&2
+    exit 1
+  fi
+  grep "Manifest:    found" "$WORK/verify.txt" >/dev/null || { cat "$WORK/verify.txt" >&2; echo "The manifest did not come back" >&2; exit 1; }
+  LEFT="$(docker exec "$NAME" sh -c 'ls -A /data/backups 2>/dev/null || true')"
+  [ -z "$LEFT" ] || { echo "Temporary backup files were left on the server: $LEFT" >&2; exit 1; }
+  echo "    pulled, hash matched, verified against its manifest and this build's migrations, nothing left behind"
+
   docker rm -f "$NAME" >/dev/null
   docker volume rm "glm-ci-data-${SHA:0:12}" >/dev/null
   echo "==> Image smoke test passed"

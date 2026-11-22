@@ -12,7 +12,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "reset-password": "node dist/cli/reset-password.js",
-    "db:backup": "node dist/cli/backup.js"
+    "db:backup": "node dist/cli/backup.js",
+    "db:verify": "node dist/cli/verify-backup.js",
+    "db:restore": "node dist/cli/restore.js"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.5",

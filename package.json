@@ -23,7 +23,9 @@
     "lint": "eslint .",
     "ci": "bash scripts/ci-local.sh",
     "reset-password": "npm run reset-password -w @glm/server --",
-    "db:backup": "npm run db:backup -w @glm/server --"
+    "db:backup": "npm run db:backup -w @glm/server --",
+    "db:verify": "npm run db:verify -w @glm/server --",
+    "db:restore": "npm run db:restore -w @glm/server --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -47,11 +47,39 @@ Send one request normally and one with a forged `X-Forwarded-For` header, then l
 
 ## Backup
 
-Railway's volume backups are one option. To take your own copy of the database, run this from a linked project, then download it through a volume browser or your own tooling:
+Railway's volume backups are one copy, but they [can only restore into the same project, and are lost if the volume is wiped](https://docs.railway.com/volumes/backups). Keep your own copy off Railway as well.
+
+**Copy a backup to this computer.** Run this from the repo, with the Railway CLI logged in and linked to `goveeproject`:
 
 ```bash
-railway ssh node apps/server/dist/cli/backup.js /data/backup.sqlite
+bash scripts/pull-backup.sh
 ```
+
+It makes a backup on the server with the app's own command (SQLite's online backup, safe while the app runs). It brings that backup back with its SHA-256 and size, and checks both on arrival. Then it runs SQLite's integrity check, and deletes the temporary copy on the server. It saves to `~/GoveeBackups`, readable only by you. The copy holds your password hash, the push signing key and your home's location, so keep it out of the repo and out of shared folders. It works with the version deployed on 14 November (`19166b3`), so no deploy is needed first. Until the next deploy, the copy has no manifest, so only SQLite's own checks apply.
+
+**Check a backup** against this version of the app, after `npm run build`:
+
+```bash
+npm run db:verify -- ~/GoveeBackups/<file>.sqlite
+```
+
+**Restore.** `restore.js` verifies the backup, refuses while anything has the database open, and moves the current file aside with its WAL files, never deleting it. Then it checks the restored file against the backup:
+
+```bash
+node apps/server/dist/cli/restore.js <backup>.sqlite --to <database>.sqlite --replace
+```
+
+To undo a restore, move the `.before-restore-<time>` files back.
+
+**Not worked out yet: restoring on Railway.** The app holds the database open while it runs, so the restore will refuse. But stopping the service also stops the container that `railway ssh` connects to. One way is a temporary start command that keeps the container up without the app, such as `sleep infinity`, then restore, then put the start command back. That is untested, and it is a production change that needs the owner's approval. The restore drill so far runs on test data in `apps/server/tests/backup-restore.test.ts`, and on a backup pulled from the production image in `scripts/ci-local.sh --image`.
+
+A backup made on the server alone:
+
+```bash
+railway ssh node apps/server/dist/cli/backup.js /data/backups/manual.sqlite
+```
+
+After the next deploy, this also writes `manual.sqlite.manifest.json`, and it refuses to overwrite an existing file.
 
 ## Password reset
 
