@@ -1,6 +1,6 @@
 # Opening lightup.ink to the public: email sign-up and bring-your-own AI key
 
-**Status: being built. Phases 1 to 4 are done on the branch and not pushed; production was not changed.** The rest of this page is the plan as written on 21 November.
+**Status: being built. Phases 1 to 5 are done on the branch and not pushed; production was not changed.** The rest of this page is the plan as written on 21 November.
 Written 21 November 2026, against `cca931a` on `claude/public-registration-email-verify-d03096`. Line references are to that commit.
 
 This builds on [multi-user-plan.md](multi-user-plan.md) (7 November), which designed invite-only accounts and was put on hold on 9 November. The owner has now asked for **open sign-up**:
@@ -210,7 +210,7 @@ Measured cost from the earlier plan: about 1.3 MB of memory per account after a 
 
 ## Build order
 
-**Progress:** Phase 1 done (`0b04d18`), Phase 2 done (`d0c3cfe`), Phase 3 done (`b4cd681`), Phase 4 done (`1ef9e69`, `b1a1da6`, `5b2241f`), on `claude/public-registration-email-verify-d03096`, not pushed. P5 changed in Phase 3: the owner keeps signing in by username, and adds a verified email through the Phase 4 flow, rather than an unverified one at cutover. See `docs/PROGRESS.md`.
+**Progress:** Phase 1 done (`0b04d18`), Phase 2 done (`d0c3cfe`), Phase 3 done (`b4cd681`), Phase 4 done (`1ef9e69`, `b1a1da6`, `5b2241f`), Phase 5 done (see `docs/PROGRESS.md`), on `claude/public-registration-email-verify-d03096`, not pushed. P5 changed in Phase 3: the owner keeps signing in by username, and adds a verified email through the Phase 4 flow, rather than an unverified one at cutover. See `docs/PROGRESS.md`.
 
 Each phase is built and tested in full, run through `bash scripts/ci-local.sh --image` on the exact commit, and then proposed as **one** push for approval. Sizes are rough.
 

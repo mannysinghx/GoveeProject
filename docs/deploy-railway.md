@@ -57,7 +57,7 @@ Railway's volume backups are one copy, but they [can only restore into the same 
 bash scripts/pull-backup.sh
 ```
 
-It makes a backup on the server with the app's own command (SQLite's online backup, safe while the app runs). It brings that backup back with its SHA-256 and size, and checks both on arrival. Then it runs SQLite's integrity check, and deletes the temporary copy on the server. It saves to `~/GoveeBackups`, readable only by you. The copy holds your password hash, the push signing key and your home's location, so keep it out of the repo and out of shared folders. It works with the version deployed on 14 November (`19166b3`), so no deploy is needed first. Until the next deploy, the copy has no manifest, so only SQLite's own checks apply.
+It makes a backup on the server with the app's own command (SQLite's online backup, safe while the app runs). It brings that backup back with its SHA-256 and size, and checks both on arrival. Then it runs SQLite's integrity check, and deletes the temporary copy on the server. It saves to `~/GoveeBackups`, readable only by you, with each member's account file in a `.accounts` folder beside it. The copy holds password hashes, push signing keys and each home's location, so keep it out of the repo and out of shared folders. It works with the version deployed on 14 November (`19166b3`), so no deploy is needed first. Until the next deploy, the copy has no manifest, so only SQLite's own checks apply.
 
 **Check a backup** against this version of the app, after `npm run build`:
 
@@ -112,7 +112,9 @@ Optional: `MAIL_HOURLY_LIMIT` (default 300, under Namecheap's 500 an hour) and `
 
 **Turning sign-up on:** Settings, Sign-up, "Turn sign-up on". The same card shows the caps (50 a day and 500 in total to start), accounts made, and mail waiting or not delivered. Turning it off stops new sign-ups at once; people who already have an account keep signing in and can still reset their password.
 
-**Member accounts' files** are in `/data/accounts/`, one per person. `backup.js` copies each of them into `<backup>.accounts/` next to the backup. **`scripts/pull-backup.sh` does not bring them back yet**: it copies the owner's file and the control database only. That must be added before sign-up is switched on for anyone.
+**Member accounts' files** are in `/data/accounts/`, one per person. `backup.js` copies each of them into `<backup>.accounts/` next to the backup, and `scripts/pull-backup.sh` brings each one back the same way as the others, with its hash and size checked, into a `.accounts` folder beside the pulled backup.
+
+**`CREDENTIAL_KEYS` is needed before sign-up is useful.** Members connect their own Govee and AI keys in the browser, and those are stored encrypted. Without `CREDENTIAL_KEYS`, the forms say the server cannot store keys yet.
 
 ## Password reset
 

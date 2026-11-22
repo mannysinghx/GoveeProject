@@ -1,0 +1,31 @@
+"""Phase 5: the guarantee held by two guards, with both removed together. Must be CAUGHT."""
+import subprocess
+S = '/app/apps/server/'
+PAIRS = [
+    ('connected keys not scrubbed, at connect and when read', [
+        ('src/account/account-service.ts',
+         "    // Scrubbed from here on, even if the check fails, because it was typed into this server.\n    this.deps.secrets.add(apiKey);\n    try {\n      await this.deps.checkGoveeKey(apiKey);",
+         "    try {\n      await this.deps.checkGoveeKey(apiKey);"),
+        ('src/account/personal-keys.ts', "        this.secrets.add(stored.secret);\n        loaded.govee = stored.secret;", "        loaded.govee = stored.secret;"),
+    ], 'tests/own-account.test.ts', 'uses it only for that account'),
+]
+for name, edits, test, pattern in PAIRS:
+    originals = {}
+    ok = True
+    for rel, old, new in edits:
+        text = originals.get(rel) or open(S + rel).read()
+        originals.setdefault(rel, text)
+        current = open(S + rel).read()
+        if current.count(old) != 1:
+            ok = False
+            print(f'NOT APPLIED: {name} ({rel})')
+            break
+        open(S + rel, 'w').write(current.replace(old, new))
+    try:
+        if ok:
+            run = subprocess.run(['npx', 'vitest', 'run', test, '-t', pattern], cwd=S, capture_output=True, text=True, timeout=300)
+            out = run.stdout + run.stderr
+            print(('CAUGHT' if run.returncode != 0 and 'failed' in out else 'MISSED') + ': ' + name)
+    finally:
+        for rel, text in originals.items():
+            open(S + rel, 'w').write(text)

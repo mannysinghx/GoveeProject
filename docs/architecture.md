@@ -63,6 +63,17 @@ Phase 4 of [public-signup-plan.md](public-signup-plan.md). Everything is in-hous
 - **`security/proof-of-work.ts`** issues signed puzzles for the register and forgot forms. The browser solves them with WebCrypto (`apps/web/src/features/auth/proof-of-work.ts`).
 - **Limits** are counted in `request_limits` and `mail_outbox`. The sign-up switch and caps are in `platform_settings`.
 
+## People's own accounts
+
+Phase 5 of [public-signup-plan.md](public-signup-plan.md).
+
+- **`account/account-service.ts`** (on the platform) connects and removes Govee and AI keys, sets a member's AI cap, exports and deletes an account, and lists, suspends and reactivates accounts for the owner. Its routes, in `account/account-routes.ts`, always work on the signed-in person's own user, never on an id from the request; only the owner's `/admin/accounts` routes take an id.
+- **`account/personal-keys.ts`** decrypts a member's keys on first use, keeps them in memory until they change, and adds each to the scrubber. A member's account gets `goveeKey: () => keys.govee(userId)` and `aiProviders: () => keys.ai(userId)`; the owner's gets `GOVEE_API_KEY` (or their stored key) and the server's AI providers. AI keys are stored as `ai:<provider>` credentials holding the key and its model, fingerprinted by the key alone.
+- **`AiService`** asks for its providers on every request, so keys added or removed take effect at once. Resting state is kept per provider, model and a hash of the key. A member's cap is read from their own database (`application_settings`, `ai.monthly_limit_usd`). `AiGate`, shared by every account, allows 8 AI requests at once.
+- **`AccountRegistry.unload`** stops one account's timers and queue and closes its database, for suspend and delete. Its sign-in is stopped first, so no request can load it again meanwhile.
+- **Limits.** `security/limits.ts` has `hitLimit` (counts in `request_limits`, used for key checks) and `RequestRate` (in memory, signed-in requests a minute per member, checked in the request hook). `assertRoomFor` in `app/request-account.ts` caps members' groups, presets and schedules, not counting built-ins.
+- **`BuiltinPresets`** takes `showsStartEnabled`: true for the owner, false for members, whose holiday shows are set up switched off.
+
 ## Command lifecycle
 
 ```
@@ -234,7 +245,7 @@ Background status failures are recorded as incidents, not as a line in the activ
   - Replies are JSON. DeepSeek and GLM are sent `response_format: json_object`; Gemini is asked in words. Either way, every reply is checked against the shared Zod schemas: `patternDraftSchema` with cell bounds, and `scheduleDraftSchema` with `parseRecurrenceDraft` and checks that each id exists.
   - A bad draft gets one correction on the same provider, told exactly what was wrong. It then moves to the next provider, which is not rested, since the provider itself worked.
   - Pattern drafts are editor steps (paint, gradient, repeat over cell ranges), applied in the browser by `applyPatternDraft` with the editor's own functions, so they are undoable.
-- **One runner.** `AiService.withProviders` does round-robin, failover and resting for Ask and both drafts. `guarded` allows one AI request at a time, at most 6 a minute.
+- **One runner.** `AiService.withProviders` does round-robin, failover and resting for Ask and both drafts. `guarded` allows one AI request at a time per account, at most 6 a minute, and checks the server-wide `AiGate`.
 - **Spending.** `ledger.ts` records every request in `ai_usage`, with its feature (`ask`, `draft_pattern` or `draft_schedule`), including failed ones that may have been billed. The cap is checked before each request. An answer's cost includes what any failed provider cost for the same question.
 
 ## Database

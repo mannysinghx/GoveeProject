@@ -1,0 +1,89 @@
+"""Phase 5 mutation checks. Runs inside the dev container on /app. Each mutation breaks one
+guarantee, runs the test that should catch it, and restores the file. Prints CAUGHT or MISSED."""
+import subprocess, sys
+
+S = '/app/apps/server/'
+T = 'tests/own-account.test.ts'
+MUTATIONS = [
+    ('Govee key saved without asking Govee', 'src/account/account-service.ts',
+     "      await this.deps.checkGoveeKey(apiKey);\n", "", T, 'refuses a key Govee rejects'),
+    ('no limit on key checks', 'src/account/account-service.ts',
+     "    if (!hitLimit(this.control, `keycheck:user:${userId}`, MEMBER_LIMITS.keyChecksPerHour, 3600_000, this.deps.clock.nowMs())) {",
+     "    if (false) {", T, 'limits how many keys'),
+    ('owner GOVEE_API_KEY can be replaced from the browser', 'src/account/account-service.ts',
+     "    if (session.role === 'owner' && this.deps.config.govee.apiKey) {\n      throw new AppError(409, 'govee_key_on_server', 'Your key is set on the server as GOVEE_API_KEY. Change it there.');",
+     "    if (false) {\n      throw new AppError(409, 'govee_key_on_server', 'Your key is set on the server as GOVEE_API_KEY. Change it there.');",
+     T, 'GOVEE_API_KEY in charge'),
+    ('member Govee key never read', 'src/app/context.ts',
+     "      goveeKey: () => keys.govee(userId),", "      goveeKey: () => null,", T, 'uses it only for that account'),
+    ('member gets the owner AI keys', 'src/app/context.ts',
+     "      aiProviders: () => keys.ai(userId),", "      aiProviders: () => config.ai.providers,", T, 'used only for them'),
+    ('member cap is the server cap', 'src/app/context.ts',
+     "      personalAi: true,", "      personalAi: false,", T, 'cap, lock and resting'),
+    ('AI key identity includes the model', 'src/account/account-service.ts',
+     "    this.deps.credentials.put(session.userId, `ai:${provider}`, JSON.stringify(stored), apiKey);",
+     "    this.deps.credentials.put(session.userId, `ai:${provider}`, JSON.stringify(stored));", T, 'rejects, a model'),
+    ('any model accepted', 'src/account/account-service.ts',
+     "    if (!modelsFor(provider).includes(model.toLowerCase())) {", "    if (false) {", T, 'rejects, a model'),
+    ('AI key not checked', 'src/account/account-service.ts',
+     "    await this.checkAiKey(session.userId, provider, model.toLowerCase(), apiKey, ip);\n", "", T, 'rejects, a model'),
+    ('connected keys not scrubbed', 'src/account/account-service.ts',
+     "    // Scrubbed from here on, even if the check fails, because it was typed into this server.\n    this.deps.secrets.add(apiKey);",
+     "", T, 'uses it only for that account'),
+    ('server-wide AI gate ignored', 'src/ai/ai-service.ts',
+     "    if (gate && !gate.tryEnter()) {", "    if (false) {", T, 'run at once'),
+    ('resting state not tied to the key', 'src/ai/ai-service.ts',
+     "      const id = `${config.id}:${config.model}:${keyTag(config.apiKey)}`;", "      const id = `${config.id}:${config.model}`;", T, 'cap, lock and resting'),
+    ('holiday shows on for members', 'src/app/context.ts',
+     "      holidayShowsStartEnabled: false,", "      holidayShowsStartEnabled: true,", T, 'switched off for a member'),
+    ('no per-member request limit', 'src/app/build-app.ts',
+     "        if (request.session.role === 'member') {\n          const wait", "        if (false) {\n          const wait", T, 'too many requests'),
+    ('built-ins count against caps', 'src/app/request-account.ts',
+     "  presets: 'SELECT COUNT(*) AS n FROM presets WHERE builtin_key IS NULL',", "  presets: 'SELECT COUNT(*) AS n FROM presets',", T, 'caps a member'),
+    ('owner capped too', 'src/app/request-account.ts',
+     "  if (request.session?.role !== 'member') return;", "", T, 'caps a member'),
+    ('owner can delete their account', 'src/account/account-service.ts',
+     "    if (session.role === 'owner') {\n      throw new AppError(403, 'owner_cannot_delete'", "    if (false) {\n      throw new AppError(403, 'owner_cannot_delete'", T, 'deletes a member'),
+    ('delete without the password', 'src/account/account-service.ts',
+     "    const user = await this.deps.auth.confirmPassword(session.userId, currentPassword, ip, 'delete');",
+     "    const user = this.deps.auth.userById(session.userId)!;", T, 'deletes a member'),
+    ('delete leaves the file', 'src/account/account-service.ts',
+     "          fs.rmSync(file + suffix, { force: true });", "          void suffix;", T, 'deletes a member'),
+    ('delete leaves sign-in history', 'src/account/account-service.ts',
+     "      this.control.prepare('DELETE FROM audit_events WHERE user_id = ?').run(userId);\n", "", T, 'deletes a member'),
+    ('delete leaves the account loaded', 'src/account/account-service.ts',
+     "    await this.deps.accounts.unload(userId);\n\n    this.control.transaction(() => {\n      if (user.email)",
+     "\n    this.control.transaction(() => {\n      if (user.email)", T, 'deletes a member'),
+    ('export without the password', 'src/account/account-service.ts',
+     "    const user = await this.deps.auth.confirmPassword(session.userId, currentPassword, ip, 'export');",
+     "    const user = this.deps.auth.userById(session.userId)!;", T, 'exports'),
+    ('export includes the push signing key', 'src/account/account-service.ts',
+     "'login_attempts', 'push_keys', 'notification_tokens']);", "'login_attempts', 'notification_tokens']);", T, 'exports'),
+    ('suspend leaves sessions', 'src/account/account-service.ts',
+     "        if (status === 'suspended') this.control.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);\n", "", T, 'suspends and reactivates'),
+    ('suspend leaves the account loaded', 'src/account/account-service.ts',
+     "      if (status === 'suspended') await this.deps.accounts.unload(userId);", "      if (false) await this.deps.accounts.unload(userId);", T, 'suspends and reactivates'),
+    ('accounts list not owner-only', 'src/account/account-routes.ts',
+     "  api.get('/admin/accounts', { config: { owner: true } },", "  api.get('/admin/accounts', {},", T, 'suspends and reactivates'),
+]
+
+only = sys.argv[1:]
+results = []
+for name, rel, old, new, test, pattern in MUTATIONS:
+    if only and not any(o in name for o in only):
+        continue
+    path = S + rel
+    original = open(path).read()
+    if original.count(old) != 1:
+        results.append(f'NOT APPLIED ({original.count(old)} matches): {name}')
+        continue
+    open(path, 'w').write(original.replace(old, new))
+    try:
+        run = subprocess.run(['npx', 'vitest', 'run', test, '-t', pattern], cwd=S, capture_output=True, text=True, timeout=300)
+        out = run.stdout + run.stderr
+        ran = ' passed' in out or ' failed' in out
+        verdict = 'CAUGHT' if run.returncode != 0 and 'failed' in out else ('NO TESTS RAN' if not ran else 'MISSED')
+        results.append(f'{verdict}: {name}')
+    finally:
+        open(path, 'w').write(original)
+print('\n'.join(results))

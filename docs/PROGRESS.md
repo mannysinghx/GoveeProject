@@ -4,7 +4,7 @@ Current state of the project, so anyone can pick it up without the original conv
 
 ## Where it stopped
 
-- **Newest work, 22 November 2026: Phases 1 to 4 of public sign-up, built and verified, not pushed.** Branch `claude/public-registration-email-verify-d03096`: Phase 1 (`0b04d18`) adds verified backups, restore, and a way to copy a backup off Railway. Phase 2 (`d0c3cfe`) splits the server into a platform and one context per account. Phase 3 (`b4cd681`) moves sign-in to a control database, with per-account throttling and encrypted keys. Phase 4 (`1ef9e69` server, `b1a1da6` web, `5b2241f` CI script) adds email sign-up, reset and address change with an in-house mail client, off until the owner turns it on. See "Public sign-up" under "In flight". Nothing is uncommitted. Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
+- **Newest work, 22 November 2026: Phases 1 to 5 of public sign-up, built and verified, not pushed.** Phase 5 (`0386fd2` server, `4282c23` web) adds each person's own Govee and AI keys, export and delete, the owner's accounts list, per-member limits, getting-started steps, and draft privacy and terms pages. Earlier: Branch `claude/public-registration-email-verify-d03096`: Phase 1 (`0b04d18`) adds verified backups, restore, and a way to copy a backup off Railway. Phase 2 (`d0c3cfe`) splits the server into a platform and one context per account. Phase 3 (`b4cd681`) moves sign-in to a control database, with per-account throttling and encrypted keys. Phase 4 (`1ef9e69` server, `b1a1da6` web, `5b2241f` CI script) adds email sign-up, reset and address change with an in-house mail client, off until the owner turns it on. See "Public sign-up" under "In flight". Nothing is uncommitted. Production is unchanged and still runs `19166b3`. The plan and decisions are in [public-signup-plan.md](public-signup-plan.md).
 - **Newest work, 13 November 2026: deployed.** `main` is at `19166b3` (14 November, 02:53 UTC), and Railway runs it. It fixes lights showing a frozen or wrong status, and adds daily color schemes, pattern search and sort, and one brightness for all lights. See "In flight" below. The branch `claude/govee-light-recognition-b1a7e4` holds the same commits plus the deployment record, which is local only. Nothing is uncommitted.
 - Branch: `main`, pushed to <https://github.com/mannysinghx/GoveeProject>. `git log -1` shows the last commit.
 - Version 1 is built and verified against a local stand-in for the Govee API. On a real account, discovery and status work and power commands to a group are accepted. **Whether real lights respond correctly has not been confirmed.** See `docs/govee-integration.md`.
@@ -104,7 +104,31 @@ Phase 4, email and sign-up, is done (`1ef9e69`, `b1a1da6`, `5b2241f`). How it wo
 
 **Owner to do for mail:** turn on SMTP access for `info@lightup.ink` (an app password is better), DKIM and DMARC as above, then set `SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` in Railway yourself, after the push.
 
-**Next:** Phase 5, onboarding and personal keys: connect a Govee key from the browser, holiday shows opt-in, an AI key per person with its own lock, cap and resting state, delete and export, an admin screen, privacy and terms pages (`docs/public-signup-plan.md`, "Build order"). Then one push for Phases 1 to 5 with the owner's approval, after the owner has pulled a production backup.
+Phase 5, onboarding and own keys, is done (`0386fd2` server, `4282c23` web). How it works: `docs/security.md`, "People's own keys and accounts"; `docs/architecture.md`, "People's own accounts". Sign-up is still off.
+
+| Piece | How it was checked |
+|---|---|
+| Govee key from the browser: checked with Govee, stored encrypted, used only by that account, one account per key; the owner's `GOVEE_API_KEY` still wins while set, and the owner can connect one when it is not; no master key means no storing | `apps/server/tests/own-account.test.ts`, against the mock Govee |
+| Own AI keys: priced models only, checked with one request, one account per key, never the owner's; each person's own cap, lock and resting state, and a new key starts afresh; 8 at once on the server | Same file, with a stand-in for the providers |
+| 5 key checks an hour; keys scrubbed; no key in any response, log line or the control database's text | Same file |
+| Export with the password, no secret in it; delete (members only) removes sign-in, keys, sign-in history and the file, leaves everyone else as they were, and the address can sign up again | Same file, delete on a real file on disk |
+| Accounts list owner-only; suspend ends sessions and unloads the account, and old sessions stay ended after reactivating | Same file |
+| 300 requests a minute per member; caps of 50 groups, 200 presets and 200 schedules, built-ins not counted, owner not capped | Same file |
+| Members' holiday shows set up off; turning one on is their choice | Same file |
+| Route census: 96 routes, 12 public, 4 owner-only. The two-person test now also covers the new routes | `apps/server/tests/accounts.test.ts`, `signup.test.ts` |
+| Pages: Govee key, AI keys, export, delete, accounts, getting started, privacy and terms; the key leaves the form after sending | `apps/web/src/features/account/account.test.tsx`, 13 tests |
+| Breaking each guarantee on purpose | 26 mutations: 22 caught at first; 3 weak tests strengthened, then caught; 1 held by a second guard, caught when both are removed. `docs/public-signup-evidence/` |
+| The real built server in a browser | Local container with the mock Govee and the fake mail server: owner setup, sign-up on, a member registered by email, connected the mock key on the Connect page and found 3 lights, all 21 holiday shows off, the Settings cards right for each role, the time-zone button, sign-out and delete both landing on the sign-in page, the file gone. No error lines, and no key, password or link in the server log |
+| `pull-backup.sh` with a member | Against a snapshot of that container: the owner file, control database and the member's file came back, each matching the server and passing the integrity check; nothing left on the server; the script's own exit code 0 |
+| Everything together | `bash scripts/ci-local.sh --image 4282c23`: passed, 898 tests (shared 71, server 582, web 245), 0 vulnerabilities, image smoke test, backup round trip. See `docs/OPS_LOG.md` |
+
+**Found and fixed while checking, already in production:** signing out left the signed-in pages on screen, since the first build (`useLogout` cleared the cache, removing the session query it then asked to refresh). Confirmed in a real browser on the unfixed build, then fixed with `showSignedOut`, with a test (`apps/web/src/features/auth/sign-out.test.tsx`).
+
+**A mistake, logged in `docs/OPS_LOG.md`:** one test run sent 3 requests to the real DeepSeek API with a made-up key, before members' accounts got the test's stand-in. DeepSeek refused them. Fixed before any further run.
+
+**Not checked in a browser:** adding an AI key (it would send a key to a real provider); the export download itself (covered by tests). **Not done:** no AI or Govee request has been made with a real member's key.
+
+**Next:** one push for Phases 1 to 5, with the owner's approval, after the owner has pulled a production backup. Then Phase 6: sign-up on, capped at 1 or 2 trusted people.
 
 **Light status, daily color schemes, pattern search, one brightness (13 November 2026).** `459c84f` (light status) and `b2ee3c2` (the three features), with two test and CI fixes after them. **Deployed** on 14 November 2026 at 02:53 UTC as `19166b3`, with the owner's approval ("Yes, deploy"): Railway deployment `1f11c53f` succeeded, the log shows `006_light_status.sql` applied and no warnings or errors at startup, health is OK, the three new routes return 401 without a session, and the live bundle contains the new screens. Roll back by redeploying `adab10a` (deployment `458df907`) in Railway; the two new columns can stay. **Not yet seen after the deploy:** a background check's result, the 19 new built-in presets, or anything on real lights. The owner has not switched on the daily change, so no new schedule exists.
 
@@ -168,9 +192,13 @@ How it works, for whoever picks this up:
 | License is MIT, copyright "mannysinghx" | `LICENSE` | Low | Owner can change it |
 | GitHub Actions: none exist, and CI runs locally by policy | `scripts/ci-local.sh` | None | Owner |
 | ~~The global login limit could be used to block sign-in for 5 minutes at a time~~ Removed in Phase 3: no counter is shared by every account | `docs/security.md` | Resolved | |
-| `scripts/pull-backup.sh` does not bring back members' account files (`backup.js` copies them on the server, into `<backup>.accounts/`) | `scripts/pull-backup.sh`, `docs/deploy-railway.md` | High before sign-up is on for anyone (Phase 6); none exist while it is off | Build in Phase 5 |
-| Members are told to set `GOVEE_API_KEY` on the server (dashboard banner, Settings' Govee card), which only the owner can do | `apps/web/src/features/dashboard/DashboardPage.tsx`, `apps/web/src/features/settings/SettingsPage.tsx` | Medium once sign-up is on | Phase 5 onboarding |
-| Not built yet from the plan's public-site list: delete my account, export my data, per-account request limits, caps on devices and schedules, a disposable-address list (optional) | `docs/public-signup-plan.md` | Medium before Phase 6 | Phase 5 |
+| ~~`pull-backup.sh` did not bring back members' files~~ It does since Phase 5 | `scripts/pull-backup.sh` | Resolved | |
+| ~~Members told to set `GOVEE_API_KEY`~~ They connect their own key since Phase 5 | | Resolved | |
+| Privacy and terms pages are drafts, marked as such on the page, written from what the code does | `apps/web/src/features/legal/LegalPages.tsx` | High before sign-up opens to the public | Owner (P8): have them reviewed |
+| Sign-in history (audit log) is kept with no time limit, until the account is deleted. The privacy page says it is kept to protect the account, without a period | `apps/server/src/auth/auth-service.ts` (`audit`) | Medium before Phase 7 | Owner: pick a retention, then build pruning |
+| Lights per account are not capped: discovery adds whatever Govee returns for that person's key | `apps/server/src/devices/device-service.ts` | Low | Later, if needed |
+| Not built: a disposable-address list (optional in the plan), and an owner switch to pause all background traffic | `docs/public-signup-plan.md` | Low | Owner |
+| `CREDENTIAL_KEYS` must be set in Railway before members can connect any key | `docs/deploy-railway.md` | High before Phase 6 | Owner |
 | Members' account files carry the old, unused `users`, `sessions` and `login_attempts` tables from `001_initial.sql` | `migrations/001_initial.sql` | Low, harmless | Later cleanup |
 | A fresh install of this version, rolled back to `19166b3`, would offer owner setup again, because the old `users` table is empty. Not the production case: the owner exists there | `apps/server/src/auth/control.ts` | Low | None needed for production |
 | No mail has been sent from Railway: port 465 from Railway, and DKIM and DMARC for `lightup.ink`, are unconfirmed | `docs/deploy-railway.md` | Medium | Owner, after the push |
@@ -220,7 +248,7 @@ git ls-files -co --exclude-standard | COPYFILE_DISABLE=1 tar --no-mac-metadata -
 docker exec -w /app glm-dev-phase1 sh -c 'npm ci && npm test'
 ```
 
-The Phase 4 mutation checks are in `docs/public-signup-evidence/`.
+The Phase 4 and Phase 5 mutation checks are in `docs/public-signup-evidence/`, with how to run them.
 
 Before any push, run the CI on the exact commit. It never uses GitHub:
 
@@ -230,6 +258,6 @@ bash scripts/ci-local.sh --image
 
 ## Proposals not started
 
-- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Being built: Phases 1 to 4 are done, see "Public sign-up" under "In flight". Still open: P8 (terms and privacy policy, the owner's).
+- **Open public sign-up with email verification, built in-house, plus bring-your-own AI key** (asked for 21 November 2026): [the plan](public-signup-plan.md). Being built: Phases 1 to 5 are done, see "Public sign-up" under "In flight". Still open: P8 (terms and privacy policy, the owner's).
 - Letting other people sign up, invite-only: [the plan](multi-user-plan.md). On 9 November 2026 the owner said no sign-up was needed. The 21 November request above supersedes that, and reuses its design.
 - AI features for the owner's own account, free to use, with a monthly spending cap: [the plan](ai-features-plan.md). It is waiting on the decisions listed in it, and nothing is built.
