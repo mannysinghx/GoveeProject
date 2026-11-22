@@ -124,7 +124,7 @@ From Phase 5 of [public-signup-plan.md](public-signup-plan.md):
 
 ## Account recovery
 
-People with an email address on their account reset their password by email, from "Forgot your password?" on the sign-in page. Without one, or if mail is not working: if you can run commands on the server, you own the data anyway, so recovery happens there. This signs out that user's sessions only, clears their sign-in lockouts and records the reset in the audit log, and in Activity for the owner. `--user <username or email>` picks someone other than the owner.
+People with an email address on their account reset their password by email, from "Forgot your password?" on the sign-in page. The sign-in page says nothing about the server-side reset below; that is for whoever runs the server. Without one, or if mail is not working: if you can run commands on the server, you own the data anyway, so recovery happens there. This signs out that user's sessions only, clears their sign-in lockouts and records the reset in the audit log, and in Activity for the owner. `--user <username or email>` picks someone other than the owner.
 
 Direct install, after `npm run build`:
 
@@ -242,3 +242,7 @@ Ask, on the Connections and Activity pages, answers questions using up to three 
 - **Lockout as nuisance.** Since Phase 3 there is no limit shared by every account. Someone guessing one account's password from many addresses can still lock that one account's sign-in for 5 minutes at a time. Sessions already signed in keep working.
 - **Sign-in history** in the control database's audit log is kept with no time limit, until the account is deleted. A limit is not built yet.
 - **Privacy and terms pages** (`/privacy`, `/terms`) are drafts marked as such, written from what the code does. They need review by someone qualified before sign-up opens to the public (P8).
+
+## Nothing internal on pages or in responses
+
+Pages and API responses never name a server setting, a command, a docs path, the hosting or mail provider, or the tools the service is built with. Pages for the owner follow the same rule, because the web app's code ships to every visitor. Members do not get the server's Node.js version or Govee's API address in diagnostics. Error messages say what happened in plain words ("Keys cannot be added right now"), and the detail goes to the server log. Two tests enforce this: `apps/web/src/public-text.test.ts` over the web app's source, and `apps/server/tests/public-text.test.ts` over the messages the server sends; the word list is `packages/shared/src/public-text.ts`.
