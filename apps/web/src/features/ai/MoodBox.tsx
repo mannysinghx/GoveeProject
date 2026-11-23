@@ -36,7 +36,7 @@ const KEEP_ENTRIES = 6;
 
 const UNAVAILABLE: Record<NonNullable<AiStatusDto['reason']>, string | null> = {
   disabled: null,
-  no_providers: 'AI is not set up on this server yet.',
+  no_providers: null,
   no_key: null,
   limit_reached: "This month's AI spending limit has been reached. It resets on the 1st.",
 };
@@ -60,7 +60,9 @@ function LightRow({ light }: { light: AiMoodLightDto }) {
         <>
           <Spectrum colors={light.colors} height="h-4" />
           <span className="sr-only">
-            {light.colors.length === 1 ? 'Colour' : 'Colours along it'}: {describeColors(light.colors)}.
+            {light.kelvin !== null
+              ? `White light at about ${light.kelvin} K.`
+              : `${light.colors.length === 1 ? 'Colour' : 'Colours along it'}: ${describeColors(light.colors)}.`}
           </span>
         </>
       ) : (
@@ -298,9 +300,9 @@ export function MoodBox() {
   if (!status.data) return null;
   if (reason === 'disabled') return null;
 
-  const unavailable = reason === 'no_key' ? (
+  const unavailable = reason === 'no_key' || reason === 'no_providers' ? (
     <Notice tone="info">
-      Add your own DeepSeek, Gemini or GLM key in{' '}
+      Add an AI key in{' '}
       <Link to="/settings" className="font-medium underline underline-offset-2">
         Settings, under AI
       </Link>{' '}

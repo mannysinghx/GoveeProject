@@ -111,5 +111,10 @@ describe('colour maths for moods', () => {
     expect(colorName('#f0f4ff')).toBe('cool white');
     expect(colorName('#000000')).toBe('near black');
     expect(colorName('#7a0000')).toBe('deep red');
+    // A sunny yellow is yellow, not amber, and pastels are pastels, not whites.
+    expect(colorName('#ffd400')).toBe('yellow');
+    expect(colorName('#ffb6c1')).toBe('pale pink');
+    expect(colorName('#a7c7e7')).toMatch(/^pale (cyan|blue)$/);
+    expect(colorName('#e6f2ff')).toBe('cool white');
   });
 });

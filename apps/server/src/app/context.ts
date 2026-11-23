@@ -172,6 +172,17 @@ function resolveSetupCode(config: AppConfig): { code: string | null; generated: 
 }
 
 /** Every secret the server's own configuration holds, so none can reach a log line or activity record. */
+/**
+ * The owner's providers: the server's, in their order, with any provider the owner added a key for in Settings
+ * using that key and model instead, then the owner's other own providers, in the usual order.
+ */
+export function ownerAiProviders(server: AiProviderConfig[], own: AiProviderConfig[]): AiProviderConfig[] {
+  const byId = new Map(own.map((p) => [p.id, p]));
+  const merged = server.map((p) => byId.get(p.id) ?? p);
+  for (const p of own) if (!server.some((s) => s.id === p.id)) merged.push(p);
+  return merged;
+}
+
 export function configSecrets(config: AppConfig): (string | null)[] {
   return [
     config.govee.apiKey,
@@ -482,8 +493,9 @@ export function createPlatform(config: AppConfig, overrides: ContextOverrides = 
     secrets,
     pruneSessions,
     goveeKey: goveeKey.get,
-    // Decided 21 November 2026 (P3): the server's AI keys are for the owner only.
-    aiProviders: () => config.ai.providers,
+    // Decided 21 November 2026 (P3): the server's AI keys are for the owner only. A key the owner adds in Settings
+    // takes the place of the server's key for that provider, so a model can be changed without a redeploy.
+    aiProviders: () => ownerAiProviders(config.ai.providers, keys.ai(OWNER_USER_ID)),
     personalAi: false,
     aiGate,
     holidayShowsStartEnabled: true,

@@ -78,7 +78,9 @@
 ## Limits of Ask and Describe
 
 - **Answers can be wrong.** They come from small, low-cost models. Each answer links to the records it used, so check those before acting on it.
-- **Not tested against the real providers yet.** The request format follows each provider's documentation, and the tests use a stand-in. The first real questions will confirm the model names and settings, especially GLM's.
+- **Not tested against the real providers yet.** The request format follows each provider's documentation, checked on 22 November 2026, and the tests use a stand-in. The first real questions will confirm the model names and settings, especially for Meta (public preview, US first) and GLM.
+- **Meta's Model API is a public preview** in a limited list of countries, and needs a payment method before any request works. Its Muse models always reason, which adds cost and time to each answer.
+- **GLM-4.7-Flash is free, with limits Z.ai does not publish**, and it has left Z.ai's API reference. It may stop working without notice.
 - **Data leaves the server.** See [AI](security.md#ai) for what is sent and where.
 - **Drafts are suggestions.** Describe fills the pattern or schedule editor, and you check it there. A model can misread a description, so look at the pattern and the "next runs" list before you Send or Save.
 - **Patterns are still, and made of whole segments.** Describe cannot make movement, and several LEDs share each segment, so "every fourth LED" becomes the nearest whole-segment version.

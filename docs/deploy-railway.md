@@ -33,7 +33,7 @@ Current deployment: project `goveeproject`, service `@glm/server`, <https://glms
 
 `HOST`, `NODE_ENV` and `DATABASE_PATH` are already set in the `Dockerfile`.
 
-Optional, for Ask: any of `DEEPSEEK_API_KEY`, `GEMINI_API_KEY` and `GLM_API_KEY`, plus `AI_MONTHLY_LIMIT_USD` if the default of $5 does not suit. Set keys yourself in the dashboard. Each change restarts the app. These keys are for the owner's account only; people who sign up do not get them.
+Optional, for Ask, Describe and Set the mood: any of `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `GLM_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `META_API_KEY`, plus `AI_MONTHLY_LIMIT_USD` if the default of $5 does not suit. The owner can also add keys in the app, under Settings, AI, without a redeploy. Set keys yourself in the dashboard. Each change restarts the app. These keys are for the owner's account only; people who sign up do not get them.
 
 For email and sign-up, see "Email and sign-up" below.
 

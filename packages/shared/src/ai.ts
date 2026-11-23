@@ -3,8 +3,18 @@ import { missedRunPolicySchema, recurrenceSchema } from './schemas.js';
 import type { MissedRunPolicy, Recurrence, ScheduleAction, Target } from './schemas.js';
 
 /** The AI providers the app can call, in the default round-robin order. */
-export const aiProviderIds = ['deepseek', 'gemini', 'glm'] as const;
+export const aiProviderIds = ['deepseek', 'gemini', 'glm', 'openai', 'anthropic', 'meta'] as const;
 export type AiProviderId = (typeof aiProviderIds)[number];
+
+/** Each provider's name, as people know it. */
+export const AI_PROVIDER_LABELS: Record<AiProviderId, string> = {
+  deepseek: 'DeepSeek',
+  gemini: 'Google Gemini',
+  glm: 'Z.ai GLM',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic Claude',
+  meta: 'Meta Muse',
+};
 
 export const AI_QUESTION_MAX_LENGTH = 500;
 

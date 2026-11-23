@@ -113,9 +113,15 @@ const envSchema = z.object({
   DEEPSEEK_API_KEY: optionalString,
   DEEPSEEK_MODEL: z.preprocess(emptyToUndefined, z.string().default('deepseek-flash')),
   GEMINI_API_KEY: optionalString,
-  GEMINI_MODEL: z.preprocess(emptyToUndefined, z.string().default('gemini-3.1-flash-lite')),
+  GEMINI_MODEL: z.preprocess(emptyToUndefined, z.string().default('gemini-3.5-flash-lite')),
   GLM_API_KEY: optionalString,
   GLM_MODEL: z.preprocess(emptyToUndefined, z.string().default('glm-4.7-flash')),
+  OPENAI_API_KEY: optionalString,
+  OPENAI_MODEL: z.preprocess(emptyToUndefined, z.string().default('gpt-6-luna')),
+  ANTHROPIC_API_KEY: optionalString,
+  ANTHROPIC_MODEL: z.preprocess(emptyToUndefined, z.string().default('claude-haiku-5-5')),
+  META_API_KEY: optionalString,
+  META_MODEL: z.preprocess(emptyToUndefined, z.string().default('muse-ember-1.0')),
 
   // Email, for sign-up and password reset. See docs/deploy-railway.md. Mail is off until SMTP_HOST is set.
   SMTP_HOST: optionalString,
@@ -236,6 +242,9 @@ function resolveAiProviders(e: z.infer<typeof envSchema>): AiProviderConfig[] {
     deepseek: { apiKey: e.DEEPSEEK_API_KEY, model: e.DEEPSEEK_MODEL },
     gemini: { apiKey: e.GEMINI_API_KEY, model: e.GEMINI_MODEL },
     glm: { apiKey: e.GLM_API_KEY, model: e.GLM_MODEL },
+    openai: { apiKey: e.OPENAI_API_KEY, model: e.OPENAI_MODEL },
+    anthropic: { apiKey: e.ANTHROPIC_API_KEY, model: e.ANTHROPIC_MODEL },
+    meta: { apiKey: e.META_API_KEY, model: e.META_MODEL },
   };
   const wanted = e.AI_PROVIDERS.split(',')
     .map((name) => name.trim().toLowerCase())

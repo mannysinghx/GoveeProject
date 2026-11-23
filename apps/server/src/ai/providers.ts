@@ -1,56 +1,100 @@
+import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
-import type { AiProviderId } from '@glm/shared';
+import { AI_PROVIDER_LABELS, type AiProviderId } from '@glm/shared';
 import type { AiProviderConfig } from '../config/env.js';
 
 /**
- * All three providers accept the same OpenAI-style chat completions request, so one small
- * client covers them, with no SDK. Hosts are fixed here, never configurable, so a key can
- * only ever be sent to its own provider.
+ * Every provider but Anthropic accepts the same OpenAI-style chat completions request, so one small client covers
+ * them with no SDK. Anthropic is called through its official SDK, set up the same way: a fixed host, redirects
+ * refused, and no retries of its own, so the app's failover decides. Hosts are fixed here, never configurable, so a
+ * key can only ever be sent to its own provider.
  *
- * Checked against each provider's documentation on 9 November 2026:
- *  - DeepSeek: https://api-docs.deepseek.com/quick_start/pricing
- *  - Gemini:   https://ai.google.dev/gemini-api/docs/openai and /docs/pricing
- *  - GLM:      https://docs.z.ai/api-reference/introduction and /guides/overview/pricing
+ * Checked against each provider's own documentation on 22 November 2026 (see docs/ai-features-plan.md, "The
+ * providers", for the sources): models, prices, endpoints, token fields and how to keep thinking low.
  */
 interface ProviderSpec {
-  label: string;
+  /** "openai" for an OpenAI-style chat completions endpoint, "anthropic" for the Messages API through its SDK. */
+  adapter: 'openai' | 'anthropic';
+  /** The chat completions URL, or for Anthropic the API's base URL. */
   url: string;
   /** Whether the provider documents `response_format: {type: 'json_object'}` on this endpoint. */
   jsonObject: boolean;
+  /** OpenAI's reasoning models refuse `max_tokens` and take `max_completion_tokens`. */
+  tokensField: 'max_tokens' | 'max_completion_tokens';
   /** Extra request fields for a model. Thinking is turned off or kept low: these answers are short. */
   extra: (model: string) => Record<string, unknown>;
+  /**
+   * Tokens added to the reply limit for a model that always thinks, since its thinking counts against the same limit
+   * and could otherwise leave no room for the answer. It is billed only as used.
+   */
+  thinkingRoom?: (model: string) => number;
 }
 
 const PROVIDERS: Record<AiProviderId, ProviderSpec> = {
   deepseek: {
-    label: 'DeepSeek',
+    adapter: 'openai',
     url: 'https://api.deepseek.com/chat/completions',
     jsonObject: true,
+    tokensField: 'max_tokens',
     // Thinking is on by default, and with tools its reasoning would have to be sent back each round.
     extra: () => ({ thinking: { type: 'disabled' } }),
   },
   gemini: {
-    label: 'Google Gemini',
+    adapter: 'openai',
     url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
     // Its compatible endpoint documents schema-based structured output, not json_object, so JSON is asked for in the prompt.
     jsonObject: false,
-    // Gemini 3 models cannot turn thinking off. This keeps it low.
-    extra: () => ({ reasoning_effort: 'low' }),
+    tokensField: 'max_tokens',
+    // Gemini 3.x Flash-Lite cannot turn thinking off, and thinks at its lowest level, "minimal", unless asked for more,
+    // so nothing is sent. (Sending reasoning_effort "low" would raise it.) Gemini 2.5 Flash-Lite does not think by default.
+    extra: () => ({}),
   },
   glm: {
-    label: 'Z.ai GLM',
+    adapter: 'openai',
     url: 'https://api.z.ai/api/paas/v4/chat/completions',
     jsonObject: true,
+    tokensField: 'max_tokens',
     // The GLM-5.3 series can only think, and defaults to maximum effort. Older models can turn it off.
     extra: (model) =>
       model.toLowerCase().startsWith('glm-5.3')
         ? { thinking: { type: 'enabled' }, reasoning_effort: 'low' }
         : { thinking: { type: 'disabled' } },
+    thinkingRoom: (model) => (model.toLowerCase().startsWith('glm-5.3') ? 1_024 : 0),
+  },
+  openai: {
+    adapter: 'openai',
+    url: 'https://api.openai.com/v1/chat/completions',
+    // GPT-6 Luna's page lists structured outputs but not JSON mode, so JSON is asked for in the prompt.
+    jsonObject: false,
+    tokensField: 'max_completion_tokens',
+    // GPT-6 Luna and GPT-5.6 Luna reason at "medium" unless told otherwise, and on Chat Completions they accept tools only
+    // with reasoning turned off.
+    extra: () => ({ reasoning_effort: 'none' }),
+  },
+  anthropic: {
+    adapter: 'anthropic',
+    url: 'https://api.anthropic.com',
+    // Claude has no schema-free JSON mode, so JSON is asked for in the prompt, which it follows closely.
+    jsonObject: false,
+    tokensField: 'max_tokens',
+    // Claude Haiku 5.5 thinks by default. These answers are short, so it is turned off, as for the other providers.
+    extra: () => ({ thinking: { type: 'disabled' } }),
+  },
+  meta: {
+    adapter: 'openai',
+    url: 'https://api.meta.ai/v1/chat/completions',
+    // The Model API constrains JSON only through a schema, so JSON is asked for in the prompt.
+    jsonObject: false,
+    tokensField: 'max_completion_tokens',
+    // Muse models always reason, at "max" by default on Muse Ember. "low" is the lowest documented setting short of
+    // "minimal", whose support on Chat Completions is not confirmed.
+    extra: () => ({ reasoning_effort: 'low' }),
+    thinkingRoom: () => 2_048,
   },
 };
 
 export function providerLabel(id: AiProviderId): string {
-  return PROVIDERS[id].label;
+  return AI_PROVIDER_LABELS[id];
 }
 
 /** The extra fields a request to this provider and model carries. Exported for tests. */
@@ -59,38 +103,55 @@ export function requestExtras(id: AiProviderId, model: string): Record<string, u
 }
 
 /**
- * Listed paid prices in USD per million tokens. Free tiers are still counted at the paid
- * price, so the monthly cap never relies on a free allowance that may change. DeepSeek is
- * counted at its peak rate, which is double its off-peak rate.
+ * Listed paid prices in USD per million tokens, for each provider's cheap models, cheapest reliable one first: it is
+ * the one a person is offered first. Free tiers are still counted at the paid price, so the monthly cap never relies
+ * on a free allowance that may change. DeepSeek is counted at its peak rate, which is double its off-peak rate.
  */
-const PRICES: Record<string, { input: number; output: number }> = {
-  'deepseek-flash': { input: 0.3, output: 1.2 },
-  'deepseek-v4-flash': { input: 0.3, output: 1.2 },
-  'gemini-2.5-flash-lite': { input: 0.1, output: 0.4 },
-  'gemini-3.1-flash-lite': { input: 0.25, output: 1.5 },
-  'gemini-3.5-flash-lite': { input: 0.3, output: 2.5 },
-  'glm-4.7-flash': { input: 0, output: 0 },
-  'glm-4.5-flash': { input: 0, output: 0 },
-  'glm-5.3-flash': { input: 0.15, output: 0.5 },
-};
+const MODELS: { provider: AiProviderId; model: string; input: number; output: number; offered: boolean }[] = [
+  { provider: 'deepseek', model: 'deepseek-flash', input: 0.3, output: 1.2, offered: true },
+  // A legacy name for the same model. Still priced, for keys saved with it, and no longer offered.
+  { provider: 'deepseek', model: 'deepseek-v4-flash', input: 0.3, output: 1.2, offered: false },
+  // 3.5 Flash-Lite has no shutdown date. 3.1 shuts down on 7 May 2027, and new keys cannot use 2.5, so neither is offered;
+  // both stay priced for keys saved with them.
+  { provider: 'gemini', model: 'gemini-3.5-flash-lite', input: 0.3, output: 2.5, offered: true },
+  { provider: 'gemini', model: 'gemini-3.1-flash-lite', input: 0.25, output: 1.5, offered: false },
+  { provider: 'gemini', model: 'gemini-2.5-flash-lite', input: 0.1, output: 0.4, offered: false },
+  // GLM-4.7-Flash is free, but Z.ai has moved it out of its API reference and does not publish its limits.
+  { provider: 'glm', model: 'glm-5.3-flash', input: 0.15, output: 0.5, offered: true },
+  { provider: 'glm', model: 'glm-4.7-flash', input: 0, output: 0, offered: true },
+  { provider: 'glm', model: 'glm-4.5-flash', input: 0, output: 0, offered: false },
+  // gpt-5-nano and gpt-5-mini shut down on 11 December 2026, so they are not listed.
+  { provider: 'openai', model: 'gpt-6-luna', input: 0.1, output: 0.5, offered: true },
+  { provider: 'openai', model: 'gpt-5.6-luna', input: 0.2, output: 1.2, offered: true },
+  // Prices up to 100,000 tokens of input; these prompts are far below that.
+  { provider: 'anthropic', model: 'claude-haiku-5-5', input: 0.1, output: 0.5, offered: true },
+  // Standard models only: the cheaper "contributor" ones let Meta use what is sent. Prices up to 200,000 tokens of input.
+  { provider: 'meta', model: 'muse-ember-1.0', input: 0.1, output: 0.5, offered: true },
+  { provider: 'meta', model: 'muse-spark-1.3', input: 1.25, output: 4.25, offered: true },
+];
 /** For a model not listed above. Deliberately high, so an unknown price cannot slip past the cap. */
 const UNKNOWN_PRICE = { input: 2, output: 10 };
 
+function priceOf(model: string): { input: number; output: number } | undefined {
+  return MODELS.find((m) => m.model === model.toLowerCase());
+}
+
 export function estimateCostUsd(model: string, inputTokens: number, outputTokens: number): number {
-  const price = PRICES[model.toLowerCase()] ?? UNKNOWN_PRICE;
+  const price = priceOf(model) ?? UNKNOWN_PRICE;
   return (inputTokens * price.input + outputTokens * price.output) / 1_000_000;
 }
 
 export function knownPrice(model: string): boolean {
-  return PRICES[model.toLowerCase()] !== undefined;
+  return priceOf(model) !== undefined;
 }
 
 /**
- * The models a person may pick with their own key: those with a listed price, so what they
- * spend is always counted against their cap at a known rate.
+ * The models a person may pick with their own key: those with a listed price, so what they spend is always counted
+ * against their cap at a known rate. The cheapest reliable one comes first; a cheaper one later in the list, such as a
+ * free model with unpublished limits, is there for whoever wants it.
  */
 export function modelsFor(id: AiProviderId): string[] {
-  return Object.keys(PRICES).filter((model) => model.startsWith(`${id}-`));
+  return MODELS.filter((m) => m.provider === id && m.offered).map((m) => m.model);
 }
 
 /** A rough token count for text, at about 3 characters a token. */
@@ -230,9 +291,11 @@ export interface ChatOptions {
   fetchImpl?: typeof fetch;
 }
 
-/** One chat completions request. Throws AiProviderError for every kind of failure. */
+/** One chat request, to whichever provider. Throws AiProviderError for every kind of failure. */
 export async function chat(provider: AiProviderConfig, options: ChatOptions): Promise<ChatResult> {
   const spec = PROVIDERS[provider.id];
+  if (spec.adapter === 'anthropic') return chatAnthropic(provider, options, spec);
+  const label = providerLabel(provider.id);
   const fetchImpl = options.fetchImpl ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs);
@@ -240,7 +303,7 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
     model: provider.model,
     messages: options.messages,
     ...(options.tools.length > 0 ? { tools: options.tools, tool_choice: 'auto' } : {}),
-    max_tokens: options.maxTokens,
+    [spec.tokensField]: options.maxTokens + (spec.thinkingRoom?.(provider.model) ?? 0),
     stream: false,
     ...(options.jsonOutput && spec.jsonObject ? { response_format: { type: 'json_object' } } : {}),
     ...spec.extra(provider.model),
@@ -250,7 +313,7 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
     category: AiErrorCategory,
     message: string,
     extra: { retry?: number | undefined; billed?: { inputTokens: number; outputTokens: number } } = {},
-  ) => new AiProviderError(provider.id, category, `${spec.label}: ${message}`, extra.retry, extra.billed);
+  ) => new AiProviderError(provider.id, category, `${label}: ${message}`, extra.retry, extra.billed);
 
   let response: Response;
   let text: string;
@@ -323,4 +386,140 @@ export async function chat(provider: AiProviderConfig, options: ChatOptions): Pr
   const fromTotal = usage?.total_tokens !== undefined ? usage.total_tokens - inputTokens : 0;
   const outputTokens = Math.max(usage?.completion_tokens ?? estimateTokens(replyText), fromTotal);
   return { content, toolCalls, finishReason: choice.finish_reason ?? null, inputTokens, outputTokens };
+}
+
+/* -------------------------------- Anthropic -------------------------------- */
+
+type AnthropicMessage = Anthropic.MessageParam;
+
+/**
+ * The app's OpenAI-style conversation as Messages API turns: system text goes in `system`, a tool call becomes a
+ * `tool_use` block, and the tool results that answer one reply go back together, in one user turn. With `withTools`
+ * false (Ask's last step, which must answer), earlier tool turns are written out as text, because the Messages API
+ * refuses tool blocks in a request that defines no tools.
+ */
+export function toAnthropicMessages(messages: ChatMessage[], withTools = true): { system: string; messages: AnthropicMessage[] } {
+  const system: string[] = [];
+  const out: AnthropicMessage[] = [];
+  for (const message of messages) {
+    if (message.role === 'assistant') {
+      const blocks: Anthropic.ContentBlockParam[] = [];
+      if (message.content && message.content.trim() !== '') blocks.push({ type: 'text', text: message.content });
+      for (const call of message.tool_calls ?? []) {
+        if (!withTools) {
+          blocks.push({ type: 'text', text: `(Looked up ${call.function.name} with ${call.function.arguments || '{}'}.)` });
+          continue;
+        }
+        let input: unknown = {};
+        try {
+          input = JSON.parse(call.function.arguments || '{}');
+        } catch {
+          // The model's own arguments did not parse. An empty object keeps the turn valid; the tool already said why.
+        }
+        blocks.push({ type: 'tool_use', id: call.id, name: call.function.name, input: input as Record<string, unknown> });
+      }
+      // An empty reply cannot be sent back, and leaving it out keeps the turns in order.
+      if (blocks.length > 0) out.push({ role: 'assistant', content: blocks });
+    } else if (message.role === 'system') {
+      system.push(message.content);
+    } else if (message.role === 'user') {
+      out.push({ role: 'user', content: message.content });
+    } else if (message.role === 'tool' && !withTools) {
+      out.push({ role: 'user', content: `Result of that lookup: ${message.content}` });
+    } else if (message.role === 'tool') {
+      const result: Anthropic.ToolResultBlockParam = { type: 'tool_result', tool_use_id: message.tool_call_id, content: message.content };
+      const last = out.at(-1);
+      if (last && last.role === 'user' && Array.isArray(last.content) && last.content.every((b) => b.type === 'tool_result')) {
+        last.content.push(result);
+      } else {
+        out.push({ role: 'user', content: [result] });
+      }
+    }
+  }
+  return { system: system.join('\n\n'), messages: out };
+}
+
+/** Messages API stop reasons in the app's words, so a reply cut short is caught the same way for every provider. */
+function finishFrom(reason: Anthropic.StopReason | null): string | null {
+  switch (reason) {
+    case 'end_turn':
+    case 'stop_sequence':
+      return 'stop';
+    case 'tool_use':
+      return 'tool_calls';
+    case 'max_tokens':
+    case 'model_context_window_exceeded':
+      return 'length';
+    case null:
+      return null;
+    default:
+      return reason;
+  }
+}
+
+async function chatAnthropic(provider: AiProviderConfig, options: ChatOptions, spec: ProviderSpec): Promise<ChatResult> {
+  const label = providerLabel(provider.id);
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const client = new Anthropic({
+    apiKey: provider.apiKey,
+    // Never a token or a base URL from this process's environment: only the key this account saved, sent to Anthropic.
+    authToken: null,
+    baseURL: spec.url,
+    maxRetries: 0,
+    timeout: options.timeoutMs,
+    // Redirects are refused, as for every provider, so the key cannot follow one somewhere else.
+    fetch: ((url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => fetchImpl(url, { ...init, redirect: 'error' })) as typeof fetch,
+  });
+  const { system, messages } = toAnthropicMessages(options.messages, options.tools.length > 0);
+  const tools = options.tools.map((t) => ({
+    name: t.function.name,
+    description: t.function.description,
+    input_schema: t.function.parameters as Anthropic.Tool.InputSchema,
+  }));
+  const sentTokens = estimateTokens(JSON.stringify({ system, messages, tools }));
+  const fail = (category: AiErrorCategory, message: string, extra: { retry?: number | undefined; billed?: { inputTokens: number; outputTokens: number } } = {}) =>
+    new AiProviderError(provider.id, category, `${label}: ${message}`, extra.retry, extra.billed);
+
+  let reply: Anthropic.Message;
+  try {
+    reply = await client.messages.create({
+      model: provider.model,
+      max_tokens: options.maxTokens,
+      ...(system ? { system } : {}),
+      messages,
+      ...(tools.length > 0 ? { tools, tool_choice: { type: 'auto' as const } } : {}),
+      ...(spec.extra(provider.model) as Partial<Anthropic.MessageCreateParamsNonStreaming>),
+    });
+  } catch (error) {
+    if (error instanceof Anthropic.APIConnectionTimeoutError) {
+      // The provider may have read the whole request before the time ran out, so it is counted.
+      throw fail('timeout', `no reply within ${Math.round(options.timeoutMs / 1000)} seconds.`, { billed: { inputTokens: sentTokens, outputTokens: 0 } });
+    }
+    if (error instanceof Anthropic.APIConnectionError) throw fail('network', 'could not be reached.');
+    if (error instanceof Anthropic.APIError && typeof error.status === 'number') {
+      const said = error.message ? ` It said: ${error.message.split(provider.apiKey).join('[REDACTED]').slice(0, 200)}` : '';
+      throw fail(categoryFor(error.status), `the request was refused (HTTP ${error.status}).${said}`, {
+        retry: error.headers ? retryAfterMs(error.headers, options.nowMs) : undefined,
+      });
+    }
+    throw fail('bad_response', 'the reply was not in the expected format.', { billed: { inputTokens: sentTokens, outputTokens: 0 } });
+  }
+
+  if (reply.stop_reason === 'refusal') {
+    // The model declined. That is its answer, not an outage, so the provider is not rested; the request moves on.
+    throw fail('invalid_output', 'declined to answer this request.', {
+      billed: { inputTokens: reply.usage.input_tokens, outputTokens: reply.usage.output_tokens },
+    });
+  }
+  const text = reply.content.flatMap((block) => (block.type === 'text' ? [block.text] : [])).join('');
+  const toolCalls: ToolCall[] = reply.content.flatMap((block) =>
+    block.type === 'tool_use' ? [{ id: block.id, type: 'function' as const, function: { name: block.name, arguments: JSON.stringify(block.input ?? {}) } }] : [],
+  );
+  return {
+    content: text === '' ? null : text,
+    toolCalls,
+    finishReason: finishFrom(reply.stop_reason),
+    inputTokens: reply.usage.input_tokens + (reply.usage.cache_creation_input_tokens ?? 0) + (reply.usage.cache_read_input_tokens ?? 0),
+    outputTokens: reply.usage.output_tokens,
+  };
 }

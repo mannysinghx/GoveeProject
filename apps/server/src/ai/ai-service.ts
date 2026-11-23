@@ -16,6 +16,7 @@ import type {
 import type { AiProviderConfig, AppConfig } from '../config/env.js';
 import type { Clock } from '../shared/clock.js';
 import { AppError } from '../shared/errors.js';
+import { AI_PROVIDER_LABELS, aiProviderIds } from '@glm/shared';
 import { ASK_TOOLS, ReferenceRegistry, type AskTools } from './ask-tools.js';
 import { checkPattern, checkSchedule, extractJson, patternPrompt, schedulePrompt, type Checked, type ScheduleContext } from './drafts.js';
 import {
@@ -269,7 +270,7 @@ export class AiService {
       throw new AppError(503, 'ai_not_configured', 'AI is not set up yet.');
     }
     if (status.reason === 'no_key') {
-      throw new AppError(503, 'ai_no_key', 'Add your own DeepSeek, Gemini or GLM key in Settings to use AI.');
+      throw new AppError(503, 'ai_no_key', `Add your own AI key in Settings to use AI: ${aiProviderIds.map((id) => AI_PROVIDER_LABELS[id]).join(', ')}.`);
     }
     if (status.reason === 'limit_reached') {
       throw new AppError(
@@ -489,7 +490,7 @@ export class AiService {
     }
 
     const scorer = this.providers.find((p) => p !== reviewer && free(p)) ?? reviewer;
-    const second = budget.requestsLeft < 1 ? null : await this.reviewWith(scorer, budget, description, brief, layout, verdict.corrected, context);
+    const second = budget.requestsLeft < 1 ? null : await this.reviewWith(scorer, budget, description, brief, layout, verdict.corrected, context, false);
     if (!second) {
       notes.push('The corrected look could not be scored again, so it waits for you.');
       return { status: 'concerns', score: verdict.score, by, notes, independent: false, confirmation: null, replacement: verdict.corrected };
@@ -512,9 +513,10 @@ export class AiService {
     layout: MoodLayout,
     look: PlanResult,
     context: ScheduleContext,
+    canCorrect = true,
   ): Promise<MoodReview | null> {
     try {
-      return await this.draftWith(reviewer.config, budget, reviewPrompt(layout), reviewUser(description, brief, look), (json) =>
+      return await this.draftWith(reviewer.config, budget, reviewPrompt(layout, canCorrect), reviewUser(description, brief, look), (json) =>
         checkReview(json, layout, brief, context.scenes),
       );
     } catch (error) {

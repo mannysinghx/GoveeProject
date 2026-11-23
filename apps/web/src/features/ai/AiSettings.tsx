@@ -12,17 +12,17 @@ export function AiSettings() {
   return (
     <SectionCard
       title="AI"
-      description="Used by Ask and Describe."
+      description="Used by Ask, Describe and Set the mood."
     >
       {status.isPending ? <Loading label="Loading AI status" /> : null}
       {status.isError ? <ErrorNotice error={status.error} /> : null}
       {data ? (
         <div className="space-y-4">
           {data.reason === 'disabled' ? <Notice tone="info">AI is turned off.</Notice> : null}
-          {isMember ? <PersonalAiKeys /> : null}
           {data.reason === 'no_providers' ? (
-            <Notice tone="info">No AI provider is set up yet.</Notice>
+            <Notice tone="info">No AI provider is set up yet. Add a key below to turn AI on.</Notice>
           ) : null}
+          <PersonalAiKeys />
           {data.providers.length > 0 ? (
             <ul className="space-y-2">
               {data.providers.map((p) => (
@@ -42,8 +42,10 @@ export function AiSettings() {
           </p>
           <Notice tone="info" title="What is sent">
             Your question, and the records needed to answer it: light, schedule and preset names, runs, commands and connection
-            history. Never your Govee key, sign-in history, location or Govee device ids. DeepSeek processes data in China. On
-            Gemini&apos;s free tier, Google may use it to improve its products. Z.ai processes data in Singapore.
+            history. For Set the mood: your words, light names and segment counts. Never your Govee key, sign-in history,
+            location or Govee device ids. DeepSeek processes data in China. On Gemini&apos;s free tier, Google may use it to
+            improve its products. Z.ai processes data in Singapore. Anthropic does not train on API data and deletes it within
+            30 days.
           </Notice>
         </div>
       ) : null}

@@ -44,8 +44,13 @@ export interface PersonalAiKeyDto {
 }
 
 export interface PersonalAiDto {
-  /** False for the owner, whose AI keys are set on the server. */
+  /** False only when the server cannot store keys encrypted (no master key). */
   canAddKeys: boolean;
+  /**
+   * True for the owner: the monthly limit is set in the hosting settings, and a key added here is used in place
+   * of the server's key for the same provider.
+   */
+  limitOnServer: boolean;
   keys: PersonalAiKeyDto[];
   /** Models each provider may use, so prices are always known and counted against the cap. */
   models: Record<AiProviderId, string[]>;
@@ -137,26 +142,42 @@ export interface AiKeyGuide {
 }
 
 /**
- * Cheapest first. Prices are the providers' own listings, checked on 22 November 2026, and
- * match what the server counts against the monthly limit (apps/server/src/ai/providers.ts;
+ * Each provider's cheapest reliable model, cheapest first. Prices are the providers' own listings, checked on
+ * 22 November 2026, and match what the server counts against the monthly limit (apps/server/src/ai/providers.ts;
  * a server test fails if they drift apart). DeepSeek is shown at its peak rate, as counted.
  */
 export const AI_KEY_GUIDES: readonly AiKeyGuide[] = [
   {
+    provider: 'openai',
+    label: 'OpenAI',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    recommendedModel: 'gpt-6-luna',
+    price: { input: 0.1, output: 0.5 },
+    note: 'Paid from credit you buy first. OpenAI does not train on API data by default, and keeps abuse logs for up to 30 days.',
+  },
+  {
+    provider: 'meta',
+    label: 'Meta Muse',
+    keyUrl: 'https://dev.meta.ai/',
+    recommendedModel: 'muse-ember-1.0',
+    price: { input: 0.1, output: 0.5 },
+    note: "Needs a payment method first. Meta does not train on its standard models' API data. Its Model API is in preview and offered in a limited list of countries.",
+  },
+  {
+    provider: 'anthropic',
+    label: 'Anthropic Claude',
+    keyUrl: 'https://platform.claude.com/settings/keys',
+    recommendedModel: 'claude-haiku-5-5',
+    price: { input: 0.1, output: 0.5 },
+    note: 'Paid from a balance you top up. Anthropic does not train on API data, deletes it within 30 days, and may process it in any region.',
+  },
+  {
     provider: 'glm',
     label: 'Z.ai GLM',
     keyUrl: 'https://z.ai/manage-apikey/apikey-list',
-    recommendedModel: 'glm-4.7-flash',
-    price: { input: 0, output: 0 },
-    note: 'Free on Z.ai. Data is processed in Singapore.',
-  },
-  {
-    provider: 'gemini',
-    label: 'Google Gemini',
-    keyUrl: 'https://aistudio.google.com/apikey',
-    recommendedModel: 'gemini-2.5-flash-lite',
-    price: { input: 0.1, output: 0.4 },
-    note: 'Has a free tier. On the free tier, Google may use what you send to improve its products.',
+    recommendedModel: 'glm-5.3-flash',
+    price: { input: 0.15, output: 0.5 },
+    note: 'Data is processed in Singapore and not stored. GLM-4.7-Flash is free, but Z.ai does not publish its limits.',
   },
   {
     provider: 'deepseek',
@@ -164,7 +185,15 @@ export const AI_KEY_GUIDES: readonly AiKeyGuide[] = [
     keyUrl: 'https://platform.deepseek.com/api_keys',
     recommendedModel: 'deepseek-flash',
     price: { input: 0.3, output: 1.2 },
-    note: 'Paid from a balance you top up, at half this price outside peak hours. Data is processed in China.',
+    note: 'Paid from a balance you top up, at half this price outside peak hours. Data is stored in China, and DeepSeek may train on it unless you opt out by email.',
+  },
+  {
+    provider: 'gemini',
+    label: 'Google Gemini',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    recommendedModel: 'gemini-3.5-flash-lite',
+    price: { input: 0.3, output: 2.5 },
+    note: 'Has a free tier, on which Google may use what you send to improve its products. New keys cannot use the older Gemini 2.5 models.',
   },
 ];
 

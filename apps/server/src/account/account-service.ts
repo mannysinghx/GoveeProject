@@ -173,20 +173,23 @@ export class AccountService {
 
   /* ---------------------------------- AI keys --------------------------------- */
 
+  /**
+   * The signed-in person's own AI keys: never the key itself, only which provider and model. Everyone can add keys,
+   * owner included. They are stored under the person's own user id, encrypted with that id bound in.
+   */
   personalAi(session: SessionInfo): PersonalAiDto {
     const isMember = session.role === 'member';
     const models = Object.fromEntries(aiProviderIds.map((id) => [id, modelsFor(id)])) as Record<AiProviderId, string[]>;
     const infos = new Map(this.deps.credentials.list(session.userId).map((info) => [info.kind, info]));
-    const keys = isMember
-      ? this.deps.keys.ai(session.userId).map((provider) => ({
-          provider: provider.id,
-          label: providerLabel(provider.id),
-          model: provider.model,
-          connectedAt: infos.get(`ai:${provider.id}`)?.updatedAt ?? '',
-        }))
-      : [];
+    const keys = this.deps.keys.ai(session.userId).map((provider) => ({
+      provider: provider.id,
+      label: providerLabel(provider.id),
+      model: provider.model,
+      connectedAt: infos.get(`ai:${provider.id}`)?.updatedAt ?? '',
+    }));
     return {
-      canAddKeys: isMember && this.deps.credentials.enabled(),
+      canAddKeys: this.deps.credentials.enabled(),
+      limitOnServer: !isMember,
       keys,
       models,
       monthlyLimitUsd: isMember ? readAiLimit(this.account(session.userId).db) : this.deps.config.ai.monthlyLimitUsd,
@@ -194,14 +197,14 @@ export class AccountService {
     };
   }
 
+  /** The owner's monthly AI limit is a hosting setting, so only members change theirs here. */
   private requireMember(session: SessionInfo): void {
     if (session.role !== 'member') {
-      throw new AppError(409, 'ai_keys_on_server', "Your AI keys and limit are set in the app's hosting settings.");
+      throw new AppError(409, 'ai_limit_on_server', "Your AI spending limit is set in the app's hosting settings.");
     }
   }
 
   async connectAi(session: SessionInfo, provider: AiProviderId, model: string, apiKey: string, ip: string): Promise<PersonalAiDto> {
-    this.requireMember(session);
     this.requireStorage();
     if (!modelsFor(provider).includes(model.toLowerCase())) {
       throw new AppError(422, 'ai_model_unknown', `Pick one of the listed ${providerLabel(provider)} models.`);
@@ -243,7 +246,6 @@ export class AccountService {
   }
 
   removeAi(session: SessionInfo, provider: AiProviderId, ip: string): PersonalAiDto {
-    this.requireMember(session);
     this.deps.credentials.remove(session.userId, `ai:${provider}`);
     this.deps.keys.forget(session.userId);
     this.audit(session.userId, 'ai_key_removed', ip, { provider });

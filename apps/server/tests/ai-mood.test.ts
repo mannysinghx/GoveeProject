@@ -3,7 +3,6 @@ import {
   hexToRgb,
   rgbToHsv,
   type AiMoodDto,
-  type DiscoveryResultDto,
   type PresetActionInput,
   type RunResultDto,
 } from '@glm/shared';
@@ -413,12 +412,34 @@ describe('Set the mood: check 2, the brief', () => {
     expect(dto.mood!.clean).toBe(true);
   });
 
+  it('sends back a gradient between distinct colours, which would blend through colours nobody chose', () => {
+    const pinkAndGold: MoodBrief = {
+      ...brief(),
+      palette: [
+        { name: 'soft pink', hex: '#ff8fb8', role: 'main' },
+        { name: 'gold', hex: '#ffb300', role: 'accent' },
+      ],
+    };
+    const gradient = (...stops: string[]): MoodPlan => ({ name: 'x', why: 'x', lights: [{ light: 'L1', brightness: 30, look: { type: 'gradient', stops } }] });
+    const notes = paletteNotes(gradient('#ff8fb8', '#ffb300', '#ff8fb8'), pinkAndGold);
+    expect(notes.join(' ')).toContain('blends through colours nobody chose: use bands');
+    // The same colours as bands are fine, and so is a gradient between neighbouring hues or towards a white.
+    const bands: MoodPlan = { name: 'x', why: 'x', lights: [{ light: 'L1', brightness: 30, look: { type: 'bands', colors: ['#ff8fb8', '#ffb300', '#ff8fb8'], run: 2 } }] };
+    expect(paletteNotes(bands, pinkAndGold)).toEqual([]);
+    expect(paletteNotes(gradient('#ff3b1f', '#ff7a1a', '#ffb36b'), brief())).toEqual([]);
+    expect(paletteNotes(gradient('#ff7a1a', '#fff4e0'), brief())).toEqual([]);
+  });
+
   it('accepts blends between palette colours and pale whites, and flags only colours that are off the palette', () => {
     const b = brief();
     const plan = (...stops: string[]): MoodPlan => ({ name: 'x', why: 'x', lights: [{ light: 'L1', brightness: 30, look: { type: 'gradient', stops } }] });
     expect(paletteNotes(plan('#ff3b1f', '#ffb36b'), b)).toEqual([]);
     expect(paletteNotes(plan('#ff7a1a', '#fff4e0'), b)).toEqual([]);
-    expect(paletteNotes(plan('#ff7a1a', '#1e5aff'), b)).toHaveLength(1);
+    // Blue is off the palette, and a gradient from orange to blue blends through colours nobody chose: both are said.
+    const offPalette = paletteNotes(plan('#ff7a1a', '#1e5aff'), b);
+    expect(offPalette).toHaveLength(2);
+    expect(offPalette[0]).toContain('#1e5aff');
+    expect(offPalette[1]).toContain('use bands');
     expect(paletteNotes({ ...plan('#ff7a1a', '#ffb36b'), lights: [{ light: 'L1', brightness: 90, look: { type: 'warmWhite', kelvin: 2700 } }] }, b)[0]).toContain('brightness');
   });
 

@@ -119,8 +119,8 @@ AI settings, all optional. Ask stays off until at least one key is set. Read [AI
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `GLM_API_KEY` | none | Keys for the providers to use. Each one turns that provider on. |
-| `AI_PROVIDERS` | `deepseek,gemini,glm` | The order they take turns in. Leave a name out to stop using it. |
-| `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `GLM_MODEL` | `deepseek-flash`, `gemini-3.1-flash-lite`, `glm-4.7-flash` | The model for each |
+| `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `GLM_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `META_API_KEY` | none | Keys for the providers to use. Each one turns that provider on. The server reads `ANTHROPIC_API_KEY` if it is set in its environment, so leave `anthropic` out of `AI_PROVIDERS` if your shell exports one for other tools. |
+| `AI_PROVIDERS` | `deepseek,gemini,glm,openai,anthropic,meta` | The order they take turns in. Leave a name out to stop using it. |
+| `DEEPSEEK_MODEL`, `GEMINI_MODEL`, `GLM_MODEL`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `META_MODEL` | `deepseek-flash`, `gemini-3.5-flash-lite`, `glm-4.7-flash`, `gpt-6-luna`, `claude-haiku-5-5`, `muse-ember-1.0` | The model for each |
 | `AI_MONTHLY_LIMIT_USD` | `5` | No more AI requests that month once this is reached |
 | `AI_ENABLED` | `true` | Turns AI off entirely |

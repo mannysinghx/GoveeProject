@@ -26,8 +26,8 @@ const look = (over: Partial<AiMoodResultDto> = {}): AiMoodResultDto => ({
   summary: 'Embers of orange and red give a warm, slow, safe feeling.',
   note: null,
   lights: [
-    { deviceId: 'dev-1', name: 'Front Eaves', kind: 'segments', brightness: 30, colors: ['#ff3b1f', '#ff3b1f', '#ff7a1a', '#ffb36b'] },
-    { deviceId: 'dev-2', name: 'Porch Light', kind: 'power', brightness: 30, colors: [] },
+    { deviceId: 'dev-1', name: 'Front Eaves', kind: 'segments', brightness: 30, colors: ['#ff3b1f', '#ff3b1f', '#ff7a1a', '#ffb36b'], kelvin: null },
+    { deviceId: 'dev-2', name: 'Porch Light', kind: 'power', brightness: 30, colors: [], kelvin: null },
   ],
   actions: [
     { deviceId: 'dev-1', action: { type: 'power', on: true } },

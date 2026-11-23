@@ -230,7 +230,7 @@ describe('own AI keys', () => {
     expect((await member.get('/ai/status')).json()).toMatchObject({ enabled: false, reason: 'no_key' });
   });
 
-  it('refuses a key the provider rejects, a model with no listed price, and the owner', async () => {
+  it('refuses a key the provider rejects, a model with no listed price, and a key already used by someone else', async () => {
     ({ m, ai } = await start());
     const member = await m.member('aibad@example.com');
     const bad = await connect(member, BAD_AI_KEY);
@@ -241,20 +241,73 @@ describe('own AI keys', () => {
     // One AI key belongs to one account, whatever model is picked with it.
     expect((await connect(member, GOOD_AI_KEY, 'deepseek-flash')).statusCode).toBe(200);
     const other = await m.member('aiother@example.com');
-    const reused = await connect(other, GOOD_AI_KEY, 'deepseek-v4-flash');
+    const reused = await connect(other, GOOD_AI_KEY, 'deepseek-flash');
     expect([reused.statusCode, reused.json().error.code]).toEqual([409, 'credential_in_use']);
 
     const unknownModel = await connect(member, GOOD_AI_KEY, 'deepseek-reasoner-max');
     expect([unknownModel.statusCode, unknownModel.json().error.code]).toEqual([422, 'ai_model_unknown']);
 
-    const ownerPut = await m.h.app.inject({
-      method: 'PUT',
-      url: '/api/v1/account/ai/keys/deepseek',
-      cookies: m.owner.cookies,
-      headers: { 'x-csrf-token': m.owner.csrfToken },
-      payload: { model: 'deepseek-flash', apiKey: GOOD_AI_KEY },
-    });
-    expect([ownerPut.statusCode, ownerPut.json().error.code]).toEqual([409, 'ai_keys_on_server']);
+    // The same key cannot be added by the owner either: it is the member's.
+    const ownerPut = await m.owner.put('/api/v1/account/ai/keys/deepseek', { model: 'deepseek-flash', apiKey: GOOD_AI_KEY });
+    expect([ownerPut.statusCode, ownerPut.json().error.code]).toEqual([409, 'credential_in_use']);
+  });
+
+  it("lets the owner add a key that replaces the server's for that provider, and keeps everyone's keys apart", async () => {
+    ({ m, ai } = await start());
+    const OWNER_BROWSER_KEY = 'sk-owner-browser-key-77aa';
+    ai.valid.add(OWNER_BROWSER_KEY);
+
+    const added = await m.owner.put('/api/v1/account/ai/keys/deepseek', { model: 'deepseek-flash', apiKey: OWNER_BROWSER_KEY });
+    expect(added.statusCode).toBe(200);
+    const body = added.json() as PersonalAiDto;
+    expect(body).toMatchObject({ canAddKeys: true, limitOnServer: true });
+    expect(body.keys).toEqual([{ provider: 'deepseek', label: 'DeepSeek', model: 'deepseek-flash', connectedAt: expect.any(String) }]);
+    expect(added.body).not.toContain(OWNER_BROWSER_KEY);
+
+    // The owner's own key is used in place of the server's DeepSeek key.
+    const ownerStatus = (await m.owner.get('/api/v1/ai/status')).json() as AiStatusDto;
+    expect(ownerStatus.providers.filter((p) => p.id === 'deepseek')).toHaveLength(1);
+    ai.seen.length = 0;
+    expect((await m.owner.post('/api/v1/ai/ask', { question: 'Are my lights fine?' })).statusCode).toBe(200);
+    expect(ai.seen.map((s) => s.key)).toEqual([OWNER_BROWSER_KEY]);
+
+    // A member with a key, and a member without: neither can see or use anyone else's key.
+    const a = await m.member('keys-a@example.com');
+    const b = await m.member('keys-b@example.com');
+    expect((await connect(a)).statusCode).toBe(200);
+    for (const client of [a, b]) {
+      const mine = await client.get('/account/ai');
+      expect(mine.body).not.toContain(OWNER_BROWSER_KEY);
+      expect(mine.body).not.toContain(OWNER_AI_KEY);
+    }
+    expect((await b.get('/account/ai')).json().keys).toEqual([]);
+    expect((await b.get('/ai/status')).json()).toMatchObject({ enabled: false, reason: 'no_key' });
+    expect((await b.get('/account/ai')).body).not.toContain(GOOD_AI_KEY);
+    ai.seen.length = 0;
+    expect((await a.post('/ai/ask', { question: 'Mine?' })).statusCode).toBe(200);
+    expect(ai.seen.map((s) => s.key)).toEqual([GOOD_AI_KEY]);
+    // B has no key, so nothing is sent on B's behalf at all.
+    ai.seen.length = 0;
+    expect((await b.post('/ai/ask', { question: 'Mine?' })).statusCode).toBe(503);
+    expect(ai.seen).toEqual([]);
+
+    // Each key is stored under its own user, encrypted: neither appears in the table.
+    const rows = m.h.platform.control.prepare("SELECT user_id, kind FROM credentials WHERE kind = 'ai:deepseek' ORDER BY user_id").all() as { user_id: number }[];
+    expect(rows.map((r) => r.user_id)).toEqual([1, expect.any(Number)]);
+    const table = JSON.stringify(m.h.platform.control.prepare('SELECT * FROM credentials').all());
+    expect(table).not.toContain(OWNER_BROWSER_KEY);
+    expect(table).not.toContain(GOOD_AI_KEY);
+    expect(m.h.logs()).not.toContain(OWNER_BROWSER_KEY);
+
+    // The owner's monthly limit stays a hosting setting.
+    const limit = await m.owner.patch('/api/v1/account/ai', { monthlyLimitUsd: 1 });
+    expect([limit.statusCode, limit.json().error.code]).toEqual([409, 'ai_limit_on_server']);
+
+    // Removing the owner's key goes back to the server's DeepSeek key.
+    expect((await m.owner.delete('/api/v1/account/ai/keys/deepseek')).json().keys).toEqual([]);
+    ai.seen.length = 0;
+    expect((await m.owner.post('/api/v1/ai/ask', { question: 'And now?' })).statusCode).toBe(200);
+    expect(ai.seen.map((s) => s.key)).toEqual([OWNER_AI_KEY]);
   });
 
   it("keeps each person's cap, lock and resting state apart", async () => {

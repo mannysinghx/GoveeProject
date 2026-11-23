@@ -41,8 +41,16 @@ const keyStatus = (overrides: Partial<GoveeKeyStatusDto> = {}): GoveeKeyStatusDt
 
 const personalAi = (overrides: Partial<PersonalAiDto> = {}): PersonalAiDto => ({
   canAddKeys: true,
+  limitOnServer: false,
   keys: [],
-  models: { deepseek: ['deepseek-flash', 'deepseek-v4-flash'], gemini: ['gemini-2.5-flash-lite'], glm: ['glm-4.7-flash'] },
+  models: {
+    deepseek: ['deepseek-flash', 'deepseek-v4-flash'],
+    gemini: ['gemini-2.5-flash-lite'],
+    glm: ['glm-4.7-flash'],
+    openai: ['gpt-6-luna'],
+    anthropic: ['claude-haiku-5-5'],
+    meta: ['muse-ember-1.0'],
+  },
   monthlyLimitUsd: 5,
   monthlyLimitMaxUsd: 100,
   ...overrides,

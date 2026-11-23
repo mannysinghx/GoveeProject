@@ -199,17 +199,19 @@ export function colorName(hex: string): string {
   const { h, s, v } = rgbToHsv(hexToRgb(hex));
   if (v < 0.2) return 'near black';
   if (s < 0.04) return v > 0.85 ? 'white' : v > 0.5 ? 'light grey' : 'grey';
+  // On the line from candlelight to daylight a faint tint reads as white. Any other faint tint is a pastel.
+  let pale = false;
   if (s < 0.35 && v > 0.8) {
-    // A faint tint of a hue: whites are named by their warmth.
-    if (h < 70 || h >= 330) return 'warm white';
-    if (h >= 170 && h < 270) return 'cool white';
+    if (h >= 15 && h < 55 && s < 0.4) return 'warm white';
+    if (h >= 190 && h < 250 && s < 0.2) return 'cool white';
+    pale = true;
   }
   const family =
     h < 12 || h >= 345
       ? 'red'
       : h < 38
         ? 'orange'
-        : h < 52
+        : h < 48
           ? 'amber'
           : h < 70
             ? 'yellow'
@@ -228,6 +230,7 @@ export function colorName(hex: string): string {
                         : h < 320
                           ? 'magenta'
                           : 'pink';
-  const shade = v < 0.5 ? 'deep ' : s < 0.5 ? 'soft ' : '';
-  return `${shade}${family}`;
+  const shade = pale ? 'pale ' : v < 0.5 ? 'deep ' : s < 0.5 ? 'soft ' : '';
+  // A pale red is what people call pink.
+  return `${shade}${pale && family === 'red' ? 'pink' : family}`;
 }

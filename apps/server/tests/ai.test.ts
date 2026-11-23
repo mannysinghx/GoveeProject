@@ -196,7 +196,9 @@ describe('Ask', () => {
     expect(used).toEqual(['deepseek', 'gemini', 'glm', 'deepseek']);
     const gemini = fake.seen.find((r) => r.provider === 'gemini')!;
     expect(gemini.url).toBe('https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
-    expect(gemini.body).toMatchObject({ model: 'gemini-3.1-flash-lite', reasoning_effort: 'low' });
+    // Gemini 3.5 Flash-Lite thinks at its lowest level unless asked for more, so nothing is sent to change it.
+    expect(gemini.body).toMatchObject({ model: 'gemini-3.5-flash-lite' });
+    expect(gemini.body).not.toHaveProperty('reasoning_effort');
     expect(gemini.authorization).toBe(`Bearer ${KEYS.GEMINI_API_KEY}`);
     const glm = fake.seen.find((r) => r.provider === 'glm')!;
     expect(glm.url).toBe('https://api.z.ai/api/paas/v4/chat/completions');
@@ -416,8 +418,8 @@ describe('Ask, after review', () => {
     fake.queues.deepseek.push(toolCall('list_lights'), { status: 500, json: {} });
     fake.queues.gemini.push(answer('Gemini answered.'));
     const result = (await ask(client, 'What happened?')).json() as AiAnswerDto;
-    // DeepSeek (800 x 0.30 + 40 x 1.20) plus Gemini (1000 x 0.25 + 100 x 1.50), per million.
-    expect(result.costUsd).toBeCloseTo(0.000688, 9);
+    // DeepSeek (800 x 0.30 + 40 x 1.20) plus Gemini 3.5 Flash-Lite (1000 x 0.30 + 100 x 2.50), per million.
+    expect(result.costUsd).toBeCloseTo(0.000838, 9);
   });
 
   it('allows at most 8 requests for one question, across every provider it tries', async () => {

@@ -42,6 +42,8 @@ export interface AiMoodLightDto {
   brightness: number | null;
   /** The colour of each segment in on-screen order for "segments", one colour for "color" and "white", none for "power". */
   colors: string[];
+  /** When the light shows white light, its temperature in kelvin. `colors` then holds only how that white is drawn. */
+  kelvin: number | null;
 }
 
 /** Check 3: a second look, by a different model when one is available. */

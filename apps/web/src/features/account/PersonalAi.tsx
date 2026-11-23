@@ -1,17 +1,19 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { aiProviderIds, type AiProviderId, type PersonalAiDto } from '@glm/shared';
+import { AI_PROVIDER_LABELS, aiProviderIds, type AiProviderId, type PersonalAiDto } from '@glm/shared';
 import { Button, ErrorNotice, Field, inputClass, Loading, Notice } from '../../components/ui';
 import { dateTime } from '../../lib/format';
 import { AiKeyGuideList } from './KeyGuide';
 import { useConnectAiKey, usePersonalAi, useRemoveAiKey, useSetAiLimit } from './queries';
 
-const LABELS: Record<AiProviderId, string> = { deepseek: 'DeepSeek', gemini: 'Google Gemini', glm: 'Z.ai GLM' };
+const LABELS = AI_PROVIDER_LABELS;
 
 /** One provider at a time: pick it, a model with a listed price, and paste the key. */
 function AddKeyForm({ data }: { data: PersonalAiDto }) {
   const connect = useConnectAiKey();
-  const [provider, setProvider] = useState<AiProviderId>(aiProviderIds[0]);
-  const [model, setModel] = useState(data.models[aiProviderIds[0]][0] ?? '');
+  // Only providers with at least one model whose price is listed, so every key's spend is counted.
+  const offered = aiProviderIds.filter((id) => data.models[id].length > 0);
+  const [provider, setProvider] = useState<AiProviderId>(offered[0] ?? aiProviderIds[0]);
+  const [model, setModel] = useState(data.models[offered[0] ?? aiProviderIds[0]][0] ?? '');
   const [apiKey, setApiKey] = useState('');
   const [error, setError] = useState<unknown>(null);
 
@@ -42,7 +44,7 @@ function AddKeyForm({ data }: { data: PersonalAiDto }) {
         <Field label="Provider">
           {(props) => (
             <select {...props} className={inputClass} value={provider} onChange={(e) => choose(e.target.value as AiProviderId)}>
-              {aiProviderIds.map((id) => (
+              {offered.map((id) => (
                 <option key={id} value={id}>
                   {LABELS[id]}
                 </option>
@@ -121,7 +123,10 @@ function MonthlyLimit({ data }: { data: PersonalAiDto }) {
   );
 }
 
-/** A member's own AI keys. Without one, AI is off for them. */
+/**
+ * The signed-in person's own AI keys. A member needs one for AI to work. For the owner, a key added here is used in
+ * place of the server's key for the same provider. Keys are never shown again once saved.
+ */
 export function PersonalAiKeys() {
   const personal = usePersonalAi();
   const remove = useRemoveAiKey();
@@ -144,8 +149,12 @@ export function PersonalAiKeys() {
             </li>
           ))}
         </ul>
+      ) : data.limitOnServer ? (
+        <p className="text-sm text-fg-3">
+          You can add your own key for any provider below. It is used in place of the server&apos;s key for that provider.
+        </p>
       ) : (
-        <Notice tone="info">AI is off until you add a key of your own from DeepSeek, Google Gemini or Z.ai.</Notice>
+        <Notice tone="info">AI is off until you add a key of your own from one of the providers below.</Notice>
       )}
       {remove.isError ? <ErrorNotice error={remove.error} /> : null}
       {data.canAddKeys ? (
@@ -158,7 +167,11 @@ export function PersonalAiKeys() {
       ) : null}
       {data.canAddKeys ? <AddKeyForm data={data} /> : null}
       {!data.canAddKeys ? <Notice tone="warn">Keys cannot be added right now. Please try again later.</Notice> : null}
-      <MonthlyLimit data={data} />
+      {data.limitOnServer ? (
+        <p className="text-xs text-fg-4">Your monthly spending limit is set in the app&apos;s hosting settings.</p>
+      ) : (
+        <MonthlyLimit data={data} />
+      )}
     </div>
   );
 }

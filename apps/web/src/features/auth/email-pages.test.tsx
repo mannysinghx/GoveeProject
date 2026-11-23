@@ -84,12 +84,28 @@ describe('creating an account', () => {
     await userEvent.click(screen.getByText(/An AI key, if you want AI/));
     const providers = screen.getAllByRole('link', { name: /: create a key/ });
     // Lowest cost first, each to its own provider's site, in a new tab.
-    expect(providers.map((link) => link.textContent)).toEqual(['Z.ai GLM: create a key', 'Google Gemini: create a key', 'DeepSeek: create a key']);
-    expect(providers.map((link) => new URL(link.getAttribute('href')!).host)).toEqual(['z.ai', 'aistudio.google.com', 'platform.deepseek.com']);
+    expect(providers.map((link) => link.textContent)).toEqual([
+      'OpenAI: create a key',
+      'Meta Muse: create a key',
+      'Anthropic Claude: create a key',
+      'Z.ai GLM: create a key',
+      'DeepSeek: create a key',
+      'Google Gemini: create a key',
+    ]);
+    expect(providers.map((link) => new URL(link.getAttribute('href')!).host)).toEqual([
+      'platform.openai.com',
+      'dev.meta.ai',
+      'platform.claude.com',
+      'z.ai',
+      'platform.deepseek.com',
+      'aistudio.google.com',
+    ]);
     for (const link of providers) expect(link).toHaveAttribute('target', '_blank');
-    expect(screen.getByText('glm-4.7-flash')).toBeInTheDocument();
-    expect(screen.getByText('Free')).toBeInTheDocument();
-    expect(screen.getByText('$0.10 in, $0.40 out, per million tokens')).toBeInTheDocument();
+    for (const model of ['gpt-6-luna', 'muse-ember-1.0', 'claude-haiku-5-5', 'glm-5.3-flash', 'deepseek-flash', 'gemini-3.5-flash-lite']) {
+      expect(screen.getByText(model)).toBeInTheDocument();
+    }
+    expect(screen.getAllByText('$0.10 in, $0.50 out, per million tokens')).toHaveLength(3);
+    expect(screen.getByText('$0.30 in, $2.50 out, per million tokens')).toBeInTheDocument();
     expect(screen.getByText(/Add the key after signing in, in Settings under AI/)).toBeInTheDocument();
   });
 
