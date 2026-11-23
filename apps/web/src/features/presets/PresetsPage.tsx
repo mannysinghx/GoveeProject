@@ -6,6 +6,7 @@ import { Spectrum } from '../../components/light';
 import { Badge, Button, Card, EmptyState, ErrorNotice, Field, inputClass, Loading, PageHeader, SectionCard } from '../../components/ui';
 import { ImportedBadge, ShareButton } from '../sharing/ShareButton';
 import { useDeletePreset, useDevices, useDuplicatePreset, usePresets } from '../../lib/queries';
+import { MoodBox } from '../ai/MoodBox';
 import { ScenesPanel } from '../devices/ScenesPanel';
 import { isPatternPreset } from '../patterns/pattern-model';
 import { ApplyPresetDialog } from './ApplyPresetDialog';
@@ -207,6 +208,12 @@ export function PresetsPage() {
           </>
         }
       />
+
+      {devices.data && devices.data.length > 0 ? (
+        <div className="mb-8">
+          <MoodBox />
+        </div>
+      ) : null}
 
       <div className="mb-8 grid grid-cols-1 gap-2 md:grid-cols-3">
         {[

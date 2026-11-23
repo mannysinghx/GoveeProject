@@ -3,6 +3,7 @@
 **Status:**
 - **Ask (Phase 1)** is built and deployed (10 November 2026).
 - **Describe a pattern and Describe a schedule (Phase 2)** are built on branch `claude/stoic-antonelli-c7ec73`, without the photo option. They wait for the owner's approval to deploy.
+- **Set the mood (Phase 6)** is built on branch `claude/ui-redesign-a5aff2`, committed locally, not pushed or deployed. It has never been run against a real provider. See feature 7.
 - **The rest is a plan.**
 
 Written 9 November 2026 against `main` at `81e115b`, and updated the same day when the owner chose the providers. Line references are to that commit.
@@ -49,12 +50,15 @@ Six features, in this order. Each one reuses something the app already has.
 | 4 | **Photo check** | A photo of the house shows whether the lights match what was sent, which Govee cannot report | No | About $0.004, on DeepSeek or Gemini only |
 | 5 | **Weekly digest** | A short notification: what ran, what failed, which lights dropped out | No | About $0.007 a week |
 | 6 | **Suggestions** | "Diwali is on 8 November. Want the show?", extended later to games and local events | Only if you accept | About $0.003 each |
+| 7 | **Set the mood** (built) | Type "cozy fireside evening" on Scenes & Presets and every light is set to match, after three checks | Yes: when every check is clean, or when you press Set my lights | About $0.005, or $0.01 with a correction |
 
 GLM costs nothing, so in rotation the average is about two thirds of these figures.
 
 Photo check needs a short trial with your own photos before it is built, because nobody knows yet how well these models read lights at night.
 
 **What it does not do.** Music sync and moving effects are still not possible. Govee's rate limits and cloud delay are the cause, not the AI. The AI also never turns lights on by itself: anything that changes lights goes through a button you press, and through the same checks and limits as today.
+
+**Set the mood is the one place where your words are the button.** You type, you press Set the mood, and a look that passed every check is sent at once. The model still never sends a command: the server only returns steps, and the browser sends them through the same `POST /presets/apply-draft` route as the pattern editor, with the same device checks, rate limits and activity record. A look that fails a check, or any look while "Preview first" is on, waits for a second press.
 
 ## Decisions
 
@@ -80,7 +84,8 @@ Photo check needs a short trial with your own photos before it is built, because
 | `ai-service.ts` | Round-robin, failover, rest periods for failing providers, the tool loop, reference checking and the cap |
 | `ask-tools.ts` | Ask's six read-only tools |
 | `ledger.ts` | What each request cost, and the questions asked |
-| `ai-routes.ts` | `GET /ai/status`, `POST /ai/ask`, `GET /ai/questions` |
+| `mood.ts` | Set the mood: the lights it may set, the three prompts, the plan format, the render into light steps, and every check that is not a model's opinion |
+| `ai-routes.ts` | `GET /ai/status`, `POST /ai/ask`, `POST /ai/draft-pattern`, `POST /ai/draft-schedule`, `POST /ai/mood`, `GET /ai/questions` |
 
 It calls the existing services directly, not Govee. The model never sees the Govee key, and never sends a command itself.
 
@@ -220,6 +225,21 @@ The protection does not depend on the model obeying. Ask has no write tools, and
 - **What:** a few days before a holiday on the built-in list, a notification asks whether to run its show. Accepting turns on the show's schedules. The holiday calendar already has the shows, so the AI's job is the wording and choosing which holidays to mention.
 - **Later, only with D5:** games or local events, found with web search, offered as a draft schedule. New holidays currently need an app update (`docs/known-limitations.md:55`), and this would remove that need.
 
+### 7. Set the mood (built)
+
+- **Where:** a "Set the mood" card at the top of Scenes & Presets, once there are lights. A box, six one-tap suggestions, a choice of which lights (all, a group or one light), and a "Preview first" tick that is remembered in the browser. Each ask shows the look as a bead strip per light, the three checks, and buttons to set it, try another take, or save it as a preset. If AI is not set up the card says so and links to Settings.
+- **How, in order:**
+  1. **Brief.** The model reads the words and writes a short design brief: a title, the feeling, warm or cool, calm or lively, a palette of two to five colours, and how bright it should be. Words that are not a look ("turn everything off") end here with a plain reply and no change.
+  2. **Plan.** The same model is given the brief and the lights, each under a short name (L1, L2, …) with what it can show: segments, one colour, white only, or on and brightness only. It returns one entry per light: a brightness and a look (solid, gradient, bands or warm white). Gradients can run on from one string to the next, in the order set in the pattern editor.
+  3. **Check 1, the lights.** Every light is covered once, every colour is valid, and each step is built with the same code that builds real commands (`buildCommand`), so a step a light would refuse is caught here. Dark colours are raised, because LEDs show them as dim and muddy: dimness comes from brightness. Gradients are stepped into at most six colours per string, because each colour is one command and every command takes real time at Govee's limits.
+  4. **Check 2, the brief.** Each colour must be in the brief's palette or a blend of it (compared by hue, for rich colours only), and each brightness within 15 points of the brief's range. If not, the model is told exactly what and may fix it once. If it stands by its answer, the look is kept, marked as not clean.
+  5. **Check 3, a second opinion.** A different provider, when there is one that is not resting, reads the finished look in words (each light's colours by name, in order) against the owner's words and scores it from 1 to 10. Eight or more passes. Below that it returns a corrected plan, which goes through checks 1 and 2 and is then **scored again**, by a model other than the one that wrote the correction when there is one; it is used only if that second score is 8 or more. Otherwise the look is kept with the reviewer's concerns and waits. If no review could be had, that is shown, and never counted as a pass. With no other provider free, the designer reviews its own work: the card says so, and such a look always waits for a press.
+- **Set at once only when clean:** all three checks clean, the deciding review by a different model from the one whose work it judged, the page still open, and "Preview first" off. Otherwise the look waits, with the reason, for **Set my lights**. Looks too big to send are refused before they are shown: more than 60 lights asks for a group, and more than the 500 steps the apply route accepts is sent back to the model.
+- **What is sent to the provider:** the words, the light names the app shows, a short name for each (L1…), segment counts and the temperature range of white-only lights. Never a Govee address, a key, a location or a sign-in. The words go in the user turn as quoted data, and the instructions tell the model not to follow instructions in them. Whatever the model returns is checked field by field, so words cannot make it send anything but colours and brightness to the lights listed.
+- **Cost and limits:** three requests, up to eight with corrections and a second scoring, about 6,000 tokens in and 2,000 out for the usual three: about $0.005 on DeepSeek or Gemini at the listed prices. It counts against the monthly cap, the six-a-minute limit and the one-at-a-time guard like every other AI request, and uses at most 8 provider requests, including any failover. The ledger records them as `mood`.
+- **Tested:** `apps/server/tests/ai-mood.test.ts` (34 tests) against a stand-in for the providers, including mutation checks (breaking each check makes a test fail), and `apps/web/src/features/ai/mood.test.tsx` (26). One independent review read the whole change and found five problems (an unscored correction could be set at once, a self-review counted as a pass, a look could exceed the 500-step limit, a look could be set after the page was left, and screen readers could not hear the colours); all five are fixed, each with a test that fails without the fix. Also run in a real browser, on desktop and phone width, against the mock Govee API with a stand-in model that follows the three prompts: ask, check, set (29 of 29 steps accepted), Preview first, a non-mood, a failed review.
+- **Not verified:** how well a real model designs a mood. The prompts, the colour starting points and the thresholds (8 of 10, 15 points of brightness, 40 degrees of hue) are reasoned, not tuned. Try ten moods on a real key, see how many you would keep, and adjust the thresholds and starting points in `mood.ts` from what you see. Nothing here has been sent to real lights.
+
 ## Cost
 
 Estimates per use, at the listed paid prices, with thinking turned off or low. DeepSeek is shown at its peak rate.
@@ -264,6 +284,7 @@ Each phase is built and tested in full, then proposed as **one** deploy, with `s
 | **3. Digest and holiday suggestions** | Weekly notification, holiday prompts | Small, about 1 day | Not started |
 | **4. Photo check trial** | Your photos tested by hand against DeepSeek and Gemini | Under $0.10, an evening | Not started |
 | **5. Photo check** | Only if the trial passes | Medium | Not started |
+| **6. Set the mood** | Words become a checked look on every light, from Scenes & Presets | Medium | **Built, tested locally, not deployed.** Real-provider check still to do. |
 
 Sizes are rough estimates. Stopping after any phase leaves a working app.
 

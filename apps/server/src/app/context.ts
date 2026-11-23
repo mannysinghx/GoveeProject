@@ -341,7 +341,7 @@ export function createAccountContext(config: AppConfig, deps: AccountDeps): Acco
       providers: deps.aiProviders,
       ...(deps.personalAi ? { monthlyLimitUsd: () => readAiLimit(db), missingReason: 'no_key' as const } : {}),
       gate: deps.aiGate,
-      drafts: { devices, groups, presets },
+      drafts: { devices, groups, presets, scenes },
       ...(deps.aiFetch ? { fetchImpl: deps.aiFetch } : {}),
     },
   );

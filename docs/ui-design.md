@@ -63,6 +63,10 @@ Tokens are CSS variables in `apps/web/src/styles/index.css`, defined once for Ni
 4. Tests find things by role and name, not by class. A few look for a class on purpose: `.card` (a card found by its heading), `.ambient` (the glow layer) and `.bead` (a string's beads); the pattern editor's tests use `data-led` and `data-cell` attributes.
 5. Every `grid` needs a base column (`grid-cols-1` or another `grid-cols-N`), or one wide child can push the page sideways on a 320 px phone. `src/layout-guards.test.ts` reads the source and fails if one is missing.
 
+## Set the mood
+
+A card at the top of Scenes & Presets (`features/ai/MoodBox.tsx`). It is a small chat: your words on the right as a bubble, the reply below as an inset card, newest first, so the answer is always under the box. The reply shows the title and a sentence on why it fits, a bead strip per light with its brightness, the three checks (each with a tick or a warning and its notes), and what happened to the lights. A look that is not clean, or any look while Preview first is on, shows why it is waiting and a **Set my lights** button. **Try another take** asks again with the same words, and **Save as preset** asks for a name first, so a clash with an existing preset is a message and not a loss. If AI is not set up the card is replaced by a note that links to Settings, and the card is left out when there are no lights. Pure helpers (when to apply at once, how the checks read, the preset description) are in `features/ai/mood-model.ts` with their own tests. How it works on the server: [ai-features-plan.md](ai-features-plan.md), feature 7.
+
 ## What it does not do
 
 - The glow follows a light's reported or accepted colour or its colour temperature, and a warm white for a light that is on but reports neither. Govee does not report segment colours, so after a painted pattern the glow follows only what the app can know, and the lights themselves are the truth. This is the same honesty as the rest of the app: nothing here claims more than Govee said.

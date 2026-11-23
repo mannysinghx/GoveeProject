@@ -265,11 +265,12 @@ export const presetActionInputSchema = z.object({
 export type PresetActionInput = z.infer<typeof presetActionInputSchema>;
 
 const presetDescriptionSchema = z.string().trim().max(500);
-// Large enough for a gradient across many strings, at one step per segment.
+/** Large enough for a gradient across many strings, at one step per segment. */
+export const MAX_PRESET_ACTIONS = 500;
 const presetActionsSchema = z
   .array(presetActionInputSchema)
   .min(1, 'Add at least one action')
-  .max(500, 'A preset can hold at most 500 actions');
+  .max(MAX_PRESET_ACTIONS, `A preset can hold at most ${MAX_PRESET_ACTIONS} actions`);
 
 export const presetCreateSchema = z.object({
   name: nameSchema,

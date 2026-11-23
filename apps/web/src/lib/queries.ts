@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import type {
   ActivityListDto,
   AiAnswerDto,
+  AiMoodDto,
+  AiMoodRequest,
   AiPatternDraftDto,
   AiPatternDraftRequest,
   AiQuestionListDto,
@@ -625,6 +627,18 @@ export function useDraftPattern() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (body: AiPatternDraftRequest) => api<AiPatternDraftDto>('/ai/draft-pattern', { method: 'POST', body }),
+    onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
+  });
+}
+
+/**
+ * A look for the owner's words, designed and checked three ways on the server. This only designs it: nothing
+ * reaches the lights until the steps are sent through the apply route.
+ */
+export function useSetMood() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AiMoodRequest) => api<AiMoodDto>('/ai/mood', { method: 'POST', body }),
     onSettled: () => client.invalidateQueries({ queryKey: ['ai'] }),
   });
 }

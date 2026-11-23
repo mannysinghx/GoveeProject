@@ -9,6 +9,7 @@ import {
   type ScheduleDraft,
 } from '@glm/shared';
 import type { DeviceService } from '../devices/device-service.js';
+import type { SceneStore } from '../devices/scene-store.js';
 import type { GroupService } from '../groups/group-service.js';
 import type { PresetService } from '../presets/preset-service.js';
 
@@ -31,7 +32,11 @@ export function extractJson(text: string): unknown {
   }
 }
 
-export type Checked<T> = { value: T } | { problems: string };
+/**
+ * A draft that passed, or the problems that stop it. `soft` marks a draft that is usable but drifts from what was
+ * asked: the model is told once and may fix it, and if it does not, the usable draft is kept.
+ */
+export type Checked<T> = { value: T; soft?: string } | { problems: string };
 
 /* --------------------------------- pattern -------------------------------- */
 
@@ -83,6 +88,8 @@ export interface ScheduleContext {
   devices: DeviceService;
   groups: GroupService;
   presets: PresetService;
+  /** For checking that every step of a mood is one its light accepts. */
+  scenes: SceneStore;
 }
 
 /** What the model may refer to. Names and the app's own ids only. */

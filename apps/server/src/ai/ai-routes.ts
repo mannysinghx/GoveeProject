@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   aiAskRequestSchema,
+  aiMoodRequestSchema,
   aiPatternDraftRequestSchema,
   aiQuestionsQuerySchema,
   aiScheduleDraftRequestSchema,
@@ -28,6 +29,12 @@ export function registerAiRoutes(api: FastifyInstance): void {
   api.post('/ai/draft-schedule', async (request) =>
     accountOf(request).ai.draftSchedule(parseInput(aiScheduleDraftRequestSchema, request.body)),
   );
+
+  /**
+   * A look for the owner's words, designed and checked three ways. Nothing is sent to the lights here: the
+   * result is steps for the preset apply route, which the owner's own press (or a clean result) sends.
+   */
+  api.post('/ai/mood', async (request) => accountOf(request).ai.setMood(parseInput(aiMoodRequestSchema, request.body)));
 
   api.get('/ai/questions', async (request): Promise<AiQuestionListDto> => {
     const { ai } = accountOf(request);

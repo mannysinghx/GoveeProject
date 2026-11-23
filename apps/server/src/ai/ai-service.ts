@@ -2,6 +2,9 @@ import crypto from 'node:crypto';
 import type { Logger } from 'pino';
 import type {
   AiAnswerDto,
+  AiMoodChecksDto,
+  AiMoodDto,
+  AiMoodRequest,
   AiPatternDraftDto,
   AiPatternDraftRequest,
   AiReferenceDto,
@@ -15,6 +18,35 @@ import type { Clock } from '../shared/clock.js';
 import { AppError } from '../shared/errors.js';
 import { ASK_TOOLS, ReferenceRegistry, type AskTools } from './ask-tools.js';
 import { checkPattern, checkSchedule, extractJson, patternPrompt, schedulePrompt, type Checked, type ScheduleContext } from './drafts.js';
+import {
+  briefPrompt,
+  briefUser,
+  buildMoodLayout,
+  checkBrief,
+  checkPlan,
+  checkReview,
+  composePrompt,
+  composeUser,
+  REVIEW_PASS_SCORE,
+  reviewPrompt,
+  reviewUser,
+  MAX_MOOD_LIGHTS,
+  type MoodBrief,
+  type MoodLayout,
+  type MoodReview,
+  type PlanResult,
+} from './mood.js';
+
+/** What check 3 found. `independent` and `confirmation` go to the owner as they are; `replacement` is the look to show instead. */
+interface MoodReviewOutcome {
+  status: AiMoodChecksDto['review']['status'];
+  score: number | null;
+  by: string | null;
+  notes: string[];
+  independent: boolean;
+  confirmation: { by: string; score: number } | null;
+  replacement: PlanResult | null;
+}
 import type { AiLedger } from './ledger.js';
 import {
   AiProviderError,
@@ -64,7 +96,7 @@ interface ProviderState {
 
 /** What one request has used so far, shared by every provider it tries. */
 interface QuestionBudget {
-  /** Recorded in ai_usage: ask, draft_pattern or draft_schedule. */
+  /** Recorded in ai_usage: ask, draft_pattern, draft_schedule or mood. */
   feature: string;
   requestsLeft: number;
   toolChars: number;
@@ -143,7 +175,10 @@ function systemPrompt(nowIso: string, timeZone: string): string {
   ].join('\n');
 }
 
-/** AI features. For now only Ask, which reads the app's records and never changes anything. */
+/**
+ * AI features: Ask, which reads the app's records, and drafts and moods, which only ever propose steps.
+ * Nothing here sends a command to a light.
+ */
 export class AiService {
   /** Resting state, kept per provider and key, so replacing a refused key starts afresh. */
   private readonly states = new Map<string, ProviderState>();
@@ -337,6 +372,164 @@ export class AiService {
   }
 
   /**
+   * A look for the owner's words: a brief, a plan, then three checks (the lights, the brief, a second model's
+   * review). The result is steps for the preset apply route. Nothing is sent to the lights here.
+   */
+  async setMood(request: AiMoodRequest): Promise<AiMoodDto> {
+    const context = this.options.drafts;
+    if (!context) throw new AppError(503, 'ai_not_configured', 'Moods are not available.');
+    const layout = buildMoodLayout(context, this.getSettings().patternStrings, request.target);
+    if (layout.lights.length === 0) {
+      throw new AppError(409, 'no_lights', 'There are no lights to set. Connect to Govee and find your lights first.');
+    }
+    if (layout.lights.length > MAX_MOOD_LIGHTS) {
+      throw new AppError(409, 'too_many_lights', `A mood can set at most ${MAX_MOOD_LIGHTS} lights at once. Pick a group or a light.`);
+    }
+    return this.guarded(async (deadlineMs) => {
+      const { result, provider, model, costUsd } = await this.withProviders('mood', deadlineMs, (p, budget) =>
+        this.moodWith(p, budget, request.description, layout, context),
+      );
+      return { ...result, provider, model, costUsd };
+    });
+  }
+
+  /**
+   * The three steps with one provider designing and, when another is available, a different one reviewing.
+   * Anything the plan gets wrong that the app can check is sent back to the designer once.
+   */
+  private async moodWith(
+    provider: AiProviderConfig,
+    budget: QuestionBudget,
+    description: string,
+    layout: MoodLayout,
+    context: ScheduleContext,
+  ): Promise<Pick<AiMoodDto, 'isMood' | 'reply' | 'mood'>> {
+    const brief = await this.draftWith(provider, budget, briefPrompt(), briefUser(description), checkBrief);
+    if (!brief.isMood) return { isMood: false, reply: brief.reply, mood: null };
+
+    const designed = await this.draftWith(
+      provider,
+      budget,
+      composePrompt(layout),
+      composeUser(description, brief),
+      (json) => checkPlan(json, layout, brief, context.scenes),
+    );
+    const review = await this.reviewMood(provider, budget, description, brief, layout, designed, context);
+
+    const final = review.replacement ?? designed;
+    const checks: AiMoodChecksDto = {
+      lights: { passed: true, notes: final.adjustments },
+      palette: { passed: final.paletteNotes.length === 0, notes: final.paletteNotes },
+      review: {
+        status: review.status,
+        score: review.score,
+        by: review.by,
+        notes: review.notes,
+        independent: review.independent,
+        confirmation: review.confirmation,
+      },
+    };
+    // Set without a second press only when every check is clean and the deciding score came from another model.
+    const clean = checks.palette.passed && review.independent && (review.status === 'passed' || review.status === 'adjusted');
+    return {
+      isMood: true,
+      reply: null,
+      mood: {
+        name: final.plan.name,
+        summary: final.plan.why,
+        note: final.plan.note?.trim() || brief.motionNote,
+        lights: final.lights,
+        actions: final.actions,
+        checks,
+        clean,
+      },
+    };
+  }
+
+  /**
+   * Check 3. A different provider reads the finished look against the owner's words, because a model tends to agree
+   * with itself. With no other provider free, the designer reviews, and that is recorded as not independent. A review
+   * that cannot be done is unavailable, never a pass. A corrected look from the reviewer is new work nobody has scored,
+   * so it is scored again, by a model other than the one that wrote it when there is one, before it can count.
+   */
+  private async reviewMood(
+    composer: AiProviderConfig,
+    budget: QuestionBudget,
+    description: string,
+    brief: MoodBrief,
+    layout: MoodLayout,
+    designed: PlanResult,
+    context: ScheduleContext,
+  ): Promise<MoodReviewOutcome> {
+    const unavailable: MoodReviewOutcome = {
+      status: 'unavailable',
+      score: null,
+      by: null,
+      notes: ['No second opinion could be had this time.'],
+      independent: false,
+      confirmation: null,
+      replacement: null,
+    };
+    const designer = this.providers.find((p) => p.config === composer);
+    const free = (p: ProviderState) => p.unavailableUntilMs <= this.clock.nowMs();
+    const reviewer = this.providers.find((p) => p !== designer && free(p)) ?? designer;
+    if (!reviewer || budget.requestsLeft < 1) return unavailable;
+
+    const verdict = await this.reviewWith(reviewer, budget, description, brief, layout, designed, context);
+    if (!verdict) return unavailable;
+    const by = providerLabel(reviewer.config.id);
+    const notes = verdict.problems.slice(0, 4);
+    const independent = reviewer !== designer;
+    if (verdict.score >= REVIEW_PASS_SCORE && verdict.matches) {
+      return { status: 'passed', score: verdict.score, by, notes, independent, confirmation: null, replacement: null };
+    }
+    if (!verdict.corrected) {
+      if (verdict.correctedProblems) notes.push("The reviewer's corrected version did not pass the app's checks, so the original is shown.");
+      return { status: 'concerns', score: verdict.score, by, notes, independent, confirmation: null, replacement: null };
+    }
+
+    const scorer = this.providers.find((p) => p !== reviewer && free(p)) ?? reviewer;
+    const second = budget.requestsLeft < 1 ? null : await this.reviewWith(scorer, budget, description, brief, layout, verdict.corrected, context);
+    if (!second) {
+      notes.push('The corrected look could not be scored again, so it waits for you.');
+      return { status: 'concerns', score: verdict.score, by, notes, independent: false, confirmation: null, replacement: verdict.corrected };
+    }
+    const confirmation = { by: providerLabel(scorer.config.id), score: second.score };
+    const confirmedIndependently = scorer !== reviewer;
+    if (second.score >= REVIEW_PASS_SCORE && second.matches) {
+      return { status: 'adjusted', score: verdict.score, by, notes, independent: confirmedIndependently, confirmation, replacement: verdict.corrected };
+    }
+    notes.push(...second.problems.slice(0, 2));
+    return { status: 'concerns', score: verdict.score, by, notes, independent: confirmedIndependently, confirmation, replacement: verdict.corrected };
+  }
+
+  /** One review of a look, or null when none could be had. A provider that fails is rested, as for any request. */
+  private async reviewWith(
+    reviewer: ProviderState,
+    budget: QuestionBudget,
+    description: string,
+    brief: MoodBrief,
+    layout: MoodLayout,
+    look: PlanResult,
+    context: ScheduleContext,
+  ): Promise<MoodReview | null> {
+    try {
+      return await this.draftWith(reviewer.config, budget, reviewPrompt(layout), reviewUser(description, brief, look), (json) =>
+        checkReview(json, layout, brief, context.scenes),
+      );
+    } catch (error) {
+      // Failing to review is not a reason to throw the design away, and never counts as a pass.
+      if (error instanceof AiProviderError) {
+        if (error.category !== 'invalid_output') this.rest(reviewer, error);
+        this.logger.warn({ provider: reviewer.config.id, category: error.category }, 'A mood review failed');
+        return null;
+      }
+      if (error instanceof AppError) return null;
+      throw error;
+    }
+  }
+
+  /**
    * Runs one request's work against the providers in turn, until one succeeds. The budget of
    * requests, time and money is shared by every provider tried.
    */
@@ -503,6 +696,8 @@ export class AiService {
       { role: 'user', content: description },
     ];
     let problems = '';
+    // A draft that works but drifts from what was asked. Kept in case the correction does not do better.
+    let fallback: { value: T } | null = null;
     for (let attempt = 1; attempt <= DRAFT_ATTEMPTS && budget.requestsLeft > 0; attempt++) {
       const reply = await this.request(provider, budget, messages, { tools: [], jsonOutput: true });
       const text = reply.content ?? '';
@@ -515,13 +710,24 @@ export class AiService {
         continue;
       }
       const checked = check(json);
-      if ('value' in checked) return checked.value;
+      if ('value' in checked) {
+        if (!checked.soft) return checked.value;
+        fallback = { value: checked.value };
+        problems = checked.soft.slice(0, 600);
+        if (attempt === DRAFT_ATTEMPTS) return checked.value;
+        messages.push(
+          { role: 'assistant', content: text.slice(0, 4_000) },
+          { role: 'user', content: `That works, but it drifts from what was asked: ${problems}. Reply with the corrected JSON object only, or the same one if you disagree.` },
+        );
+        continue;
+      }
       problems = checked.problems.slice(0, 600);
       messages.push(
         { role: 'assistant', content: text.slice(0, 4_000) },
         { role: 'user', content: `That JSON has problems: ${problems}. Reply with the corrected JSON object only.` },
       );
     }
+    if (fallback) return fallback.value;
     throw new AiProviderError(provider.id, 'invalid_output', `${providerLabel(provider.id)}: the draft did not follow the rules (${problems.slice(0, 200)}).`);
   }
 

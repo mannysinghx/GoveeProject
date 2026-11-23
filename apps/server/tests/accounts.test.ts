@@ -94,6 +94,7 @@ const ROUTES: [method: string, url: string, kind: 'public' | 'signed-in' | 'owne
   ['POST', '/api/v1/ai/ask', 'signed-in'],
   ['POST', '/api/v1/ai/draft-pattern', 'signed-in'],
   ['POST', '/api/v1/ai/draft-schedule', 'signed-in'],
+  ['POST', '/api/v1/ai/mood', 'signed-in'],
   ['GET', '/api/v1/ai/questions', 'signed-in'],
   // Notifications
   ['GET', '/api/v1/notifications', 'signed-in'],
@@ -147,7 +148,7 @@ describe('route census', () => {
       .sort();
     const expected = ROUTES.map(([method, url, kind]) => `${method} ${url} ${kind}`).sort();
     expect(actual).toEqual(expected);
-    expect(ROUTES).toHaveLength(109);
+    expect(ROUTES).toHaveLength(110);
     expect(ROUTES.filter(([, , kind]) => kind === 'public')).toHaveLength(12);
     expect(ROUTES.filter(([, , kind]) => kind === 'owner')).toHaveLength(10);
   });

@@ -87,6 +87,17 @@
 - **It only reads.** Ask cannot change lights, schedules or settings, and cannot see anything the app has not recorded, such as changes made in the Govee Home app.
 - **Costs are estimates.** They use each provider's listed paid price, and DeepSeek's peak rate, so the real bill should be the same or lower.
 
+## Limits of Set the mood
+
+- **Never run against a real model.** The checks, prompts and thresholds are tested against a stand-in. How closely a real model's looks match a mood is unknown until it is tried; the first real asks will tell, and the thresholds in `apps/server/src/ai/mood.ts` are meant to be adjusted from them.
+- **The checks catch what a program can see, not taste.** Hue, richness, brightness, coverage and what a light accepts are checked by code. Whether it feels like a fireside is judged by a second model, which can be wrong too. That is why a look that is not clean waits for you, and why you can always see the look before it is set.
+- **Still looks only.** No flicker, movement or fading: Govee's API cannot do it. A request for movement gets the closest still look, and a note says so.
+- **Gradients are stepped.** A string is given at most six distinct colours, so it sets quickly. Expect bands, not a smooth blend.
+- **Dark colours are raised.** LEDs show them as dim and muddy, so "deep navy" becomes a rich blue at a low brightness.
+- **It does not use Govee scenes.** The look is built from colours, so it is the same on every light, and it cannot reach a scene that exists only in the Govee Home app.
+- **It cannot undo.** Govee never reports segment colours, so the app does not know what a string showed before. "Try another take" or a preset sets it again.
+- **It sets what you scoped.** With no choice that is every light still on the pattern canvas. A string you left off the canvas is skipped unless you pick it.
+
 ## Limits of connection monitoring
 
 - **It diagnoses and retries. It does not repair.** Govee's public API has no restart, Wi-Fi or firmware commands, and a hosted server cannot reach your home network.
